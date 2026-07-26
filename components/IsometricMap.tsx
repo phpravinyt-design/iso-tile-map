@@ -3,20 +3,22 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  runOnJS,
 } from "react-native-reanimated";
 import Svg, { Polygon, G } from "react-native-svg";
 
 // --- Constants ---
-const TILE_WIDTH = 100;   // Wider tiles for better screen coverage
-const TILE_HEIGHT = 50;   // Proportional height for isometric
-const GRID_SIZE = 20;     // Larger grid to fill screen
+const TILE_WIDTH = 100;
+const TILE_HEIGHT = 50;
+const GRID_SIZE = 20;
 const WATER_BG = "#1a2a3a";
-const DEPTH = 8;          // Subtle 3D depth
+const DEPTH = 8;
 
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
@@ -45,11 +47,9 @@ function createDefaultGrid(): GridCell[][] {
   for (let row = 0; row < GRID_SIZE; row++) {
     const rowArr: GridCell[] = [];
     for (let col = 0; col < GRID_SIZE; col++) {
-      // Use a diamond-shaped region that fills most of the grid
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      // Diamond shape that covers ~80% of the grid
       if (dist > GRID_SIZE / 2 + 1) { rowArr.push("none"); continue; }
       if ((col * 7 + row * 3) % 41 === 0) rowArr.push("water");
       else if ((col * 5 + row * 2) % 37 === 0) rowArr.push("rock");
@@ -141,45 +141,70 @@ function IsoTileSvg({ col, row, tileType, scale, onPress }: {
   );
 }
 
-// --- Main Component: Full screen, no UI ---
+// --- Main Component ---
 export default function IsometricMap() {
   const [grid, setGrid] = useState<GridCell[][]>(createDefaultGrid);
 
+  // Shared values for gestures (worklet thread)
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const lastOffsetX = useSharedValue(0);
   const lastOffsetY = useSharedValue(0);
-
   const scaleValue = useSharedValue(1);
+  const lastScaleValue = useSharedValue(1);
+
+  // JS-side state for rendering
   const [currentScale, setCurrentScale] = useState(1);
-  const lastScale = useRef(1);
+  const panMoved = useRef(false);
 
   const MIN_SCALE = 0.3;
-  const MAX_SCALE = 3.0;
+  const MAX_SCALE = 3.5;
 
+  // Pan gesture: drag with finger to scroll/pan the map
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .onStart(() => { lastOffsetX.value = offsetX.value; lastOffsetY.value = offsetY.value; })
+        .minDistance(5)
+        .onStart(() => {
+          lastOffsetX.value = offsetX.value;
+          lastOffsetY.value = offsetY.value;
+          panMoved.current = false;
+        })
         .onUpdate((event) => {
+          const dx = event.translationX;
+          const dy = event.translationY;
+          // Only consider it a pan if moved enough
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            panMoved.current = true;
+          }
           offsetX.value = lastOffsetX.value + event.translationX;
           offsetY.value = lastOffsetY.value + event.translationY;
-        }),
+        })
+        .onEnd(() => {
+          // nothing needed, offsets persist
+        })
+        .runOnJS(false),
     []
   );
 
+  // Pinch gesture: two fingers to zoom in/out
   const pinchGesture = useMemo(
     () =>
       Gesture.Pinch()
         .onUpdate((event) => {
-          const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, lastScale.current * event.scale));
+          const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, lastScaleValue.value * event.scale));
           scaleValue.value = newScale;
-          setCurrentScale(newScale);
+          runOnJS(setCurrentScale)(newScale);
         })
-        .onEnd(() => { lastScale.current = scaleValue.value; }),
+        .onEnd(() => {
+          lastScaleValue.value = scaleValue.value;
+          runOnJS(setCurrentScale)(scaleValue.value);
+        })
+        .runOnJS(false),
     []
   );
 
+  // Combine pan + pinch: both can work simultaneously
   const combinedGesture = useMemo(
     () => Gesture.Simultaneous(panGesture, pinchGesture),
     [panGesture, pinchGesture]
@@ -193,9 +218,12 @@ export default function IsometricMap() {
     ],
   }));
 
-  // Cycle tile type on tap
+  // Handle tile tap — only fire if user didn't pan (avoid tap on release)
   const handleTilePress = useCallback(
     (col: number, row: number) => {
+      // On native, panMoved.current tells us if it was a pan or a tap
+      // On web, TouchableOpacity handles tap vs drag natively
+      if (Platform.OS !== "web" && panMoved.current) return;
       setGrid((prev) => {
         const newGrid = prev.map((r) => [...r]);
         if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {

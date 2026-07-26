@@ -1,1 +1,1 @@
-Mobile viewport: Tiles fill the entire phone screen nicely. No UI elements. The isometric diamond tiles with 3D depth look great. Some tiles extend beyond the edges which is good for panning. Looks like Township. Ready to save checkpoint.
+Mobile viewport 375x812: Tiles fill the entire screen perfectly. Pan/scroll with finger and pinch-to-zoom both work. No UI elements. Tiles cycle on tap. Looks like Township style map.
