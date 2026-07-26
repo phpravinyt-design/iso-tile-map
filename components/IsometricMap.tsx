@@ -35,7 +35,7 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] 
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
-const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "grass_plant", "none"] as const;
+const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "none"] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
@@ -60,7 +60,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -79,7 +79,7 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none" }); continue; }
+      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false }); continue; }
       let tile: TileType = "grass";
       if ((col * 7 + row * 3) % 41 === 0) tile = "water";
       else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
@@ -92,7 +92,7 @@ function createDefaultGrid(): GridCell[][] {
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
       }
-      rowArr.push({ tile, building });
+      rowArr.push({ tile, building, grassOverlay: false });
     }
     grid.push(rowArr);
   }
@@ -298,6 +298,34 @@ function PngGrassPlant({ col, row, scale }: { col: number; row: number; scale: n
   );
 }
 
+// --- Grass Overlay Renderer ---
+function GrassOverlay({ col, row, scale }: { col: number; row: number; scale: number }) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+
+  // Grass overlay covers the tile (slightly larger)
+  const overlaySize = ts * 1.1;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - overlaySize / 2,
+      top: pos.y - overlaySize / 2,
+      width: overlaySize,
+      height: overlaySize,
+      zIndex: 2,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={GRASS_PLANT_PNG}
+        style={{ width: overlaySize, height: overlaySize }}
+        contentFit="cover"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // --- Building Component Selector ---
 function BuildingOnTile({ col, row, buildingType, scale }: {
   col: number; row: number; buildingType: BuildingType; scale: number;
@@ -306,7 +334,6 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
     case "tree_png": return <PngTree col={col} row={row} scale={scale} />;
-    case "grass_plant": return <PngGrassPlant col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -402,7 +429,10 @@ export default function IsometricMap() {
             newGrid[row][col].tile = nextType;
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
-          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png" || mode === "grass_plant") {
+          } else if (mode === "grass_plant") {
+            // Toggle grass overlay independently - doesn't affect building
+            newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
+          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
@@ -490,6 +520,20 @@ export default function IsometricMap() {
               }} />
               {emptyHitAreas}
               {tiles}
+              {/* Grass overlays rendered between tiles and buildings */}
+              {(() => {
+                const overlays: React.ReactNode[] = [];
+                for (let row = 0; row < GRID_SIZE; row++) {
+                  for (let col = 0; col < GRID_SIZE; col++) {
+                    if (grid[row][col].grassOverlay) {
+                      overlays.push(
+                        <GrassOverlay key={`grass-${row}-${col}`} col={col} row={row} scale={currentScale} />
+                      );
+                    }
+                  }
+                }
+                return overlays;
+              })()}
               {buildings}
             </Animated.View>
           </GestureDetector>
