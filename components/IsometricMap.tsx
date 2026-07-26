@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Platform,
   Text,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -13,6 +12,11 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import Svg, { Polygon, G, Rect, Circle } from "react-native-svg";
+import { Image } from "expo-image";
+import { Platform } from "react-native";
+
+// Tree PNG asset
+const TREE_PNG = require("@/assets/images/tree.png");
 
 // --- Constants ---
 const TILE_WIDTH = 100;
@@ -26,11 +30,11 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] 
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
-const BUILDING_TYPES = ["house_small", "house_big", "tree_small", "tree_big", "none"] as const;
+const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "none"] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "tree_small", "tree_big"] as const;
+const MODES = ["tile", "house_small", "house_big", "tree_png"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 const TILE_COLORS: Record<TileType, { top: string; left: string; right: string; accent: string; detail: string }> = {
@@ -47,8 +51,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   house_small: "🏠",
   house_big: "🏡",
-  tree_small: "🌲",
-  tree_big: "🌳",
+  tree_png: "🌳",
 };
 
 type GridCell = { tile: TileType; building: BuildingType };
@@ -78,7 +81,7 @@ function createDefaultGrid(): GridCell[][] {
       // Scatter some trees on grass tiles
       let building: BuildingType = "none";
       if (tile === "grass" && (col * 11 + row * 7) % 53 === 0) {
-        building = (col + row) % 2 === 0 ? "tree_small" : "tree_big";
+        building = "tree_png";
       }
       // Scatter some small houses
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
@@ -259,66 +262,33 @@ function BigHouse({ col, row, scale }: { col: number; row: number; scale: number
   );
 }
 
-// --- SVG Tree: Small ---
-function SmallTree({ col, row, scale }: { col: number; row: number; scale: number }) {
+// --- PNG Tree ---
+function PngTree({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToIso(col, row, scale);
   const tw = TILE_WIDTH * scale;
   const th = TILE_HEIGHT * scale;
   const halfW = tw / 2;
   const halfH = th / 2;
 
-  return (
-    <View style={{
-      position: "absolute",
-      left: pos.x - halfW * 0.3,
-      top: pos.y - halfH * 2.0,
-      width: halfW * 0.6,
-      height: halfH * 2.6,
-      zIndex: Math.floor(col + row) * 4 + 3,
-    }}>
-      <Svg width={halfW * 0.6} height={halfH * 2.6} viewBox={`0 0 ${halfW * 0.6} ${halfH * 2.6}`}>
-        <G>
-          {/* Trunk */}
-          <Rect x={halfW * 0.2} y={halfH * 1.6} width={halfW * 0.2} height={halfH * 1.0} fill="#8B4513" />
-          {/* Tree top - triangle */}
-          <Polygon points={`${halfW*0.05},${halfH*1.8} ${halfW*0.3},${halfH*0.0} ${halfW*0.55},${halfH*1.8}`} fill="#2d5a27" stroke="#1e3d1a" strokeWidth={0.8} />
-          <Polygon points={`${halfW*0.15},${halfH*1.2} ${halfW*0.3},${halfH*0.4} ${halfW*0.45},${halfH*1.2}`} fill="#3a7a30" />
-          <Polygon points={`${halfW*0.2},${halfH*0.8} ${halfW*0.3},${halfH*0.3} ${halfW*0.4},${halfH*0.8}`} fill="#4a9a40" />
-        </G>
-      </Svg>
-    </View>
-  );
-}
-
-// --- SVG Tree: Big ---
-function BigTree({ col, row, scale }: { col: number; row: number; scale: number }) {
-  const pos = gridToIso(col, row, scale);
-  const tw = TILE_WIDTH * scale;
-  const th = TILE_HEIGHT * scale;
-  const halfW = tw / 2;
-  const halfH = th / 2;
+  // Tree image size: slightly larger than tile, tall
+  const imgSize = tw * 1.4;
+  const imgHeight = th * 2.8;
 
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - halfW * 0.4,
-      top: pos.y - halfH * 2.6,
-      width: halfW * 0.8,
-      height: halfH * 3.2,
+      left: pos.x - imgSize / 2,
+      top: pos.y - imgHeight + halfH * 0.5,
+      width: imgSize,
+      height: imgHeight,
       zIndex: Math.floor(col + row) * 4 + 3,
     }}>
-      <Svg width={halfW * 0.8} height={halfH * 3.2} viewBox={`0 0 ${halfW * 0.8} ${halfH * 3.2}`}>
-        <G>
-          {/* Trunk - thicker */}
-          <Rect x={halfW * 0.25} y={halfH * 2.2} width={halfW * 0.3} height={halfH * 1.0} fill="#6b3a1f" />
-          {/* Large foliage - rounded */}
-          <Circle cx={halfW * 0.4} cy={halfH * 1.5} r={halfW * 0.35} fill="#2d5a27" />
-          <Circle cx={halfW * 0.25} cy={halfH * 1.3} r={halfW * 0.25} fill="#3a7a30" />
-          <Circle cx={halfW * 0.55} cy={halfH * 1.3} r={halfW * 0.25} fill="#3a7a30" />
-          <Circle cx={halfW * 0.4} cy={halfH * 0.8} r={halfW * 0.3} fill="#4a9a40" />
-          <Circle cx={halfW * 0.4} cy={halfH * 1.1} r={halfW * 0.35} fill="#2d5a27" opacity={0.7} />
-        </G>
-      </Svg>
+      <Image
+        source={TREE_PNG}
+        style={{ width: imgSize, height: imgHeight }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
     </View>
   );
 }
@@ -330,8 +300,7 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
-    case "tree_small": return <SmallTree col={col} row={row} scale={scale} />;
-    case "tree_big": return <BigTree col={col} row={row} scale={scale} />;
+    case "tree_png": return <PngTree col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -425,7 +394,7 @@ export default function IsometricMap() {
             newGrid[row][col].tile = nextType;
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
-          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_small" || mode === "tree_big") {
+          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
             // Place building - only on grass, dirt, or road tiles
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;

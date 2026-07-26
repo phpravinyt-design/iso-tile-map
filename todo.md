@@ -19,3 +19,4 @@
 - [x] Add trees (ped) placement on map - Township style
 - [x] Add roads (raste) placement on map - Township style
 - [x] Add toolbar to select buildings/trees/roads to place
+- [x] Use user's provided tree PNG image for tree placement on tiles
