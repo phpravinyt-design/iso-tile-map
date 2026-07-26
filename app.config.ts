@@ -32,7 +32,7 @@ const env = {
   appSlug: "iso-tile-map",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://d300idlmy0c2jhr3834ji2zxh-da58c917.sg1.manus.computer/manus-storage/app_icon_e33827d2.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,

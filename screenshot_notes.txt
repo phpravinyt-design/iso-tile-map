@@ -1,0 +1,1 @@
+Mobile viewport (375x812): The map fills the screen well, tiles are visible and interactive. Top bar with zoom controls is compact. Bottom toolbar fits nicely. The map is slightly larger than the viewport which is good for panning. Looks like a proper mobile game.
