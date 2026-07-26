@@ -328,7 +328,11 @@ export default function IsometricMap() {
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .minDistance(8)
+        .minDistance(5)
+        .activeOffsetX([-10, 10])
+        .activeOffsetY([-10, 10])
+        .failOffsetX([-100, 100])
+        .failOffsetY([-100, 100])
         .onStart(() => {
           lastOffsetX.value = offsetX.value;
           lastOffsetY.value = offsetY.value;
@@ -338,7 +342,7 @@ export default function IsometricMap() {
         .onUpdate((event) => {
           const dx = event.translationX;
           const dy = event.translationY;
-          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
             panMoved.current = true;
           }
           offsetX.value = lastOffsetX.value + event.translationX;
