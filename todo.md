@@ -22,3 +22,5 @@
 - [x] Use user's provided tree PNG image for tree placement on tiles
 - [x] Ensure map scroll/pan works smoothly on mobile - improved gesture sensitivity
 - [x] Use user's grass texture PNG for all grass tiles
+- [x] Change tiles to 1:1 square aspect ratio, each tile shows the grass PNG as a complete tile
+- [x] Change to flat top-down square tiles (bird's eye view like Township), 1:1 aspect ratio, grass PNG per tile

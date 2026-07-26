@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -11,22 +11,21 @@ import Animated, {
   useSharedValue,
   runOnJS,
 } from "react-native-reanimated";
-import Svg, { Polygon, G, Rect, Circle } from "react-native-svg";
+import Svg, { Rect, Circle, Polygon, G } from "react-native-svg";
 import { Image } from "expo-image";
 import { Platform } from "react-native";
 
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
-// Grass texture PNG asset
+// Grass texture PNG asset - used as the tile image
 const GRASS_TEXTURE = require("@/assets/images/grass_texture.png");
 
 // --- Constants ---
-const TILE_WIDTH = 100;
-const TILE_HEIGHT = 50;
-const GRID_SIZE = 30;
+// Flat top-down square tiles (1:1 aspect ratio) - Township style
+const TILE_SIZE = 90;
+const GRID_SIZE = 25;
 const WATER_BG = "#1a2a3a";
-const DEPTH = 8;
 
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
@@ -40,14 +39,14 @@ type BuildingType = (typeof BUILDING_TYPES)[number];
 const MODES = ["tile", "house_small", "house_big", "tree_png"] as const;
 type PlaceMode = (typeof MODES)[number];
 
-const TILE_COLORS: Record<TileType, { top: string; left: string; right: string; accent: string; detail: string }> = {
-  grass: { top: "#5cb85c", left: "#3a7a3a", right: "#2d6b2d", accent: "#7ec87e", detail: "#4a9a4a" },
-  water: { top: "#3498db", left: "#1a6fa8", right: "#145a8a", accent: "#5dade2", detail: "#2980b9" },
-  rock: { top: "#95a5a6", left: "#6c7a7b", right: "#566566", accent: "#bdc3c7", detail: "#7f8c8d" },
-  flower: { top: "#6ab04c", left: "#4a8c2a", right: "#3a7a1a", accent: "#f9ca24", detail: "#e74c3c" },
-  dirt: { top: "#b08968", left: "#7a5c42", right: "#5c4430", accent: "#ddb892", detail: "#8d6e63" },
-  road: { top: "#6b6b6b", left: "#4a4a4a", right: "#3a3a3a", accent: "#8a8a8a", detail: "#555555" },
-  none: { top: WATER_BG, left: "#0f1a25", right: "#0a1218", accent: WATER_BG, detail: WATER_BG },
+const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: string }> = {
+  grass: { base: "#5cb85c", detail: "#4a9a4a", accent: "#7ec87e" },
+  water: { base: "#3498db", detail: "#2980b9", accent: "#5dade2" },
+  rock: { base: "#95a5a6", detail: "#7f8c8d", accent: "#bdc3c7" },
+  flower: { base: "#6ab04c", detail: "#e74c3c", accent: "#f9ca24" },
+  dirt: { base: "#b08968", detail: "#8d6e63", accent: "#ddb892" },
+  road: { base: "#6b6b6b", detail: "#555555", accent: "#8a8a8a" },
+  none: { base: WATER_BG, detail: WATER_BG, accent: WATER_BG },
 };
 
 const MODE_LABELS: Record<PlaceMode, string> = {
@@ -59,11 +58,12 @@ const MODE_LABELS: Record<PlaceMode, string> = {
 
 type GridCell = { tile: TileType; building: BuildingType };
 
-function gridToIso(col: number, row: number, scale: number) {
+// Simple grid positioning (flat top-down, square tiles)
+function gridToScreen(col: number, row: number, scale: number) {
   const cx = GRID_SIZE / 2 - 0.5;
   const cy = GRID_SIZE / 2 - 0.5;
-  const x = (col - cx - (row - cy)) * (TILE_WIDTH / 2) * scale;
-  const y = (col - cx + row - cy) * (TILE_HEIGHT / 2) * scale;
+  const x = (col - cx) * TILE_SIZE * scale;
+  const y = (row - cy) * TILE_SIZE * scale;
   return { x, y };
 }
 
@@ -75,18 +75,16 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 2) { rowArr.push({ tile: "none", building: "none" }); continue; }
+      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none" }); continue; }
       let tile: TileType = "grass";
       if ((col * 7 + row * 3) % 41 === 0) tile = "water";
       else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
       else if ((col * 3 + row * 5) % 31 === 0) tile = "flower";
       else if ((col * 2 + row * 7) % 43 === 0) tile = "dirt";
-      // Scatter some trees on grass tiles
       let building: BuildingType = "none";
       if (tile === "grass" && (col * 11 + row * 7) % 53 === 0) {
         building = "tree_png";
       }
-      // Scatter some small houses
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
       }
@@ -97,30 +95,13 @@ function createDefaultGrid(): GridCell[][] {
   return grid;
 }
 
-// --- SVG Isometric Tile ---
-function IsoTileSvg({ col, row, cell, scale, onPress }: {
+// --- Flat Square Tile Component ---
+function SquareTile({ col, row, cell, scale, onPress }: {
   col: number; row: number; cell: GridCell; scale: number; onPress: () => void;
 }) {
-  const pos = gridToIso(col, row, scale);
+  const pos = gridToScreen(col, row, scale);
   const colors = TILE_COLORS[cell.tile];
-  const tw = TILE_WIDTH * scale;
-  const th = TILE_HEIGHT * scale;
-  const depth = DEPTH * scale;
-  const halfW = tw / 2;
-  const halfH = th / 2;
-
-  const topPoints = `0,${-halfH} ${halfW},0 0,${halfH} ${-halfW},0`;
-  const leftPoints = `${-halfW},0 0,${halfH} 0,${halfH + depth} ${-halfW},${depth}`;
-  const rightPoints = `0,${halfH} ${halfW},0 ${halfW},${depth} 0,${halfH + depth}`;
-
-  // Road has center line
-  const roadCenterLine = cell.tile === "road" ? (
-    <>
-      <Rect x={-halfW * 0.15} y={-halfH * 0.05} width={halfW * 0.3} height={halfH * 0.1} fill="#e8e8e8" opacity={0.7} />
-    </>
-  ) : null;
-
-  const isGrass = cell.tile === "grass";
+  const ts = TILE_SIZE * scale;
 
   return (
     <TouchableOpacity
@@ -128,185 +109,156 @@ function IsoTileSvg({ col, row, cell, scale, onPress }: {
       onPress={onPress}
       style={{
         position: "absolute",
-        left: pos.x - halfW,
-        top: pos.y - halfH,
-        width: tw,
-        height: th + depth,
-        zIndex: Math.floor(col + row) * 4 + 1,
+        left: pos.x - ts / 2,
+        top: pos.y - ts / 2,
+        width: ts,
+        height: ts,
+        zIndex: 1,
       }}
     >
-      <Svg
-        width={tw}
-        height={th + depth}
-        viewBox={`${-halfW} ${-halfH} ${tw} ${th + depth}`}
-      >
-        <G>
-          {/* Tile base - grass uses lighter base for texture blend */}
-          <Polygon points={topPoints} fill={isGrass ? "#6ec96e" : colors.top} stroke={colors.left} strokeWidth={0.5} />
-          
-          {isGrass && (
-            <>
-              {/* Grass blades */}
-              <Polygon points={`${-halfW*0.3},${-halfH*0.1} ${-halfW*0.25},${-halfH*0.4} ${-halfW*0.2},${-halfH*0.1}`} fill="rgba(255,255,255,0.15)" />
-              <Polygon points={`${halfW*0.1},${-halfH*0.2} ${halfW*0.15},${-halfH*0.5} ${halfW*0.2},${-halfH*0.2}`} fill="rgba(255,255,255,0.1)" />
-              <Polygon points={`${halfW*0.35},${halfH*0.05} ${halfW*0.4},${-halfH*0.25} ${halfW*0.45},${halfH*0.05}`} fill="rgba(255,255,255,0.12)" />
-              <Polygon points={`${-halfW*0.15},${halfH*0.15} ${-halfW*0.1},${-halfH*0.05} ${-halfW*0.05},${halfH*0.15}`} fill="rgba(255,255,255,0.1)" />
-            </>
-          )}
-          {!isGrass && cell.tile === "water" && (
-            <>
-              <Polygon points={`${-halfW*0.4},${halfH*0.1} ${-halfW*0.1},${halfH*0.05} ${-halfW*0.15},${halfH*0.15}`} fill={colors.accent} opacity={0.4} />
-              <Polygon points={`${halfW*0.1},${halfH*0.2} ${halfW*0.35},${halfH*0.15} ${halfW*0.3},${halfH*0.25}`} fill={colors.accent} opacity={0.3} />
-            </>
-          )}
-          {!isGrass && cell.tile === "rock" && (
-            <>
-              <Polygon points={`${-halfW*0.3},${-halfH*0.15} ${-halfW*0.05},${-halfH*0.2} ${-halfW*0.1},${halfH*0.1} ${-halfW*0.35},${halfH*0.05}`} fill={colors.accent} />
-              <Polygon points={`${halfW*0.15},${halfH*0.0} ${halfW*0.35},${-halfH*0.05} ${halfW*0.3},${halfH*0.2} ${halfW*0.1},${halfH*0.15}`} fill="#d5d8d9" />
-            </>
-          )}
-          {!isGrass && cell.tile === "flower" && (
-            <>
-              <Polygon points={`${-halfW*0.25},${-halfH*0.15} ${-halfW*0.2},${-halfH*0.25} ${-halfW*0.15},${-halfH*0.1}`} fill="#e74c3c" />
-              <Polygon points={`${halfW*0.3},${halfH*0.05} ${halfW*0.35},${-halfH*0.05} ${halfW*0.4},${halfH*0.1}`} fill="#e74c3c" />
-              <Polygon points={`${halfW*0.05},${-halfH*0.2} ${halfW*0.1},${-halfH*0.3} ${halfW*0.15},${-halfH*0.15}`} fill="#f1c40f" />
-            </>
-          )}
-          {!isGrass && cell.tile === "dirt" && (
-            <>
-              <Polygon points={`${-halfW*0.2},0 ${-halfW*0.15},${-halfH*0.1} ${-halfW*0.1},${halfH*0.05} ${-halfW*0.25},${halfH*0.02}`} fill={colors.detail} />
-              <Polygon points={`${halfW*0.2},${halfH*0.1} ${halfW*0.28},${halfH*0.02} ${halfW*0.25},${halfH*0.2} ${halfW*0.15},${halfH*0.15}`} fill={colors.detail} />
-            </>
-          )}
-          {roadCenterLine}
-
-          <Polygon points={leftPoints} fill={isGrass ? "#4a9a4a" : colors.left} stroke={colors.left} strokeWidth={0.3} />
-          <Polygon points={rightPoints} fill={isGrass ? "#3a8a3a" : colors.right} stroke={colors.right} strokeWidth={0.3} />
-        </G>
-      </Svg>
-      {/* Grass texture PNG overlay */}
-      {isGrass && (
+      {/* Grass PNG as the tile image */}
+      {cell.tile === "grass" ? (
         <Image
           source={GRASS_TEXTURE}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            width: tw,
-            height: th,
-          }}
+          style={{ width: ts, height: ts }}
           contentFit="cover"
           pointerEvents="none"
         />
+      ) : (
+        <Svg width={ts} height={ts}>
+          {/* Tile background */}
+          <Rect x={0} y={0} width={ts} height={ts} fill={colors.base} />
+          {cell.tile === "water" && (
+            <>
+              <Polygon points={`${ts*0.1},${ts*0.3} ${ts*0.3},${ts*0.25} ${ts*0.25},${ts*0.35}`} fill={colors.accent} opacity={0.5} />
+              <Polygon points={`${ts*0.6},${ts*0.6} ${ts*0.8},${ts*0.55} ${ts*0.75},${ts*0.65}`} fill={colors.accent} opacity={0.4} />
+            </>
+          )}
+          {cell.tile === "rock" && (
+            <>
+              <Polygon points={`${ts*0.2},${ts*0.3} ${ts*0.4},${ts*0.25} ${ts*0.35},${ts*0.55} ${ts*0.15},${ts*0.5}`} fill={colors.accent} />
+              <Polygon points={`${ts*0.55},${ts*0.45} ${ts*0.75},${ts*0.4} ${ts*0.7},${ts*0.65} ${ts*0.5},${ts*0.6}`} fill={colors.detail} />
+            </>
+          )}
+          {cell.tile === "flower" && (
+            <>
+              <Circle cx={ts * 0.25} cy={ts * 0.35} r={ts * 0.06} fill="#e74c3c" />
+              <Circle cx={ts * 0.25} cy={ts * 0.35} r={ts * 0.025} fill="#f1c40f" />
+              <Circle cx={ts * 0.7} cy={ts * 0.55} r={ts * 0.05} fill="#e74c3c" />
+              <Circle cx={ts * 0.7} cy={ts * 0.55} r={ts * 0.02} fill="#f1c40f" />
+              <Circle cx={ts * 0.5} cy={ts * 0.25} r={ts * 0.04} fill="#f9ca24" />
+            </>
+          )}
+          {cell.tile === "dirt" && (
+            <>
+              <Polygon points={`${ts*0.15},${ts*0.3} ${ts*0.25},${ts*0.2} ${ts*0.3},${ts*0.4} ${ts*0.2},${ts*0.35}`} fill={colors.detail} />
+              <Polygon points={`${ts*0.6},${ts*0.5} ${ts*0.7},${ts*0.4} ${ts*0.75},${ts*0.55} ${ts*0.65},${ts*0.6}`} fill={colors.detail} />
+            </>
+          )}
+          {cell.tile === "road" && (
+            <>
+              <Rect x={ts * 0.35} y={ts * 0.1} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
+              <Rect x={ts * 0.35} y={ts * 0.4} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
+              <Rect x={ts * 0.35} y={ts * 0.7} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
+            </>
+          )}
+        </Svg>
       )}
     </TouchableOpacity>
   );
 }
 
-// --- SVG Building: Small House ---
+// --- SVG Building: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
-  const pos = gridToIso(col, row, scale);
-  const tw = TILE_WIDTH * scale;
-  const th = TILE_HEIGHT * scale;
-  const halfW = tw / 2;
-  const halfH = th / 2;
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
 
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - halfW * 0.55,
-      top: pos.y - halfH * 2.2,
-      width: tw * 0.7,
-      height: halfH * 2.8,
-      zIndex: Math.floor(col + row) * 4 + 3,
+      left: pos.x - ts * 0.6,
+      top: pos.y - ts * 0.6,
+      width: ts * 1.2,
+      height: ts * 1.2,
+      zIndex: 10,
+      pointerEvents: "box-none",
     }}>
-      <Svg width={tw * 0.7} height={halfH * 2.8} viewBox={`0 0 ${tw * 0.7} ${halfH * 2.8}`}>
-        <G>
-          {/* Roof - triangle shape */}
-          <Polygon points={`${tw*0.05},${halfH*0.6} ${tw*0.35},${-halfH*0.2} ${tw*0.65},${halfH*0.6}`} fill="#c0392b" stroke="#922b21" strokeWidth={1} />
-          <Polygon points={`${tw*0.05},${halfH*0.6} ${tw*0.35},${-halfH*0.2} ${tw*0.35},${halfH*0.5}`} fill="#e74c3c" />
-          {/* House body */}
-          <Rect x={tw*0.1} y={halfH*0.6} width={tw*0.5} height={halfH*1.6} fill="#d4a574" stroke="#a0522d" strokeWidth={0.5} />
-          {/* Door */}
-          <Rect x={tw*0.25} y={halfH*1.4} width={tw*0.2} height={halfH*0.8} fill="#8B4513" rx={2} />
-          <Circle cx={tw*0.41} cy={halfH*1.8} r={tw*0.015} fill="#f1c40f" />
-          {/* Windows */}
-          <Rect x={tw*0.12} y={halfH*0.8} width={tw*0.12} height={halfH*0.3} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          <Rect x={tw*0.46} y={halfH*0.8} width={tw*0.12} height={halfH*0.3} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          {/* Chimney */}
-          <Rect x={tw*0.4} y={halfH*0.0} width={tw*0.1} height={halfH*0.4} fill="#8B4513" />
-        </G>
+      <Svg width={ts * 1.2} height={ts * 1.2} viewBox={`0 0 ${ts * 1.2} ${ts * 1.2}`}>
+        {/* House body */}
+        <Rect x={ts * 0.15} y={ts * 0.2} width={ts * 0.7} height={ts * 0.8} fill="#d4a574" stroke="#a0522d" strokeWidth={1} rx={2} />
+        {/* Roof */}
+        <Polygon points={`${ts*0.1},${ts*0.2} ${ts*0.6},${ts*0.02} ${ts*0.9},${ts*0.2}`} fill="#c0392b" stroke="#922b21" strokeWidth={0.5} />
+        {/* Door */}
+        <Rect x={ts * 0.45} y={ts * 0.6} width={ts * 0.2} height={ts * 0.35} fill="#8B4513" rx={2} />
+        <Circle cx={ts * 0.6} cy={ts * 0.78} r={ts * 0.02} fill="#f1c40f" />
+        {/* Windows */}
+        <Rect x={ts * 0.22} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        <Rect x={ts * 0.62} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        {/* Chimney */}
+        <Rect x={ts * 0.7} y={ts * 0.05} width={ts * 0.12} height={ts * 0.2} fill="#8B4513" />
       </Svg>
     </View>
   );
 }
 
-// --- SVG Building: Big House ---
+// --- SVG Building: Big House (top-down view) ---
 function BigHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
-  const pos = gridToIso(col, row, scale);
-  const tw = TILE_WIDTH * scale;
-  const th = TILE_HEIGHT * scale;
-  const halfW = tw / 2;
-  const halfH = th / 2;
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
 
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - halfW * 0.65,
-      top: pos.y - halfH * 2.8,
-      width: tw * 0.8,
-      height: halfH * 3.5,
-      zIndex: Math.floor(col + row) * 4 + 3,
+      left: pos.x - ts * 0.65,
+      top: pos.y - ts * 0.7,
+      width: ts * 1.3,
+      height: ts * 1.4,
+      zIndex: 10,
+      pointerEvents: "box-none",
     }}>
-      <Svg width={tw * 0.8} height={halfH * 3.5} viewBox={`0 0 ${tw * 0.8} ${halfH * 3.5}`}>
-        <G>
-          {/* Roof - larger */}
-          <Polygon points={`${tw*0.05},${halfH*0.7} ${tw*0.4},${-halfH*0.1} ${tw*0.75},${halfH*0.7}`} fill="#2c3e50" stroke="#1a252f" strokeWidth={1} />
-          <Polygon points={`${tw*0.05},${halfH*0.7} ${tw*0.4},${-halfH*0.1} ${tw*0.4},${halfH*0.6}`} fill="#34495e" />
-          {/* House body */}
-          <Rect x={tw*0.08} y={halfH*0.7} width={tw*0.64} height={halfH*2.2} fill="#f5e6c8" stroke="#c9a96e" strokeWidth={0.5} />
-          {/* Large door */}
-          <Rect x={tw*0.3} y={halfH*1.7} width={tw*0.2} height={halfH*1.2} fill="#5d4037" rx={tw*0.02} />
-          <Circle cx={tw*0.47} cy={halfH*2.3} r={tw*0.018} fill="#f1c40f" />
-          {/* Windows - bigger */}
-          <Rect x={tw*0.1} y={halfH*0.9} width={tw*0.14} height={halfH*0.4} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          <Rect x={tw*0.56} y={halfH*0.9} width={tw*0.14} height={halfH*0.4} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          <Rect x={tw*0.1} y={halfH*1.5} width={tw*0.14} height={halfH*0.4} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          <Rect x={tw*0.56} y={halfH*1.5} width={tw*0.14} height={halfH*0.4} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-          {/* Chimney */}
-          <Rect x={tw*0.5} y={halfH*0.1} width={tw*0.12} height={halfH*0.5} fill="#7f8c8d" />
-          {/* Fence */}
-          <Rect x={tw*0.05} y={halfH*2.7} width={tw*0.7} height={halfH*0.15} fill="#8B7355" opacity={0.6} />
-        </G>
+      <Svg width={ts * 1.3} height={ts * 1.4} viewBox={`0 0 ${ts * 1.3} ${ts * 1.4}`}>
+        {/* House body */}
+        <Rect x={ts * 0.1} y={ts * 0.3} width={ts * 0.85} height={ts * 1.05} fill="#f5e6c8" stroke="#c9a96e" strokeWidth={1} rx={2} />
+        {/* Roof */}
+        <Polygon points={`${ts*0.05},${ts*0.3} ${ts*0.525},${ts*0.1} ${ts*1.0},${ts*0.3}`} fill="#2c3e50" stroke="#1a252f" strokeWidth={0.5} />
+        {/* Large door */}
+        <Rect x={ts * 0.4} y={ts * 0.85} width={ts * 0.25} height={ts * 0.45} fill="#5d4037" rx={3} />
+        <Circle cx={ts * 0.6} cy={ts * 1.08} r={ts * 0.025} fill="#f1c40f" />
+        {/* Windows */}
+        <Rect x={ts * 0.15} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        <Rect x={ts * 0.72} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        <Rect x={ts * 0.15} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        <Rect x={ts * 0.72} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
+        {/* Chimney */}
+        <Rect x={ts * 0.78} y={ts * 0.15} width={ts * 0.15} height={ts * 0.25} fill="#7f8c8d" />
+        {/* Fence */}
+        <Rect x={ts * 0.05} y={ts * 1.28} width={ts * 0.95} height={ts * 0.06} fill="#8B7355" opacity={0.6} />
       </Svg>
     </View>
   );
 }
 
-// --- PNG Tree ---
+// --- PNG Tree (top-down view) ---
 function PngTree({ col, row, scale }: { col: number; row: number; scale: number }) {
-  const pos = gridToIso(col, row, scale);
-  const tw = TILE_WIDTH * scale;
-  const th = TILE_HEIGHT * scale;
-  const halfW = tw / 2;
-  const halfH = th / 2;
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
 
-  // Tree image size: slightly larger than tile, tall
-  const imgSize = tw * 1.4;
-  const imgHeight = th * 2.8;
+  // Tree is larger than tile (spans ~1.3x tile)
+  const treeSize = ts * 1.5;
 
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - imgSize / 2,
-      top: pos.y - imgHeight + halfH * 0.5,
-      width: imgSize,
-      height: imgHeight,
-      zIndex: Math.floor(col + row) * 4 + 3,
+      left: pos.x - treeSize / 2,
+      top: pos.y - treeSize / 2,
+      width: treeSize,
+      height: treeSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
     }}>
       <Image
         source={TREE_PNG}
-        style={{ width: imgSize, height: imgHeight }}
+        style={{ width: treeSize, height: treeSize }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -411,20 +363,16 @@ export default function IsometricMap() {
         const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
         if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
           if (mode === "tile") {
-            // Cycle tile type
             const current = newGrid[row][col].tile;
             const typeIndex = TILE_TYPES.indexOf(current as TileType);
             const nextType = TILE_TYPES[(typeIndex + 1) % TILE_TYPES.length];
-            // If new tile is road, clear building; if new tile is none, clear building
             newGrid[row][col].tile = nextType;
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
-            // Place building - only on grass, dirt, or road tiles
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
-              // Toggle: if same building exists, remove it; otherwise place it
               if (currentBuilding === mode) {
                 newGrid[row][col].building = "none";
               } else {
@@ -439,7 +387,7 @@ export default function IsometricMap() {
     [mode]
   );
 
-  // Render tiles (bottom layer)
+  // Render tiles
   const tiles = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (let row = 0; row < GRID_SIZE; row++) {
@@ -447,14 +395,14 @@ export default function IsometricMap() {
         const cell = grid[row][col];
         if (cell.tile === "none") continue;
         elements.push(
-          <IsoTileSvg key={`tile-${row}-${col}`} col={col} row={row} cell={cell} scale={currentScale} onPress={() => handleTilePress(col, row)} />
+          <SquareTile key={`tile-${row}-${col}`} col={col} row={row} cell={cell} scale={currentScale} onPress={() => handleTilePress(col, row)} />
         );
       }
     }
     return elements;
   }, [grid, currentScale, handleTilePress]);
 
-  // Render buildings (top layer)
+  // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (let row = 0; row < GRID_SIZE; row++) {
@@ -475,12 +423,11 @@ export default function IsometricMap() {
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         if (grid[row][col].tile !== "none") continue;
-        const pos = gridToIso(col, row, currentScale);
-        const tw = TILE_WIDTH * currentScale;
-        const th = TILE_HEIGHT * currentScale;
+        const pos = gridToScreen(col, row, currentScale);
+        const ts = TILE_SIZE * currentScale;
         elements.push(
           <TouchableOpacity key={`empty-${row}-${col}`} activeOpacity={0.3}
-            style={{ position: "absolute", left: pos.x - tw / 2, top: pos.y - th / 2, width: tw, height: th + DEPTH * currentScale, zIndex: 0 }}
+            style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 0 }}
             onPress={() => handleTilePress(col, row)} />
         );
       }
@@ -489,11 +436,8 @@ export default function IsometricMap() {
   }, [grid, currentScale, handleTilePress]);
 
   const gridBounds = useMemo(() => {
-    const maxDist = (GRID_SIZE / 2 + 2);
-    return {
-      width: maxDist * TILE_WIDTH * 2 + TILE_WIDTH * 2,
-      height: maxDist * TILE_HEIGHT + TILE_HEIGHT * 2 + DEPTH * 2,
-    };
+    const totalSize = GRID_SIZE * TILE_SIZE + TILE_SIZE * 2;
+    return { width: totalSize, height: totalSize };
   }, []);
 
   return (
@@ -502,6 +446,7 @@ export default function IsometricMap() {
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
+              {/* Background */}
               <View style={{
                 position: "absolute",
                 left: -gridBounds.width / 2,
@@ -509,7 +454,6 @@ export default function IsometricMap() {
                 width: gridBounds.width,
                 height: gridBounds.height,
                 backgroundColor: WATER_BG,
-                borderRadius: 4,
               }} />
               {emptyHitAreas}
               {tiles}

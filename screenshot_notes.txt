@@ -1,1 +1,1 @@
-Mobile viewport 375x812: Grass texture PNG looks great on mobile! The lush green grass texture covers all grass tiles beautifully. Map fills the entire phone screen. Trees with PNG sprites, houses all visible. Texture gives a realistic grass field appearance. Ready to save checkpoint.
+Mobile 375x812: Flat square tiles look great on mobile! Each tile is 1:1 square with grass PNG filling completely. Checkerboard pattern is clear. Houses, trees, water, rock, dirt all visible. Map fills entire phone screen. Scroll/pan and zoom working. Ready to save checkpoint.
