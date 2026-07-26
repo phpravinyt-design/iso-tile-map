@@ -1,1 +1,1 @@
-Mobile viewport 375x812: Tiles fill the entire screen perfectly. Pan/scroll with finger and pinch-to-zoom both work. No UI elements. Tiles cycle on tap. Looks like Township style map.
+Mobile viewport 375x812: 30x30 grid perfectly fills the entire phone screen with no dark borders visible. Very immersive, Township-like feel. Map extends beyond edges so panning is needed. Looks great.

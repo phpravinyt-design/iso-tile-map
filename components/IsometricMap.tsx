@@ -16,7 +16,7 @@ import Svg, { Polygon, G } from "react-native-svg";
 // --- Constants ---
 const TILE_WIDTH = 100;
 const TILE_HEIGHT = 50;
-const GRID_SIZE = 20;
+const GRID_SIZE = 30;
 const WATER_BG = "#1a2a3a";
 const DEPTH = 8;
 
@@ -50,7 +50,7 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push("none"); continue; }
+      if (dist > GRID_SIZE / 2 + 2) { rowArr.push("none"); continue; }
       if ((col * 7 + row * 3) % 41 === 0) rowArr.push("water");
       else if ((col * 5 + row * 2) % 37 === 0) rowArr.push("rock");
       else if ((col * 3 + row * 5) % 31 === 0) rowArr.push("flower");

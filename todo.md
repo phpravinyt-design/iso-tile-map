@@ -14,3 +14,4 @@
 - [x] Add app icon and branding
 - [x] Remove all buttons, topbar, toolbar - tiles fill entire screen
 - [x] Add finger scroll (pan) and pinch-to-zoom gesture support
+- [x] Increase grid size to 30x30 for more immersive scrollable map
