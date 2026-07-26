@@ -21,3 +21,4 @@
 - [x] Add toolbar to select buildings/trees/roads to place
 - [x] Use user's provided tree PNG image for tree placement on tiles
 - [x] Ensure map scroll/pan works smoothly on mobile - improved gesture sensitivity
+- [x] Use user's grass texture PNG for all grass tiles

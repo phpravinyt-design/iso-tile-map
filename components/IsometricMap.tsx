@@ -18,6 +18,9 @@ import { Platform } from "react-native";
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
+// Grass texture PNG asset
+const GRASS_TEXTURE = require("@/assets/images/grass_texture.png");
+
 // --- Constants ---
 const TILE_WIDTH = 100;
 const TILE_HEIGHT = 50;
@@ -117,6 +120,8 @@ function IsoTileSvg({ col, row, cell, scale, onPress }: {
     </>
   ) : null;
 
+  const isGrass = cell.tile === "grass";
+
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -136,37 +141,38 @@ function IsoTileSvg({ col, row, cell, scale, onPress }: {
         viewBox={`${-halfW} ${-halfH} ${tw} ${th + depth}`}
       >
         <G>
-          {/* Tile base */}
-          <Polygon points={topPoints} fill={colors.top} stroke={colors.left} strokeWidth={0.5} />
+          {/* Tile base - grass uses lighter base for texture blend */}
+          <Polygon points={topPoints} fill={isGrass ? "#6ec96e" : colors.top} stroke={colors.left} strokeWidth={0.5} />
           
-          {cell.tile === "grass" && (
+          {isGrass && (
             <>
-              <Polygon points={`${-halfW*0.3},${-halfH*0.1} ${-halfW*0.25},${-halfH*0.4} ${-halfW*0.2},${-halfH*0.1}`} fill={colors.accent} />
-              <Polygon points={`${halfW*0.1},${-halfH*0.2} ${halfW*0.15},${-halfH*0.5} ${halfW*0.2},${-halfH*0.2}`} fill="#8de88d" />
-              <Polygon points={`${halfW*0.35},${halfH*0.05} ${halfW*0.4},${-halfH*0.25} ${halfW*0.45},${halfH*0.05}`} fill={colors.accent} />
-              <Polygon points={`${-halfW*0.15},${halfH*0.15} ${-halfW*0.1},${-halfH*0.05} ${-halfW*0.05},${halfH*0.15}`} fill="#9fe89f" />
+              {/* Grass blades */}
+              <Polygon points={`${-halfW*0.3},${-halfH*0.1} ${-halfW*0.25},${-halfH*0.4} ${-halfW*0.2},${-halfH*0.1}`} fill="rgba(255,255,255,0.15)" />
+              <Polygon points={`${halfW*0.1},${-halfH*0.2} ${halfW*0.15},${-halfH*0.5} ${halfW*0.2},${-halfH*0.2}`} fill="rgba(255,255,255,0.1)" />
+              <Polygon points={`${halfW*0.35},${halfH*0.05} ${halfW*0.4},${-halfH*0.25} ${halfW*0.45},${halfH*0.05}`} fill="rgba(255,255,255,0.12)" />
+              <Polygon points={`${-halfW*0.15},${halfH*0.15} ${-halfW*0.1},${-halfH*0.05} ${-halfW*0.05},${halfH*0.15}`} fill="rgba(255,255,255,0.1)" />
             </>
           )}
-          {cell.tile === "water" && (
+          {!isGrass && cell.tile === "water" && (
             <>
               <Polygon points={`${-halfW*0.4},${halfH*0.1} ${-halfW*0.1},${halfH*0.05} ${-halfW*0.15},${halfH*0.15}`} fill={colors.accent} opacity={0.4} />
               <Polygon points={`${halfW*0.1},${halfH*0.2} ${halfW*0.35},${halfH*0.15} ${halfW*0.3},${halfH*0.25}`} fill={colors.accent} opacity={0.3} />
             </>
           )}
-          {cell.tile === "rock" && (
+          {!isGrass && cell.tile === "rock" && (
             <>
               <Polygon points={`${-halfW*0.3},${-halfH*0.15} ${-halfW*0.05},${-halfH*0.2} ${-halfW*0.1},${halfH*0.1} ${-halfW*0.35},${halfH*0.05}`} fill={colors.accent} />
               <Polygon points={`${halfW*0.15},${halfH*0.0} ${halfW*0.35},${-halfH*0.05} ${halfW*0.3},${halfH*0.2} ${halfW*0.1},${halfH*0.15}`} fill="#d5d8d9" />
             </>
           )}
-          {cell.tile === "flower" && (
+          {!isGrass && cell.tile === "flower" && (
             <>
               <Polygon points={`${-halfW*0.25},${-halfH*0.15} ${-halfW*0.2},${-halfH*0.25} ${-halfW*0.15},${-halfH*0.1}`} fill="#e74c3c" />
               <Polygon points={`${halfW*0.3},${halfH*0.05} ${halfW*0.35},${-halfH*0.05} ${halfW*0.4},${halfH*0.1}`} fill="#e74c3c" />
               <Polygon points={`${halfW*0.05},${-halfH*0.2} ${halfW*0.1},${-halfH*0.3} ${halfW*0.15},${-halfH*0.15}`} fill="#f1c40f" />
             </>
           )}
-          {cell.tile === "dirt" && (
+          {!isGrass && cell.tile === "dirt" && (
             <>
               <Polygon points={`${-halfW*0.2},0 ${-halfW*0.15},${-halfH*0.1} ${-halfW*0.1},${halfH*0.05} ${-halfW*0.25},${halfH*0.02}`} fill={colors.detail} />
               <Polygon points={`${halfW*0.2},${halfH*0.1} ${halfW*0.28},${halfH*0.02} ${halfW*0.25},${halfH*0.2} ${halfW*0.15},${halfH*0.15}`} fill={colors.detail} />
@@ -174,10 +180,25 @@ function IsoTileSvg({ col, row, cell, scale, onPress }: {
           )}
           {roadCenterLine}
 
-          <Polygon points={leftPoints} fill={colors.left} stroke={colors.left} strokeWidth={0.3} />
-          <Polygon points={rightPoints} fill={colors.right} stroke={colors.right} strokeWidth={0.3} />
+          <Polygon points={leftPoints} fill={isGrass ? "#4a9a4a" : colors.left} stroke={colors.left} strokeWidth={0.3} />
+          <Polygon points={rightPoints} fill={isGrass ? "#3a8a3a" : colors.right} stroke={colors.right} strokeWidth={0.3} />
         </G>
       </Svg>
+      {/* Grass texture PNG overlay */}
+      {isGrass && (
+        <Image
+          source={GRASS_TEXTURE}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: tw,
+            height: th,
+          }}
+          contentFit="cover"
+          pointerEvents="none"
+        />
+      )}
     </TouchableOpacity>
   );
 }
