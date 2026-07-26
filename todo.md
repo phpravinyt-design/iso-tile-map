@@ -24,3 +24,4 @@
 - [x] Use user's grass texture PNG for all grass tiles
 - [x] Change tiles to 1:1 square aspect ratio, each tile shows the grass PNG as a complete tile
 - [x] Change to flat top-down square tiles (bird's eye view like Township), 1:1 aspect ratio, grass PNG per tile
+- [x] Add grass placement button to toolbar with new grass PNG (like tree/home buttons)

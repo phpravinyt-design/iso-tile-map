@@ -21,6 +21,9 @@ const TREE_PNG = require("@/assets/images/tree.png");
 // Grass texture PNG asset - used as the tile image
 const GRASS_TEXTURE = require("@/assets/images/grass_texture.png");
 
+// Grass plant PNG asset - used as a building/object on tiles
+const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
+
 // --- Constants ---
 // Flat top-down square tiles (1:1 aspect ratio) - Township style
 const TILE_SIZE = 90;
@@ -32,11 +35,11 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] 
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
-const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "none"] as const;
+const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "grass_plant", "none"] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "tree_png"] as const;
+const MODES = ["tile", "house_small", "house_big", "tree_png", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: string }> = {
@@ -54,6 +57,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   house_small: "🏠",
   house_big: "🏡",
   tree_png: "🌳",
+  grass_plant: "🌿",
 };
 
 type GridCell = { tile: TileType; building: BuildingType };
@@ -266,6 +270,34 @@ function PngTree({ col, row, scale }: { col: number; row: number; scale: number 
   );
 }
 
+// --- PNG Grass Plant (top-down view) ---
+function PngGrassPlant({ col, row, scale }: { col: number; row: number; scale: number }) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+
+  // Grass plant spans the tile
+  const plantSize = ts * 1.2;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - plantSize / 2,
+      top: pos.y - plantSize / 2,
+      width: plantSize,
+      height: plantSize,
+      zIndex: 5,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={GRASS_PLANT_PNG}
+        style={{ width: plantSize, height: plantSize }}
+        contentFit="cover"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // --- Building Component Selector ---
 function BuildingOnTile({ col, row, buildingType, scale }: {
   col: number; row: number; buildingType: BuildingType; scale: number;
@@ -274,6 +306,7 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
     case "tree_png": return <PngTree col={col} row={row} scale={scale} />;
+    case "grass_plant": return <PngGrassPlant col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -369,7 +402,7 @@ export default function IsometricMap() {
             newGrid[row][col].tile = nextType;
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
-          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
+          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png" || mode === "grass_plant") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {

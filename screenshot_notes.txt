@@ -1,1 +1,1 @@
-Mobile 375x812: Flat square tiles look great on mobile! Each tile is 1:1 square with grass PNG filling completely. Checkerboard pattern is clear. Houses, trees, water, rock, dirt all visible. Map fills entire phone screen. Scroll/pan and zoom working. Ready to save checkpoint.
+Both desktop and mobile: Grass plant button (🌿) now visible in toolbar alongside paintbrush, house_small, house_big, and tree buttons. All 5 modes working. Ready to save checkpoint.
