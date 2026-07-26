@@ -15,3 +15,7 @@
 - [x] Remove all buttons, topbar, toolbar - tiles fill entire screen
 - [x] Add finger scroll (pan) and pinch-to-zoom gesture support
 - [x] Increase grid size to 30x30 for more immersive scrollable map
+- [x] Add houses (chote ghar) placement on map - Township style
+- [x] Add trees (ped) placement on map - Township style
+- [x] Add roads (raste) placement on map - Township style
+- [x] Add toolbar to select buildings/trees/roads to place

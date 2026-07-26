@@ -1,1 +1,1 @@
-Mobile viewport 375x812: 30x30 grid perfectly fills the entire phone screen with no dark borders visible. Very immersive, Township-like feel. Map extends beyond edges so panning is needed. Looks great.
+Mobile viewport 375x812: Township-style map looks great on mobile! Houses, trees visible. Bottom toolbar with 5 mode icons (paintbrush, house, house, tree, tree) visible at bottom. Map fills screen. Buildings properly placed on tiles. Ready to deliver.
