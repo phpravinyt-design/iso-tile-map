@@ -12,3 +12,4 @@
 - [x] Add tile counter display
 - [x] Pre-populate map with default grass tiles
 - [x] Add app icon and branding
+- [x] Remove all buttons, topbar, toolbar - tiles fill entire screen
