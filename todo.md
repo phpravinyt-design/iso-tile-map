@@ -26,3 +26,4 @@
 - [x] Change to flat top-down square tiles (bird's eye view like Township), 1:1 aspect ratio, grass PNG per tile
 - [x] Add grass placement button to toolbar with new grass PNG (like tree/home buttons)
 - [x] Make grass_plant an overlay (not a building) so trees, houses, etc. can be placed on top of it
+- [x] Generate seamless grass texture PNG without visible seams between tiles

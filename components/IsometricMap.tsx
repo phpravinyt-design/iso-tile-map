@@ -18,7 +18,7 @@ import { Platform } from "react-native";
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
-// Grass texture PNG asset - used as the tile image
+// Seamless grass texture PNG asset - used as the tile image (tileable, no seams)
 const GRASS_TEXTURE = require("@/assets/images/grass_texture.png");
 
 // Grass plant PNG asset - used as a building/object on tiles
@@ -120,7 +120,7 @@ function SquareTile({ col, row, cell, scale, onPress }: {
         zIndex: 1,
       }}
     >
-      {/* Grass PNG as the tile image */}
+      {/* Tile rendering */}
       {cell.tile === "grass" ? (
         <Image
           source={GRASS_TEXTURE}
@@ -128,7 +128,7 @@ function SquareTile({ col, row, cell, scale, onPress }: {
           contentFit="cover"
           pointerEvents="none"
         />
-      ) : (
+      ) : (cell.tile === "none" ? null : (
         <Svg width={ts} height={ts}>
           {/* Tile background */}
           <Rect x={0} y={0} width={ts} height={ts} fill={colors.base} />
@@ -167,7 +167,7 @@ function SquareTile({ col, row, cell, scale, onPress }: {
             </>
           )}
         </Svg>
-      )}
+      ))}
     </TouchableOpacity>
   );
 }
@@ -509,17 +509,28 @@ export default function IsometricMap() {
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
-              {/* Background */}
+              {/* Seamless grass background - covers entire grid to avoid tile seams */}
               <View style={{
                 position: "absolute",
                 left: -gridBounds.width / 2,
                 top: -gridBounds.height / 2,
                 width: gridBounds.width,
                 height: gridBounds.height,
-                backgroundColor: WATER_BG,
-              }} />
+                zIndex: 0,
+              }}>
+                <Image
+                  source={GRASS_TEXTURE}
+                  style={{ width: gridBounds.width, height: gridBounds.height }}
+                  contentFit="cover"
+                  pointerEvents="none"
+                />
+              </View>
               {emptyHitAreas}
-              {tiles}
+              {/* Non-grass tiles rendered on top of the seamless background */}
+              {tiles.filter((t: any) => {
+                // Only render non-grass tiles since grass is covered by the background
+                return t?.props?.cell?.tile !== "grass";
+              })}
               {/* Grass overlays rendered between tiles and buildings */}
               {(() => {
                 const overlays: React.ReactNode[] = [];
