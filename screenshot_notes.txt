@@ -1,1 +1,1 @@
-Premium grass texture applied successfully. Beautiful Township/HayDay style grass with leaf clusters and clover patterns. Completely seamless - no visible seams or edges. Bright fresh green color. Non-grass tiles and buildings render correctly on top. Looks premium and polished.
+Tree now sits directly on grass tiles without any grass/diamond base underneath. The foliage and trunk are clearly visible and blend nicely with the grass texture background. Looks clean and Township-style. Fix is complete.

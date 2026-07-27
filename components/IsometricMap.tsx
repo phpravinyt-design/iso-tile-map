@@ -247,8 +247,8 @@ function PngTree({ col, row, scale }: { col: number; row: number; scale: number 
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
 
-  // Tree is larger than tile (spans ~1.3x tile)
-  const treeSize = ts * 1.5;
+  // Tree PNG is already cropped (no grass base) - show full image
+  const treeSize = ts * 1.3;
 
   return (
     <View style={{
