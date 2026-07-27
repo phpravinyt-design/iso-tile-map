@@ -27,3 +27,4 @@
 - [x] Add grass placement button to toolbar with new grass PNG (like tree/home buttons)
 - [x] Make grass_plant an overlay (not a building) so trees, houses, etc. can be placed on top of it
 - [x] Generate seamless grass texture PNG without visible seams between tiles
+- [x] Generate premium high-quality seamless grass texture (Township/HayDay style, 2048x2048, perfectly tileable)
