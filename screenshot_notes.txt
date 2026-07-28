@@ -1,1 +1,1 @@
-The Township-style house PNG is rendering beautifully on the map. The colorful blue house with red roof, flowers, and bushes looks great. Both small and big house modes use the same PNG but at different sizes (1.5x and 1.8x tile size). Trees, water, rock, flower, dirt tiles all working. Toolbar visible at bottom.
+The new tree PNG with transparent background is rendering perfectly on the map. No black background visible. Tree sits cleanly on the grass tiles. House, water, rock, flower, dirt tiles all working.
