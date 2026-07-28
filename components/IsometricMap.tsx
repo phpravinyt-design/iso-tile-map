@@ -18,8 +18,8 @@ import { Platform } from "react-native";
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
-// Seamless grass texture PNG asset - used as the tile image (tileable, no seams)
-const GRASS_TEXTURE = require("@/assets/images/grass_texture.png");
+// Individual grass tile PNG - placed on each grass tile separately
+const GRASS_TILE_PNG = require("@/assets/images/grass_texture.png");
 
 // Grass plant PNG asset - used as a building/object on tiles
 const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
@@ -100,6 +100,7 @@ function createDefaultGrid(): GridCell[][] {
 }
 
 // --- Flat Square Tile Component ---
+// Each grass tile gets its own PNG image placed individually
 function SquareTile({ col, row, cell, scale, onPress }: {
   col: number; row: number; cell: GridCell; scale: number; onPress: () => void;
 }) {
@@ -122,8 +123,9 @@ function SquareTile({ col, row, cell, scale, onPress }: {
     >
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
+        // Each grass tile gets its own individual PNG
         <Image
-          source={GRASS_TEXTURE}
+          source={GRASS_TILE_PNG}
           style={{ width: ts, height: ts }}
           contentFit="cover"
           pointerEvents="none"
@@ -188,17 +190,12 @@ function SmallHouse({ col, row, scale }: { col: number; row: number; scale: numb
       pointerEvents: "box-none",
     }}>
       <Svg width={ts * 1.2} height={ts * 1.2} viewBox={`0 0 ${ts * 1.2} ${ts * 1.2}`}>
-        {/* House body */}
         <Rect x={ts * 0.15} y={ts * 0.2} width={ts * 0.7} height={ts * 0.8} fill="#d4a574" stroke="#a0522d" strokeWidth={1} rx={2} />
-        {/* Roof */}
         <Polygon points={`${ts*0.1},${ts*0.2} ${ts*0.6},${ts*0.02} ${ts*0.9},${ts*0.2}`} fill="#c0392b" stroke="#922b21" strokeWidth={0.5} />
-        {/* Door */}
         <Rect x={ts * 0.45} y={ts * 0.6} width={ts * 0.2} height={ts * 0.35} fill="#8B4513" rx={2} />
         <Circle cx={ts * 0.6} cy={ts * 0.78} r={ts * 0.02} fill="#f1c40f" />
-        {/* Windows */}
         <Rect x={ts * 0.22} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
         <Rect x={ts * 0.62} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        {/* Chimney */}
         <Rect x={ts * 0.7} y={ts * 0.05} width={ts * 0.12} height={ts * 0.2} fill="#8B4513" />
       </Svg>
     </View>
@@ -221,21 +218,15 @@ function BigHouse({ col, row, scale }: { col: number; row: number; scale: number
       pointerEvents: "box-none",
     }}>
       <Svg width={ts * 1.3} height={ts * 1.4} viewBox={`0 0 ${ts * 1.3} ${ts * 1.4}`}>
-        {/* House body */}
         <Rect x={ts * 0.1} y={ts * 0.3} width={ts * 0.85} height={ts * 1.05} fill="#f5e6c8" stroke="#c9a96e" strokeWidth={1} rx={2} />
-        {/* Roof */}
         <Polygon points={`${ts*0.05},${ts*0.3} ${ts*0.525},${ts*0.1} ${ts*1.0},${ts*0.3}`} fill="#2c3e50" stroke="#1a252f" strokeWidth={0.5} />
-        {/* Large door */}
         <Rect x={ts * 0.4} y={ts * 0.85} width={ts * 0.25} height={ts * 0.45} fill="#5d4037" rx={3} />
         <Circle cx={ts * 0.6} cy={ts * 1.08} r={ts * 0.025} fill="#f1c40f" />
-        {/* Windows */}
         <Rect x={ts * 0.15} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
         <Rect x={ts * 0.72} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
         <Rect x={ts * 0.15} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
         <Rect x={ts * 0.72} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        {/* Chimney */}
         <Rect x={ts * 0.78} y={ts * 0.15} width={ts * 0.15} height={ts * 0.25} fill="#7f8c8d" />
-        {/* Fence */}
         <Rect x={ts * 0.05} y={ts * 1.28} width={ts * 0.95} height={ts * 0.06} fill="#8B7355" opacity={0.6} />
       </Svg>
     </View>
@@ -246,8 +237,6 @@ function BigHouse({ col, row, scale }: { col: number; row: number; scale: number
 function PngTree({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
-
-  // Tree PNG is already cropped (no grass base) - show full image
   const treeSize = ts * 1.3;
 
   return (
@@ -274,8 +263,6 @@ function PngTree({ col, row, scale }: { col: number; row: number; scale: number 
 function PngGrassPlant({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
-
-  // Grass plant spans the tile
   const plantSize = ts * 1.2;
 
   return (
@@ -302,8 +289,6 @@ function PngGrassPlant({ col, row, scale }: { col: number; row: number; scale: n
 function GrassOverlay({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
-
-  // Grass overlay covers the tile (slightly larger)
   const overlaySize = ts * 1.1;
 
   return (
@@ -430,7 +415,6 @@ export default function IsometricMap() {
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
-            // Toggle grass overlay independently - doesn't affect building
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
           } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
             const currentTile = newGrid[row][col].tile;
@@ -450,7 +434,7 @@ export default function IsometricMap() {
     [mode]
   );
 
-  // Render tiles
+  // Render ALL tiles (including grass tiles with individual PNG)
   const tiles = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (let row = 0; row < GRID_SIZE; row++) {
@@ -498,6 +482,21 @@ export default function IsometricMap() {
     return elements;
   }, [grid, currentScale, handleTilePress]);
 
+  // Grass overlays
+  const grassOverlays = useMemo(() => {
+    const overlays: React.ReactNode[] = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        if (grid[row][col].grassOverlay) {
+          overlays.push(
+            <GrassOverlay key={`grass-${row}-${col}`} col={col} row={row} scale={currentScale} />
+          );
+        }
+      }
+    }
+    return overlays;
+  }, [grid, currentScale]);
+
   const gridBounds = useMemo(() => {
     const totalSize = GRID_SIZE * TILE_SIZE + TILE_SIZE * 2;
     return { width: totalSize, height: totalSize };
@@ -509,42 +508,11 @@ export default function IsometricMap() {
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
-              {/* Seamless grass background - covers entire grid to avoid tile seams */}
-              <View style={{
-                position: "absolute",
-                left: -gridBounds.width / 2,
-                top: -gridBounds.height / 2,
-                width: gridBounds.width,
-                height: gridBounds.height,
-                zIndex: 0,
-              }}>
-                <Image
-                  source={GRASS_TEXTURE}
-                  style={{ width: gridBounds.width, height: gridBounds.height }}
-                  contentFit="cover"
-                  pointerEvents="none"
-                />
-              </View>
+              {/* All tiles rendered - each grass tile has its own PNG */}
+              {tiles}
               {emptyHitAreas}
-              {/* Non-grass tiles rendered on top of the seamless background */}
-              {tiles.filter((t: any) => {
-                // Only render non-grass tiles since grass is covered by the background
-                return t?.props?.cell?.tile !== "grass";
-              })}
               {/* Grass overlays rendered between tiles and buildings */}
-              {(() => {
-                const overlays: React.ReactNode[] = [];
-                for (let row = 0; row < GRID_SIZE; row++) {
-                  for (let col = 0; col < GRID_SIZE; col++) {
-                    if (grid[row][col].grassOverlay) {
-                      overlays.push(
-                        <GrassOverlay key={`grass-${row}-${col}`} col={col} row={row} scale={currentScale} />
-                      );
-                    }
-                  }
-                }
-                return overlays;
-              })()}
+              {grassOverlays}
               {buildings}
             </Animated.View>
           </GestureDetector>
