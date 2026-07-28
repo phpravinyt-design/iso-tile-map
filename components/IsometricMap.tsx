@@ -18,6 +18,9 @@ import { Platform } from "react-native";
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
+// House PNG asset - Township-style house
+const HOUSE_PNG = require("@/assets/images/house.png");
+
 // Individual grass tile PNG - placed on each grass tile separately
 const GRASS_TILE_PNG = require("@/assets/images/grass_texture.png");
 
@@ -174,61 +177,58 @@ function SquareTile({ col, row, cell, scale, onPress }: {
   );
 }
 
-// --- SVG Building: Small House (top-down view) ---
+// --- PNG House: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
 
+  // House PNG size - slightly larger than tile
+  const houseSize = ts * 1.5;
+
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - ts * 0.6,
-      top: pos.y - ts * 0.6,
-      width: ts * 1.2,
-      height: ts * 1.2,
+      left: pos.x - houseSize / 2,
+      top: pos.y - houseSize / 2,
+      width: houseSize,
+      height: houseSize,
       zIndex: 10,
       pointerEvents: "box-none",
     }}>
-      <Svg width={ts * 1.2} height={ts * 1.2} viewBox={`0 0 ${ts * 1.2} ${ts * 1.2}`}>
-        <Rect x={ts * 0.15} y={ts * 0.2} width={ts * 0.7} height={ts * 0.8} fill="#d4a574" stroke="#a0522d" strokeWidth={1} rx={2} />
-        <Polygon points={`${ts*0.1},${ts*0.2} ${ts*0.6},${ts*0.02} ${ts*0.9},${ts*0.2}`} fill="#c0392b" stroke="#922b21" strokeWidth={0.5} />
-        <Rect x={ts * 0.45} y={ts * 0.6} width={ts * 0.2} height={ts * 0.35} fill="#8B4513" rx={2} />
-        <Circle cx={ts * 0.6} cy={ts * 0.78} r={ts * 0.02} fill="#f1c40f" />
-        <Rect x={ts * 0.22} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.62} y={ts * 0.35} width={ts * 0.15} height={ts * 0.15} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.7} y={ts * 0.05} width={ts * 0.12} height={ts * 0.2} fill="#8B4513" />
-      </Svg>
+      <Image
+        source={HOUSE_PNG}
+        style={{ width: houseSize, height: houseSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
     </View>
   );
 }
 
-// --- SVG Building: Big House (top-down view) ---
+// --- PNG House: Big House (top-down view) ---
 function BigHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
 
+  // House PNG size - larger for big house
+  const houseSize = ts * 1.8;
+
   return (
     <View style={{
       position: "absolute",
-      left: pos.x - ts * 0.65,
-      top: pos.y - ts * 0.7,
-      width: ts * 1.3,
-      height: ts * 1.4,
+      left: pos.x - houseSize / 2,
+      top: pos.y - houseSize / 2,
+      width: houseSize,
+      height: houseSize,
       zIndex: 10,
       pointerEvents: "box-none",
     }}>
-      <Svg width={ts * 1.3} height={ts * 1.4} viewBox={`0 0 ${ts * 1.3} ${ts * 1.4}`}>
-        <Rect x={ts * 0.1} y={ts * 0.3} width={ts * 0.85} height={ts * 1.05} fill="#f5e6c8" stroke="#c9a96e" strokeWidth={1} rx={2} />
-        <Polygon points={`${ts*0.05},${ts*0.3} ${ts*0.525},${ts*0.1} ${ts*1.0},${ts*0.3}`} fill="#2c3e50" stroke="#1a252f" strokeWidth={0.5} />
-        <Rect x={ts * 0.4} y={ts * 0.85} width={ts * 0.25} height={ts * 0.45} fill="#5d4037" rx={3} />
-        <Circle cx={ts * 0.6} cy={ts * 1.08} r={ts * 0.025} fill="#f1c40f" />
-        <Rect x={ts * 0.15} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.72} y={ts * 0.45} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.15} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.72} y={ts * 0.7} width={ts * 0.18} height={ts * 0.18} fill="#87CEEB" stroke="#5b9bd5" strokeWidth={0.5} />
-        <Rect x={ts * 0.78} y={ts * 0.15} width={ts * 0.15} height={ts * 0.25} fill="#7f8c8d" />
-        <Rect x={ts * 0.05} y={ts * 1.28} width={ts * 0.95} height={ts * 0.06} fill="#8B7355" opacity={0.6} />
-      </Svg>
+      <Image
+        source={HOUSE_PNG}
+        style={{ width: houseSize, height: houseSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
     </View>
   );
 }
