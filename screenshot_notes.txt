@@ -1,1 +1,1 @@
-Tree now sits directly on grass tiles without any grass/diamond base underneath. The foliage and trunk are clearly visible and blend nicely with the grass texture background. Looks clean and Township-style. Fix is complete.
+New grass PNG applied as the full map background texture. The user's image with green grass patches and yellow-green leaf clusters is now the base layer covering the entire map. Looks good - consistent with the user's provided texture.

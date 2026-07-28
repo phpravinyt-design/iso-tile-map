@@ -29,3 +29,4 @@
 - [x] Generate seamless grass texture PNG without visible seams between tiles
 - [x] Generate premium high-quality seamless grass texture (Township/HayDay style, 2048x2048, perfectly tileable)
 - [x] Remove the grass patch from under the tree PNG - tree sits directly on grass tiles
+- [x] Replace the entire map background grass texture with user's new grass PNG
