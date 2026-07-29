@@ -18,6 +18,9 @@ import { Platform } from "react-native";
 // Tree PNG asset
 const TREE_PNG = require("@/assets/images/tree.png");
 
+// Palm tree PNG asset
+const PALM_TREE_PNG = require("@/assets/images/palm_tree.png");
+
 // House PNG asset - Township-style house
 const HOUSE_PNG = require("@/assets/images/house.png");
 
@@ -38,12 +41,16 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] 
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
-const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "none"] as const;
+const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "palm_tree", "none"] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "tree_png", "grass_plant"] as const;
+const MODES = ["tile", "house_small", "house_big", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
+
+// Tree sub-types for selection
+const TREE_TYPES = ["tree_png", "palm_tree"] as const;
+type TreeType = (typeof TREE_TYPES)[number];
 
 const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: string }> = {
   grass: { base: "#5cb85c", detail: "#4a9a4a", accent: "#7ec87e" },
@@ -59,7 +66,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   house_small: "🏠",
   house_big: "🏡",
-  tree_png: "🌳",
+  tree: "🌳",
   grass_plant: "🌿",
 };
 
@@ -233,7 +240,7 @@ function BigHouse({ col, row, scale }: { col: number; row: number; scale: number
   );
 }
 
-// --- PNG Tree (top-down view) ---
+// --- PNG Tree (round foliage tree) ---
 function PngTree({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -251,6 +258,32 @@ function PngTree({ col, row, scale }: { col: number; row: number; scale: number 
     }}>
       <Image
         source={TREE_PNG}
+        style={{ width: treeSize, height: treeSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
+// --- PNG Palm Tree ---
+function PalmTree({ col, row, scale }: { col: number; row: number; scale: number }) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const treeSize = ts * 1.3;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - treeSize / 2,
+      top: pos.y - treeSize / 2,
+      width: treeSize,
+      height: treeSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={PALM_TREE_PNG}
         style={{ width: treeSize, height: treeSize }}
         contentFit="contain"
         cachePolicy="memory"
@@ -319,6 +352,7 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
     case "tree_png": return <PngTree col={col} row={row} scale={scale} />;
+    case "palm_tree": return <PalmTree col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -327,6 +361,8 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
 export default function IsometricMap() {
   const [grid, setGrid] = useState<GridCell[][]>(createDefaultGrid);
   const [mode, setMode] = useState<PlaceMode>("tile");
+  const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
+  const [showTreeSelector, setShowTreeSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -416,14 +452,23 @@ export default function IsometricMap() {
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
-          } else if (mode === "house_small" || mode === "house_big" || mode === "tree_png") {
+          } else if (mode === "house_small" || mode === "house_big" || mode === "tree") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
-              if (currentBuilding === mode) {
-                newGrid[row][col].building = "none";
+              if (mode === "tree") {
+                // Tree mode: use selectedTreeType
+                if (currentBuilding === selectedTreeType) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = selectedTreeType;
+                }
               } else {
-                newGrid[row][col].building = mode;
+                if (currentBuilding === mode) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = mode;
+                }
               }
             }
           }
@@ -525,7 +570,14 @@ export default function IsometricMap() {
           <TouchableOpacity
             key={m}
             style={[styles.modeButton, mode === m && styles.modeButtonActive]}
-            onPress={() => setMode(m)}
+            onPress={() => {
+              if (m === "tree") {
+                setShowTreeSelector(!showTreeSelector);
+              } else {
+                setShowTreeSelector(false);
+              }
+              setMode(m);
+            }}
             activeOpacity={0.7}
           >
             <Text style={[styles.modeIcon, mode === m && styles.modeIconActive]}>
@@ -534,6 +586,24 @@ export default function IsometricMap() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Tree Sub-Selector (shown when tree mode is active) */}
+      {showTreeSelector && (
+        <View style={styles.treeSelector}>
+          {TREE_TYPES.map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.treeOption, selectedTreeType === t && styles.treeOptionActive]}
+              onPress={() => {
+                setSelectedTreeType(t);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.treeOptionEmoji}>{t === "tree_png" ? "🌳" : "🌴"}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -576,5 +646,37 @@ const styles = StyleSheet.create({
   },
   modeIconActive: {
     fontSize: 26,
+  },
+  treeSelector: {
+    position: "absolute",
+    bottom: 70,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    gap: 12,
+    zIndex: 101,
+  },
+  treeOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  treeOptionActive: {
+    backgroundColor: "rgba(76,175,80,0.5)",
+    borderColor: "#4CAF50",
+    borderWidth: 2,
+  },
+  treeOptionEmoji: {
+    fontSize: 24,
   },
 });

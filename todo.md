@@ -33,3 +33,4 @@
 - [x] Place individual grass PNG on each grass tile (one PNG per tile, not continuous background)
 - [x] Replace SVG houses with user's beautiful Township-style house PNG for both small and big house modes
 - [x] Replace tree PNG with user's new clean tree image (transparent background, just foliage and trunk)
+- [x] Add palm tree PNG alongside existing round tree - tree button shows sub-selector for 2 tree types

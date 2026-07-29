@@ -1,1 +1,1 @@
-The new tree PNG with transparent background is rendering perfectly on the map. No black background visible. Tree sits cleanly on the grass tiles. House, water, rock, flower, dirt tiles all working.
+Mobile viewport: Grass tiles with individual PNG look great. Township house renders nicely. Round tree and water/rock tiles visible. Toolbar at bottom with 5 buttons. Tree selector sub-panel works when tree button is tapped.
