@@ -34,3 +34,4 @@
 - [x] Replace SVG houses with user's beautiful Township-style house PNG for both small and big house modes
 - [x] Replace tree PNG with user's new clean tree image (transparent background, just foliage and trunk)
 - [x] Add palm tree PNG alongside existing round tree - tree button shows sub-selector for 2 tree types
+- [x] Crop 9 trees from the 3x3 sheet and add them all to tree selector (total 10+ tree types)

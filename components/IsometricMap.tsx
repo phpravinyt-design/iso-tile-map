@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   Text,
@@ -15,11 +16,17 @@ import Svg, { Rect, Circle, Polygon, G } from "react-native-svg";
 import { Image } from "expo-image";
 import { Platform } from "react-native";
 
-// Tree PNG asset
+// Tree PNG assets - 11 tree types
 const TREE_PNG = require("@/assets/images/tree.png");
-
-// Palm tree PNG asset
 const PALM_TREE_PNG = require("@/assets/images/palm_tree.png");
+const GREEN_TREE_PNG = require("@/assets/images/cropped_trees/green_tree.png");
+const PINE_TREE_PNG = require("@/assets/images/cropped_trees/pine_tree.png");
+const WILLOW_TREE_PNG = require("@/assets/images/cropped_trees/willow_tree.png");
+const APPLE_TREE_PNG = require("@/assets/images/cropped_trees/apple_tree.png");
+const CHERRY_BLOSSOM_PNG = require("@/assets/images/cropped_trees/cherry_blossom.png");
+const BIRCH_TREE_PNG = require("@/assets/images/cropped_trees/birch_tree.png");
+const AUTUMN_TREE_PNG = require("@/assets/images/cropped_trees/autumn_tree.png");
+const BLUE_TREE_PNG = require("@/assets/images/cropped_trees/blue_tree.png");
 
 // House PNG asset - Township-style house
 const HOUSE_PNG = require("@/assets/images/house.png");
@@ -41,15 +48,41 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] 
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
-const BUILDING_TYPES = ["house_small", "house_big", "tree_png", "palm_tree", "none"] as const;
+const BUILDING_TYPES = [
+  "house_small", "house_big", "none",
+  // 11 tree types
+  "tree_png", "palm_tree",
+  "green_tree", "pine_tree", "willow_tree",
+  "apple_tree", "cherry_blossom", "birch_tree",
+  "autumn_tree", "blue_tree",
+] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
 const MODES = ["tile", "house_small", "house_big", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
-// Tree sub-types for selection
-const TREE_TYPES = ["tree_png", "palm_tree"] as const;
+// Tree emoji labels
+const TREE_EMOJIS: Record<string, string> = {
+  tree_png: "🌳",
+  palm_tree: "🌴",
+  green_tree: "🟢",
+  pine_tree: "🎄",
+  willow_tree: "🌾",
+  apple_tree: "🍎",
+  cherry_blossom: "🌸",
+  birch_tree: "🤍",
+  autumn_tree: "🍂",
+  blue_tree: "🩵",
+};
+
+// Tree sub-types for selection (11 types)
+const TREE_TYPES = [
+  "tree_png", "palm_tree",
+  "green_tree", "pine_tree", "willow_tree",
+  "apple_tree", "cherry_blossom", "birch_tree",
+  "autumn_tree", "blue_tree",
+] as const;
 type TreeType = (typeof TREE_TYPES)[number];
 
 const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: string }> = {
@@ -292,6 +325,49 @@ function PalmTree({ col, row, scale }: { col: number; row: number; scale: number
   );
 }
 
+// --- New Tree Types (all share same rendering pattern) ---
+// Map of tree type key to PNG source
+const TREE_SOURCES: Record<string, any> = {
+  tree_png: TREE_PNG,
+  palm_tree: PALM_TREE_PNG,
+  green_tree: GREEN_TREE_PNG,
+  pine_tree: PINE_TREE_PNG,
+  willow_tree: WILLOW_TREE_PNG,
+  apple_tree: APPLE_TREE_PNG,
+  cherry_blossom: CHERRY_BLOSSOM_PNG,
+  birch_tree: BIRCH_TREE_PNG,
+  autumn_tree: AUTUMN_TREE_PNG,
+  blue_tree: BLUE_TREE_PNG,
+};
+
+// Generic PNG Tree renderer
+function PngTreeGeneric({ col, row, scale, treeType }: {
+  col: number; row: number; scale: number; treeType: string;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const treeSize = ts * 1.3;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - treeSize / 2,
+      top: pos.y - treeSize / 2,
+      width: treeSize,
+      height: treeSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={TREE_SOURCES[treeType] || TREE_PNG}
+        style={{ width: treeSize, height: treeSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // --- PNG Grass Plant (top-down view) ---
 function PngGrassPlant({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
@@ -348,11 +424,13 @@ function GrassOverlay({ col, row, scale }: { col: number; row: number; scale: nu
 function BuildingOnTile({ col, row, buildingType, scale }: {
   col: number; row: number; buildingType: BuildingType; scale: number;
 }) {
+  // All tree types use the generic renderer
+  if (buildingType in TREE_SOURCES) {
+    return <PngTreeGeneric col={col} row={row} scale={scale} treeType={buildingType} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
-    case "tree_png": return <PngTree col={col} row={row} scale={scale} />;
-    case "palm_tree": return <PalmTree col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -589,19 +667,25 @@ export default function IsometricMap() {
 
       {/* Tree Sub-Selector (shown when tree mode is active) */}
       {showTreeSelector && (
-        <View style={styles.treeSelector}>
-          {TREE_TYPES.map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.treeOption, selectedTreeType === t && styles.treeOptionActive]}
-              onPress={() => {
-                setSelectedTreeType(t);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.treeOptionEmoji}>{t === "tree_png" ? "🌳" : "🌴"}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.treeSelectorWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {TREE_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedTreeType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedTreeType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.treeOptionEmoji}>{TREE_EMOJIS[t] || "🌳"}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -647,24 +731,28 @@ const styles = StyleSheet.create({
   modeIconActive: {
     fontSize: 26,
   },
-  treeSelector: {
+  treeSelectorWrapper: {
     position: "absolute",
     bottom: 70,
     left: 0,
     right: 0,
+    zIndex: 101,
+    maxHeight: 80,
+  },
+  treeSelector: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: "rgba(0,0,0,0.8)",
-    gap: 12,
-    zIndex: 101,
+    gap: 8,
+    borderRadius: 16,
+    marginHorizontal: 16,
   },
   treeOption: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
@@ -677,6 +765,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   treeOptionEmoji: {
-    fontSize: 24,
+    fontSize: 20,
   },
 });
