@@ -36,3 +36,4 @@
 - [x] Add palm tree PNG alongside existing round tree - tree button shows sub-selector for 2 tree types
 - [x] Crop 9 trees from the 3x3 sheet and add them all to tree selector (total 10+ tree types)
 - [ ] Fix tree selector buttons to show each tree's own unique PNG thumbnail instead of all showing the same tree
+- [ ] Replace cherry blossom tree on map with user's exact pink cherry blossom PNG (with grass base and flowers)
