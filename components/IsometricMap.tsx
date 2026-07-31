@@ -682,7 +682,12 @@ export default function IsometricMap() {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.treeOptionEmoji}>{TREE_EMOJIS[t] || "🌳"}</Text>
+                <Image
+                  source={TREE_SOURCES[t] || TREE_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -750,9 +755,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   treeOption: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
+    width: 56,
+    height: 56,
+    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
@@ -763,6 +768,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(76,175,80,0.5)",
     borderColor: "#4CAF50",
     borderWidth: 2,
+  },
+  treeOptionImage: {
+    width: 48,
+    height: 48,
   },
   treeOptionEmoji: {
     fontSize: 20,
