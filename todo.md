@@ -39,3 +39,4 @@
 - [x] Replace cherry blossom tree on map with user's exact pink cherry blossom PNG (with grass base and flowers)
 - [x] When placing trees, place all 10 tree types on the map so the map looks more beautiful with diverse trees
 - [x] Add Town Market & Provisions building PNG to toolbar - user can select and place on map
+- [x] Fix tree mode: one tree at a time, user selects preferred tree type from selector before placing

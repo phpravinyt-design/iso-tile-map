@@ -62,7 +62,7 @@ const BUILDING_TYPES = [
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "town_market", "tree", "grass_plant", "all_trees"] as const;
+const MODES = ["tile", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -105,7 +105,6 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   town_market: "🏪",
   tree: "🌳",
   grass_plant: "🌿",
-  all_trees: "🌲",
 };
 
 type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean };
@@ -134,19 +133,8 @@ function createDefaultGrid(): GridCell[][] {
       else if ((col * 3 + row * 5) % 31 === 0) tile = "flower";
       else if ((col * 2 + row * 7) % 43 === 0) tile = "dirt";
       let building: BuildingType = "none";
-      if (tile === "grass") {
-        const seed = (col * 11 + row * 7);
-        // Place different tree types across the map
-        if (seed % 103 === 0) building = "tree_png";
-        else if (seed % 97 === 0) building = "green_tree";
-        else if (seed % 89 === 0) building = "pine_tree";
-        else if (seed % 83 === 0) building = "willow_tree";
-        else if (seed % 79 === 0) building = "apple_tree";
-        else if (seed % 73 === 0) building = "cherry_blossom";
-        else if (seed % 67 === 0) building = "birch_tree";
-        else if (seed % 61 === 0) building = "autumn_tree";
-        else if (seed % 59 === 0) building = "blue_tree";
-        else if (seed % 53 === 0) building = "palm_tree";
+      if (tile === "grass" && (col * 11 + row * 7) % 53 === 0) {
+        building = "tree_png";
       }
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
@@ -573,23 +561,6 @@ export default function IsometricMap() {
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
-          } else if (mode === "all_trees") {
-            // Place all 10 tree types around the tapped tile (radius 1-2)
-            const treeList = [...TREE_TYPES];
-            let tIdx = 0;
-            for (let dr = -2; dr <= 2; dr++) {
-              for (let dc = -2; dc <= 2; dc++) {
-                const nr = row + dr;
-                const nc = col + dc;
-                if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
-                  const cell = newGrid[nr][nc];
-                  if (cell.tile === "grass" && cell.building === "none") {
-                    cell.building = treeList[tIdx % treeList.length];
-                    tIdx++;
-                  }
-                }
-              }
-            }
           } else if (mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
@@ -601,10 +572,8 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "town_market";
                 }
               } else if (mode === "tree") {
-                // Tree mode: place the selected tree type
-                // If user selected a specific tree, use that
-                // Otherwise cycle through all tree types for variety
-                if (currentBuilding !== "none" && TREE_TYPES.includes(currentBuilding as TreeType)) {
+                // Tree mode: place the user's selected tree type
+                if (currentBuilding === selectedTreeType) {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = selectedTreeType;
@@ -622,7 +591,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode]
+    [mode, selectedTreeType]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -734,7 +703,7 @@ export default function IsometricMap() {
       </View>
 
       {/* Tree Sub-Selector (shown when tree mode is active) */}
-      {showTreeSelector && (
+      {mode === "tree" && (
         <View style={styles.treeSelectorWrapper}>
           <ScrollView
             horizontal
@@ -759,6 +728,9 @@ export default function IsometricMap() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a tree to select it</Text>
+          </View>
         </View>
       )}
     </View>
@@ -844,5 +816,13 @@ const styles = StyleSheet.create({
   },
   treeOptionEmoji: {
     fontSize: 20,
+  },
+  treeSelectedLabel: {
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  treeSelectedText: {
+    color: "#aaa",
+    fontSize: 11,
   },
 });
