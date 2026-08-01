@@ -31,6 +31,9 @@ const BLUE_TREE_PNG = require("@/assets/images/cropped_trees/blue_tree.png");
 // House PNG asset - Township-style house
 const HOUSE_PNG = require("@/assets/images/house.png");
 
+// Town Market building PNG
+const TOWN_MARKET_PNG = require("@/assets/images/town_market.png");
+
 // Individual grass tile PNG - placed on each grass tile separately
 const GRASS_TILE_PNG = require("@/assets/images/grass_texture.png");
 
@@ -49,7 +52,7 @@ type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
-  "house_small", "house_big", "none",
+  "house_small", "house_big", "town_market", "none",
   // 11 tree types
   "tree_png", "palm_tree",
   "green_tree", "pine_tree", "willow_tree",
@@ -59,7 +62,7 @@ const BUILDING_TYPES = [
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "tree", "grass_plant", "all_trees"] as const;
+const MODES = ["tile", "house_small", "house_big", "town_market", "tree", "grass_plant", "all_trees"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -99,6 +102,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   house_small: "🏠",
   house_big: "🏡",
+  town_market: "🏪",
   tree: "🌳",
   grass_plant: "🌿",
   all_trees: "🌲",
@@ -432,6 +436,32 @@ function GrassOverlay({ col, row, scale }: { col: number; row: number; scale: nu
   );
 }
 
+// --- PNG Town Market Building ---
+function TownMarket({ col, row, scale }: { col: number; row: number; scale: number }) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const marketSize = ts * 2.2;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - marketSize / 2,
+      top: pos.y - marketSize / 2,
+      width: marketSize,
+      height: marketSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={TOWN_MARKET_PNG}
+        style={{ width: marketSize, height: marketSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // --- Building Component Selector ---
 function BuildingOnTile({ col, row, buildingType, scale }: {
   col: number; row: number; buildingType: BuildingType; scale: number;
@@ -443,6 +473,7 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
+    case "town_market": return <TownMarket col={col} row={row} scale={scale} />;
     default: return null;
   }
 }
@@ -559,11 +590,17 @@ export default function IsometricMap() {
                 }
               }
             }
-          } else if (mode === "house_small" || mode === "house_big" || mode === "tree") {
+          } else if (mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
-              if (mode === "tree") {
+              if (mode === "town_market") {
+                if (currentBuilding === "town_market") {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = "town_market";
+                }
+              } else if (mode === "tree") {
                 // Tree mode: place the selected tree type
                 // If user selected a specific tree, use that
                 // Otherwise cycle through all tree types for variety
