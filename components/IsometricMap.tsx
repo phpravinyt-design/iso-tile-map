@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, memo } from "react";
 import {
   View,
   ScrollView,
@@ -43,7 +43,7 @@ const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
 // --- Constants ---
 // Flat top-down square tiles (1:1 aspect ratio) - Township style
 const TILE_SIZE = 90;
-const GRID_SIZE = 25;
+const GRID_SIZE = 20;
 const WATER_BG = "#1a2a3a";
 
 // Tile types (ground)
@@ -148,7 +148,7 @@ function createDefaultGrid(): GridCell[][] {
 
 // --- Flat Square Tile Component ---
 // Each grass tile gets its own PNG image placed individually
-function SquareTile({ col, row, cell, scale, onPress }: {
+const SquareTile = memo(function SquareTile({ col, row, cell, scale, onPress }: {
   col: number; row: number; cell: GridCell; scale: number; onPress: () => void;
 }) {
   const pos = gridToScreen(col, row, scale);
@@ -219,7 +219,7 @@ function SquareTile({ col, row, cell, scale, onPress }: {
       ))}
     </TouchableOpacity>
   );
-}
+});
 
 // --- PNG House: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
@@ -664,7 +664,7 @@ export default function IsometricMap() {
 
   return (
     <View style={styles.container}>
-      <GestureHandlerRootView style={styles.mapContainer}>
+      <View style={styles.mapContainer}>
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
@@ -677,7 +677,7 @@ export default function IsometricMap() {
             </Animated.View>
           </GestureDetector>
         </View>
-      </GestureHandlerRootView>
+      </View>
 
       {/* Placement Mode Toolbar */}
       <View style={styles.toolbar}>

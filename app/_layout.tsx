@@ -128,6 +128,10 @@ export default function RootLayout() {
 
   const shouldOverrideSafeArea = Platform.OS === "web";
 
+  if (!appIsReady) {
+    return null;
+  }
+
   if (shouldOverrideSafeArea) {
     return (
       <ThemeProvider>
