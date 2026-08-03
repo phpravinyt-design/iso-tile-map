@@ -45,6 +45,9 @@ const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
 const TILE_SIZE = 90;
 const GRID_SIZE = 20;
 const WATER_BG = "#1a2a3a";
+const DEFAULT_SCALE = 1.0;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.0;
 
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
@@ -170,10 +173,10 @@ const SquareTile = memo(function SquareTile({ col, row, cell, scale, onPress }: 
     >
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
-        // Each grass tile gets its own individual PNG
+        // Each grass tile gets its own individual PNG with slight overlap to hide joints
         <Image
           source={GRASS_TILE_PNG}
-          style={{ width: ts, height: ts }}
+          style={{ width: ts + 3, height: ts + 3 }}
           contentFit="cover"
           pointerEvents="none"
         />
@@ -480,36 +483,41 @@ export default function IsometricMap() {
   const scaleValue = useSharedValue(1);
   const lastScaleValue = useSharedValue(1);
 
-  const [currentScale, setCurrentScale] = useState(1);
+  const [currentScale, setCurrentScale] = useState(DEFAULT_SCALE);
   const panMoved = useRef(false);
   const isPressing = useRef(false);
 
-  const MIN_SCALE = 0.3;
-  const MAX_SCALE = 3.5;
+  const MIN_SCALE = MIN_ZOOM;
+  const MAX_SCALE = MAX_ZOOM;
 
-  // Pan gesture
+  // Pan gesture - smooth free scrolling
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(5)
         .activeOffsetX([-10, 10])
         .activeOffsetY([-10, 10])
-        .failOffsetX([-100, 100])
-        .failOffsetY([-100, 100])
         .onStart(() => {
           lastOffsetX.value = offsetX.value;
           lastOffsetY.value = offsetY.value;
           panMoved.current = false;
-          isPressing.current = false;
+          isPressing.current = true;
         })
         .onUpdate((event) => {
           const dx = event.translationX;
           const dy = event.translationY;
-          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
             panMoved.current = true;
           }
           offsetX.value = lastOffsetX.value + event.translationX;
           offsetY.value = lastOffsetY.value + event.translationY;
+        })
+        .onEnd(() => {
+          runOnJS(() => {
+            setTimeout(() => {
+              isPressing.current = false;
+            }, 50);
+          })();
         })
         .runOnJS(false),
     []
@@ -668,6 +676,19 @@ export default function IsometricMap() {
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
+              {/* Seamless grass background - solid color behind all tiles to hide any gaps */}
+              <View
+                style={{
+                  position: "absolute",
+                  left: -TILE_SIZE * currentScale * 2,
+                  top: -TILE_SIZE * currentScale * 2,
+                  width: (GRID_SIZE + 4) * TILE_SIZE * currentScale,
+                  height: (GRID_SIZE + 4) * TILE_SIZE * currentScale,
+                  backgroundColor: TILE_COLORS.grass.base,
+                  zIndex: -1,
+                  pointerEvents: "none",
+                }}
+              />
               {/* All tiles rendered - each grass tile has its own PNG */}
               {tiles}
               {emptyHitAreas}
