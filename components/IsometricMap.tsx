@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -43,11 +43,8 @@ const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
 // --- Constants ---
 // Flat top-down square tiles (1:1 aspect ratio) - Township style
 const TILE_SIZE = 90;
-const GRID_SIZE = 20;
+const GRID_SIZE = 25;
 const WATER_BG = "#1a2a3a";
-const DEFAULT_SCALE = 1.0;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2.0;
 
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
@@ -151,7 +148,7 @@ function createDefaultGrid(): GridCell[][] {
 
 // --- Flat Square Tile Component ---
 // Each grass tile gets its own PNG image placed individually
-const SquareTile = memo(function SquareTile({ col, row, cell, scale, onPress }: {
+function SquareTile({ col, row, cell, scale, onPress }: {
   col: number; row: number; cell: GridCell; scale: number; onPress: () => void;
 }) {
   const pos = gridToScreen(col, row, scale);
@@ -173,10 +170,10 @@ const SquareTile = memo(function SquareTile({ col, row, cell, scale, onPress }: 
     >
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
-        // Each grass tile gets its own individual PNG with slight overlap to hide joints
+        // Each grass tile gets its own individual PNG
         <Image
           source={GRASS_TILE_PNG}
-          style={{ width: ts + 3, height: ts + 3 }}
+          style={{ width: ts, height: ts }}
           contentFit="cover"
           pointerEvents="none"
         />
@@ -222,7 +219,7 @@ const SquareTile = memo(function SquareTile({ col, row, cell, scale, onPress }: 
       ))}
     </TouchableOpacity>
   );
-});
+}
 
 // --- PNG House: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
@@ -483,41 +480,36 @@ export default function IsometricMap() {
   const scaleValue = useSharedValue(1);
   const lastScaleValue = useSharedValue(1);
 
-  const [currentScale, setCurrentScale] = useState(DEFAULT_SCALE);
+  const [currentScale, setCurrentScale] = useState(1);
   const panMoved = useRef(false);
   const isPressing = useRef(false);
 
-  const MIN_SCALE = MIN_ZOOM;
-  const MAX_SCALE = MAX_ZOOM;
+  const MIN_SCALE = 0.3;
+  const MAX_SCALE = 3.5;
 
-  // Pan gesture - smooth free scrolling
+  // Pan gesture
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(5)
         .activeOffsetX([-10, 10])
         .activeOffsetY([-10, 10])
+        .failOffsetX([-100, 100])
+        .failOffsetY([-100, 100])
         .onStart(() => {
           lastOffsetX.value = offsetX.value;
           lastOffsetY.value = offsetY.value;
           panMoved.current = false;
-          isPressing.current = true;
+          isPressing.current = false;
         })
         .onUpdate((event) => {
           const dx = event.translationX;
           const dy = event.translationY;
-          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
             panMoved.current = true;
           }
           offsetX.value = lastOffsetX.value + event.translationX;
           offsetY.value = lastOffsetY.value + event.translationY;
-        })
-        .onEnd(() => {
-          runOnJS(() => {
-            setTimeout(() => {
-              isPressing.current = false;
-            }, 50);
-          })();
         })
         .runOnJS(false),
     []
@@ -672,23 +664,10 @@ export default function IsometricMap() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.mapContainer}>
+      <GestureHandlerRootView style={styles.mapContainer}>
         <View style={styles.centerWrapper}>
           <GestureDetector gesture={combinedGesture}>
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
-              {/* Seamless grass background - solid color behind all tiles to hide any gaps */}
-              <View
-                style={{
-                  position: "absolute",
-                  left: -TILE_SIZE * currentScale * 2,
-                  top: -TILE_SIZE * currentScale * 2,
-                  width: (GRID_SIZE + 4) * TILE_SIZE * currentScale,
-                  height: (GRID_SIZE + 4) * TILE_SIZE * currentScale,
-                  backgroundColor: TILE_COLORS.grass.base,
-                  zIndex: -1,
-                  pointerEvents: "none",
-                }}
-              />
               {/* All tiles rendered - each grass tile has its own PNG */}
               {tiles}
               {emptyHitAreas}
@@ -698,7 +677,7 @@ export default function IsometricMap() {
             </Animated.View>
           </GestureDetector>
         </View>
-      </View>
+      </GestureHandlerRootView>
 
       {/* Placement Mode Toolbar */}
       <View style={styles.toolbar}>

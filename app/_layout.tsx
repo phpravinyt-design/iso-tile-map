@@ -8,12 +8,6 @@ import "react-native-reanimated";
 import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
-import * as SplashScreen from "expo-splash-screen";
-
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* reloading the app might trigger this error. */
-});
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -70,31 +64,6 @@ export default function RootLayout() {
       }),
   );
   const [trpcClient] = useState(() => createTRPCClient());
-  const [appIsReady, setAppIsReady] = useState(false);
-
-  useEffect(() => {
-    async function prepare() {
-      try {
-        // Pre-load fonts, make any API calls you need to do here
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (e) {
-        console.warn(e);
-      } finally {
-        // Tell the application to render
-        setAppIsReady(true);
-      }
-    }
-
-    prepare();
-  }, []);
-
-  useEffect(() => {
-    if (appIsReady) {
-      SplashScreen.hideAsync().catch(() => {
-        /* error hiding splash screen */
-      });
-    }
-  }, [appIsReady]);
 
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
@@ -127,10 +96,6 @@ export default function RootLayout() {
   );
 
   const shouldOverrideSafeArea = Platform.OS === "web";
-
-  if (!appIsReady) {
-    return null;
-  }
 
   if (shouldOverrideSafeArea) {
     return (

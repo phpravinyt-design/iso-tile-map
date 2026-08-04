@@ -40,5 +40,3 @@
 - [x] When placing trees, place all 10 tree types on the map so the map looks more beautiful with diverse trees
 - [x] Add Town Market & Provisions building PNG to toolbar - user can select and place on map
 - [x] Fix tree mode: one tree at a time, user selects preferred tree type from selector before placing
-- [x] Fix grass tiles to render seamlessly without visible gaps/joints between tiles
-- [x] Add map scrolling (pan/drag) and medium zoom in/out feature with smooth interaction
