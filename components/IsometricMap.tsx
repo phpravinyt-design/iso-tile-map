@@ -31,6 +31,17 @@ const BLUE_TREE_PNG = require("@/assets/images/cropped_trees/blue_tree.png");
 // House PNG asset - Township-style house
 const HOUSE_PNG = require("@/assets/images/house.png");
 
+// 9 Cropped House PNGs from user's sheet
+const BLUE_HOUSE_RED_ROOF_PNG = require("@/assets/images/cropped_houses/blue_house_red_roof.png");
+const BROWN_HOUSE_BLUE_ROOF_PNG = require("@/assets/images/cropped_houses/brown_house_blue_roof.png");
+const PURPLE_HOUSE_PNG = require("@/assets/images/cropped_houses/purple_house.png");
+const GREEN_ROOF_COTTAGE_PNG = require("@/assets/images/cropped_houses/green_roof_cottage.png");
+const WHITE_VILLA_DOME_PNG = require("@/assets/images/cropped_houses/white_villa_dome.png");
+const ORANGE_ROOF_HOUSE_PNG = require("@/assets/images/cropped_houses/orange_roof_house.png");
+const MODERN_WHITE_HOUSE_PNG = require("@/assets/images/cropped_houses/modern_white_house.png");
+const PURPLE_MANSION_PNG = require("@/assets/images/cropped_houses/purple_mansion.png");
+const STONE_HOUSE_BLUE_ROOF_PNG = require("@/assets/images/cropped_houses/stone_house_blue_roof.png");
+
 // Town Market building PNG
 const TOWN_MARKET_PNG = require("@/assets/images/town_market.png");
 
@@ -45,6 +56,9 @@ const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
 const TILE_SIZE = 90;
 const GRID_SIZE = 25;
 const WATER_BG = "#1a2a3a";
+const DEFAULT_SCALE = 1.0;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.0;
 
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
@@ -60,6 +74,55 @@ const BUILDING_TYPES = [
   "autumn_tree", "blue_tree",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
+
+// House types for selection (9 user-provided houses)
+const HOUSE_TYPES = [
+  "blue_house_red_roof", "brown_house_blue_roof", "purple_house",
+  "green_roof_cottage", "white_villa_dome", "orange_roof_house",
+  "modern_white_house", "purple_mansion", "stone_house_blue_roof",
+] as const;
+type HouseType = (typeof HOUSE_TYPES)[number];
+
+// House PNG sources
+const HOUSE_SOURCES: Record<string, any> = {
+  blue_house_red_roof: BLUE_HOUSE_RED_ROOF_PNG,
+  brown_house_blue_roof: BROWN_HOUSE_BLUE_ROOF_PNG,
+  purple_house: PURPLE_HOUSE_PNG,
+  green_roof_cottage: GREEN_ROOF_COTTAGE_PNG,
+  white_villa_dome: WHITE_VILLA_DOME_PNG,
+  orange_roof_house: ORANGE_ROOF_HOUSE_PNG,
+  modern_white_house: MODERN_WHITE_HOUSE_PNG,
+  purple_mansion: PURPLE_MANSION_PNG,
+  stone_house_blue_roof: STONE_HOUSE_BLUE_ROOF_PNG,
+};
+
+// Generic PNG House renderer
+function PngHouseGeneric({ col, row, scale, houseType }: {
+  col: number; row: number; scale: number; houseType: string;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const houseSize = ts * 1.6;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - houseSize / 2,
+      top: pos.y - houseSize / 2,
+      width: houseSize,
+      height: houseSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={HOUSE_SOURCES[houseType] || HOUSE_PNG}
+        style={{ width: houseSize, height: houseSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
 
 // Placement modes
 const MODES = ["tile", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
@@ -458,6 +521,10 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   if (buildingType in TREE_SOURCES) {
     return <PngTreeGeneric col={col} row={row} scale={scale} treeType={buildingType} />;
   }
+  // All user house types use the generic renderer
+  if (buildingType in HOUSE_SOURCES) {
+    return <PngHouseGeneric col={col} row={row} scale={scale} houseType={buildingType} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
@@ -472,6 +539,8 @@ export default function IsometricMap() {
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
   const [showTreeSelector, setShowTreeSelector] = useState(false);
+  const [selectedHouseType, setSelectedHouseType] = useState<HouseType>("blue_house_red_roof");
+  const [showHouseSelector, setShowHouseSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -480,12 +549,12 @@ export default function IsometricMap() {
   const scaleValue = useSharedValue(1);
   const lastScaleValue = useSharedValue(1);
 
-  const [currentScale, setCurrentScale] = useState(1);
+  const [currentScale, setCurrentScale] = useState(DEFAULT_SCALE);
   const panMoved = useRef(false);
   const isPressing = useRef(false);
 
-  const MIN_SCALE = 0.3;
-  const MAX_SCALE = 3.5;
+  const MIN_SCALE = MIN_ZOOM;
+  const MAX_SCALE = MAX_ZOOM;
 
   // Pan gesture
   const panGesture = useMemo(
@@ -561,7 +630,7 @@ export default function IsometricMap() {
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
-          } else if (mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
@@ -579,10 +648,12 @@ export default function IsometricMap() {
                   newGrid[row][col].building = selectedTreeType;
                 }
               } else {
-                if (currentBuilding === mode) {
+                // house_small or house_big mode: use selectedHouseType
+                const buildingToPlace = mode as BuildingType;
+                if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
                 } else {
-                  newGrid[row][col].building = mode;
+                  newGrid[row][col].building = buildingToPlace;
                 }
               }
             }
@@ -591,7 +662,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType]
+    [mode, selectedTreeType, selectedHouseType]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -701,6 +772,38 @@ export default function IsometricMap() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* House Sub-Selector (shown when house mode is active) */}
+      {(mode === "house_small" || mode === "house_big") && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {HOUSE_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedHouseType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedHouseType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={HOUSE_SOURCES[t] || HOUSE_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a house to select it</Text>
+          </View>
+        </View>
+      )}
 
       {/* Tree Sub-Selector (shown when tree mode is active) */}
       {mode === "tree" && (

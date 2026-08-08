@@ -1,0 +1,4 @@
+All 9 houses cropped successfully from the 3x3 sheet.
+Each is 367x367 PNG with transparent background.
+Houses include grass/path bases at bottom which is fine for placement.
+Files: assets/images/cropped_houses/

@@ -40,3 +40,4 @@
 - [x] When placing trees, place all 10 tree types on the map so the map looks more beautiful with diverse trees
 - [x] Add Town Market & Provisions building PNG to toolbar - user can select and place on map
 - [x] Fix tree mode: one tree at a time, user selects preferred tree type from selector before placing
+- [x] Crop 9 houses from the 3x3 sheet and add them to house selector - user can select and place on tiles like trees
