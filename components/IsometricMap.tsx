@@ -662,8 +662,8 @@ export default function IsometricMap() {
                   newGrid[row][col].building = selectedTreeType;
                 }
               } else {
-                // house_small or house_big mode: use selectedHouseType
-                const buildingToPlace = mode as BuildingType;
+                // house_small or house_big mode: use selectedHouseType (the user's chosen house)
+                const buildingToPlace = selectedHouseType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
                 } else {
