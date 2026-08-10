@@ -211,8 +211,8 @@ function createDefaultGrid(): GridCell[][] {
 
 // --- Flat Square Tile Component ---
 // Each grass tile gets its own PNG image placed individually
-function SquareTile({ col, row, cell, scale, onPress }: {
-  col: number; row: number; cell: GridCell; scale: number; onPress: () => void;
+function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
+  col: number; row: number; cell: GridCell; scale: number; onPress: () => void; onLongPress?: () => void;
 }) {
   const pos = gridToScreen(col, row, scale);
   const colors = TILE_COLORS[cell.tile];
@@ -222,6 +222,8 @@ function SquareTile({ col, row, cell, scale, onPress }: {
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={5000}
       style={{
         position: "absolute",
         left: pos.x - ts / 2,
@@ -614,6 +616,18 @@ export default function IsometricMap() {
     ],
   }));
 
+  // Handle long press to remove building/object
+  const handleRemoveBuilding = useCallback((col: number, row: number) => {
+    setGrid((prev) => {
+      const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+      if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+        newGrid[row][col].building = "none";
+        newGrid[row][col].grassOverlay = false;
+      }
+      return newGrid;
+    });
+  }, []);
+
   // Handle tile/building placement
   const handleTilePress = useCallback(
     (col: number, row: number) => {
@@ -673,12 +687,12 @@ export default function IsometricMap() {
         const cell = grid[row][col];
         if (cell.tile === "none") continue;
         elements.push(
-          <SquareTile key={`tile-${row}-${col}`} col={col} row={row} cell={cell} scale={currentScale} onPress={() => handleTilePress(col, row)} />
+          <SquareTile key={`tile-${row}-${col}`} col={col} row={row} cell={cell} scale={currentScale} onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)} />
         );
       }
     }
     return elements;
-  }, [grid, currentScale, handleTilePress]);
+  }, [grid, currentScale, handleTilePress, handleRemoveBuilding]);
 
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
@@ -704,14 +718,14 @@ export default function IsometricMap() {
         const pos = gridToScreen(col, row, currentScale);
         const ts = TILE_SIZE * currentScale;
         elements.push(
-          <TouchableOpacity key={`empty-${row}-${col}`} activeOpacity={0.3}
+          <TouchableOpacity key={`empty-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
             style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 0 }}
-            onPress={() => handleTilePress(col, row)} />
+            onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)} />
         );
       }
     }
     return elements;
-  }, [grid, currentScale, handleTilePress]);
+  }, [grid, currentScale, handleTilePress, handleRemoveBuilding]);
 
   // Grass overlays
   const grassOverlays = useMemo(() => {
