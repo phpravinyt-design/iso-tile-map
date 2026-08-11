@@ -44,3 +44,4 @@
 - [x] Add long press (5 second tap) on any placed object (tree, house, etc.) to remove it from map
 - [x] Fix house placement - each house button should place the user's SELECTED house type, not always the same house PNG
 - [x] Limit zoom range to medium only (0.7x to 1.5x) - not too zoomed in or out
+- [x] Set app to open in landscape (rotate) mode instead of portrait
