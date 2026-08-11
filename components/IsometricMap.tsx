@@ -57,8 +57,8 @@ const TILE_SIZE = 90;
 const GRID_SIZE = 25;
 const WATER_BG = "#1a2a3a";
 const DEFAULT_SCALE = 1.0;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2.0;
+const MIN_ZOOM = 0.7;
+const MAX_ZOOM = 1.5;
 
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
