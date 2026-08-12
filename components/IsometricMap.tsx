@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  TextInput,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -104,7 +105,9 @@ const WATER_BG = "#1a2a3a";
 const DEFAULT_SCALE = 1.0;
 const MIN_ZOOM = 0.7;
 const MAX_ZOOM = 1.5;
-
+// Currency system
+const STARTING_COINS = 1000;
+const ITEM_COST = 100;
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
@@ -229,6 +232,11 @@ type CommunityType = (typeof COMMUNITY_TYPES)[number];
 const ROAD_TYPES = ["road_straight", "road_corner", "road_intersection"] as const;
 type RoadType = (typeof ROAD_TYPES)[number];
 
+// Full value lists (including house types) used for profile item stats classification
+const TEMPLE_TYPE_VALUES: string[] = [...TEMPLE_TYPES];
+const DECORATION_TYPE_VALUES: string[] = [...DECORATION_TYPES];
+const COMMUNITY_TYPE_VALUES: string[] = [...COMMUNITY_TYPES];
+const HOUSE_TYPE_VALUES: string[] = [...HOUSE_TYPES, "town_market"];
 // House PNG sources
 const HOUSE_SOURCES: Record<string, any> = {
   blue_house_red_roof: BLUE_HOUSE_RED_ROOF_PNG,
@@ -384,6 +392,7 @@ const TREE_TYPES = [
   "autumn_tree", "blue_tree",
 ] as const;
 type TreeType = (typeof TREE_TYPES)[number];
+const TREE_TYPE_VALUES: string[] = [...TREE_TYPES];
 
 const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: string }> = {
   grass: { base: "#5cb85c", detail: "#4a9a4a", accent: "#7ec87e" },
@@ -847,6 +856,14 @@ export default function IsometricMap() {
       }
       setLoaded(true);
     });
+    // Load saved coin balance (profile currency)
+    AsyncStorage.getItem("profile_coins").then((saved) => {
+      const val = saved ? parseInt(saved, 10) : STARTING_COINS;
+      setCoins(Number.isFinite(val) ? val : STARTING_COINS);
+    });
+    AsyncStorage.getItem("profile_name").then((saved) => {
+      if (saved) setProfileName(saved);
+    });
   }, []);
 
   // Save map on change (debounced via useEffect)
@@ -855,6 +872,70 @@ export default function IsometricMap() {
       AsyncStorage.setItem("map_grid", JSON.stringify(grid)).catch(() => {});
     }
   }, [grid, loaded]);
+
+  // Currency system: user starts with 1000 coins; profile currency persisted separately
+  const [coins, setCoins] = useState(STARTING_COINS);
+  const [profileName, setProfileName] = useState("Farmer");
+  const [insufficientFunds, setInsufficientFunds] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showLowCoinsMsg, setShowLowCoinsMsg] = useState(false);
+  const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Flash a low-coins warning when the user places an item with little balance
+  const flashLowCoins = useCallback(() => {
+    if (lowCoinsTimer.current) clearTimeout(lowCoinsTimer.current);
+    setShowLowCoinsMsg(true);
+    lowCoinsTimer.current = setTimeout(() => setShowLowCoinsMsg(false), 2500);
+  }, []);
+
+  // Compute placed item stats for the profile screen
+  const itemStats = useMemo(() => {
+    let buildings = 0;
+    let trees = 0;
+    let roads = 0;
+    let grassPlants = 0;
+    let decorations = 0;
+    let temples = 0;
+    let communities = 0;
+    let houses = 0;
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cell = grid[row][col];
+        if (cell.building && cell.building !== "none") {
+          if (TREE_TYPE_VALUES.includes(cell.building)) {
+            trees += 1;
+          } else if (DECORATION_TYPE_VALUES.includes(cell.building)) {
+            decorations += 1;
+          } else if (TEMPLE_TYPE_VALUES.includes(cell.building)) {
+            temples += 1;
+          } else if (COMMUNITY_TYPE_VALUES.includes(cell.building)) {
+            communities += 1;
+          } else {
+            houses += 1;
+          }
+          buildings += 1;
+        }
+        if (cell.roadOverlay) roads += 1;
+        if (cell.grassOverlay) grassPlants += 1;
+      }
+    }
+    const totalItems = buildings + roads + grassPlants;
+    return { buildings, trees, roads, grassPlants, decorations, temples, communities, houses, totalItems };
+  }, [grid]);
+
+  // Persist coin balance whenever it changes
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem("profile_coins", String(coins)).catch(() => {});
+    }
+  }, [coins, loaded]);
+
+  // Persist profile name whenever it changes
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem("profile_name", profileName).catch(() => {});
+    }
+  }, [profileName, loaded]);
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
   const [showTreeSelector, setShowTreeSelector] = useState(false);
@@ -1051,6 +1132,11 @@ export default function IsometricMap() {
             const current = newGrid[row][col].tile;
             const typeIndex = TILE_TYPES.indexOf(current as TileType);
             const nextType = TILE_TYPES[(typeIndex + 1) % TILE_TYPES.length];
+            // Tile cycle costs 100 coins only when actually changing the tile (not when cycling back to same)
+            if (nextType !== current) {
+              if (coins < ITEM_COST) flashLowCoins();
+              setCoins((c) => Math.max(0, c - ITEM_COST));
+            }
             newGrid[row][col].tile = nextType;
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
@@ -1073,6 +1159,10 @@ export default function IsometricMap() {
               return newGrid;
             }
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
+            if (newGrid[row][col].grassOverlay) {
+              if (coins < ITEM_COST) flashLowCoins();
+              setCoins((c) => Math.max(0, c - ITEM_COST));
+            }
           } else if (mode === "road") {
             // Road mode: road PNG overlays ON grass tile (grass stays underneath)
             // For corner roads, cycle rotation 0→90→180→270 on each tap
@@ -1086,11 +1176,18 @@ export default function IsometricMap() {
             } else {
               newGrid[row][col].roadOverlay = roadToPlace;
               newGrid[row][col].roadRotation = 0;
+              if (coins < ITEM_COST) flashLowCoins();
+              setCoins((c) => Math.max(0, c - ITEM_COST));
             }
           } else if (mode === "tiles") {
             // Tiles mode: apply the selected tile texture to this tile
             const textureToPlace = selectedTileType;
             if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
+              // Tile texture costs 100 coins only when actually changing the texture
+              if (newGrid[row][col].tileTexture !== textureToPlace) {
+                if (coins < ITEM_COST) flashLowCoins();
+                setCoins((c) => Math.max(0, c - ITEM_COST));
+              }
               newGrid[row][col].tileTexture = textureToPlace;
             }
           } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
@@ -1116,6 +1213,7 @@ export default function IsometricMap() {
             if (currentTile === "grass" || currentTile === "dirt") {
               // Clear road overlay if placing a building on top
               newGrid[row][col].roadOverlay = null;
+              let placedNewBuilding = false;
               if (mode === "community") {
                 // Community building mode: use selectedCommunityType (the user's chosen community building)
                 const buildingToPlace = selectedCommunityType as BuildingType;
@@ -1123,12 +1221,14 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
                 }
               } else if (mode === "town_market") {
                 if (currentBuilding === "town_market") {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = "town_market";
+                  placedNewBuilding = true;
                 }
               } else if (mode === "temple") {
                 // Temple mode: place the user's selected temple type
@@ -1137,6 +1237,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
                 }
               } else if (mode === "decoration") {
                 // Decoration mode: place the user's selected decoration type
@@ -1145,6 +1246,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
                 }
               } else if (mode === "tree") {
                 // Tree mode: place the user's selected tree type
@@ -1152,6 +1254,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = selectedTreeType;
+                  placedNewBuilding = true;
                 }
               } else {
                 // house_small or house_big mode: use selectedHouseType (the user's chosen house)
@@ -1160,7 +1263,13 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
                 }
+              }
+              // Placing a NEW item costs 100 coins; removing/toggling off is free
+              if (placedNewBuilding) {
+                if (coins < ITEM_COST) flashLowCoins();
+                setCoins((c) => Math.max(0, c - ITEM_COST));
               }
             }
           }
@@ -1332,6 +1441,81 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Low coins warning (briefly flashes when an item is placed with 0 balance) */}
+      {showLowCoinsMsg && (
+        <View style={styles.lowCoinsMsg}>
+          <Text style={styles.lowCoinsMsgText}>🪙 Not enough coins! (Each item costs 100 🪙)</Text>
+        </View>
+      )}
+
+      {/* Profile Screen (shown when Profile button is tapped) */}
+      {showProfile && (
+        <View style={styles.profilePanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>🧑 Profile</Text>
+            <TouchableOpacity onPress={() => setShowProfile(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Coin balance */}
+          <View style={styles.profileCoinRow}>
+            <View style={styles.profileCoinBadge}>
+              <Text style={styles.profileCoinEmoji}>🪙</Text>
+              <Text style={styles.profileCoinValue}>{coins.toLocaleString()}</Text>
+            </View>
+          </View>
+          {/* Editable profile name */}
+          <TextInput
+            style={styles.profileNameInput}
+            value={profileName}
+            onChangeText={(t) => setProfileName(t.trim().slice(0, 20))}
+            placeholder="Farmer"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            maxLength={20}
+          />
+          {/* Items summary */}
+          <View style={styles.profileStatsGrid}>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.houses}</Text>
+              <Text style={styles.profileStatLabel}>🏠 Houses</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.trees}</Text>
+              <Text style={styles.profileStatLabel}>🌳 Trees</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.temples}</Text>
+              <Text style={styles.profileStatLabel}>🛕 Temples</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.communities}</Text>
+              <Text style={styles.profileStatLabel}>🏛️ Community</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.decorations}</Text>
+              <Text style={styles.profileStatLabel}>🌸 Decor</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.roads}</Text>
+              <Text style={styles.profileStatLabel}>🛣️ Roads</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.grassPlants}</Text>
+              <Text style={styles.profileStatLabel}>🌿 Grass</Text>
+            </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.totalItems}</Text>
+              <Text style={styles.profileStatLabel}>📦 Total</Text>
+            </View>
+          </View>
+          <View style={styles.profileFooter}>
+            <Text style={styles.profileFooterText}>
+              💰 Items invested: {itemStats.totalItems} × 100 = 🪙 {itemStats.totalItems * ITEM_COST}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Items Popup Panel (shown when Items menu is open) */}
       {showItemsMenu && (
         <View style={styles.itemsPanel}>
@@ -1394,6 +1578,15 @@ export default function IsometricMap() {
           activeOpacity={0.7}
         >
           <Text style={[styles.modeIcon, showItemsMenu && styles.modeIconActive]}>🔧</Text>
+        </TouchableOpacity>
+        {/* Profile button with coin balance */}
+        <TouchableOpacity
+          style={[styles.profileButton, showProfile && styles.profileButtonActive]}
+          onPress={() => setShowProfile(!showProfile)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, showProfile && styles.profileButtonIconActive]}>🧑</Text>
+          <Text style={styles.profileCoinText}>🪙 {coins.toLocaleString()}</Text>
         </TouchableOpacity>
         {MODES.includes(mode) && (
           <View style={[styles.modeButton, styles.modeButtonActive, { width: 70, justifyContent: "center" }]}>
@@ -1801,6 +1994,142 @@ const styles = StyleSheet.create({
   clipboardPreviewImage: {
     width: 44,
     height: 44,
+  },
+  profileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(20,20,20,0.75)",
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.45)",
+    gap: 5,
+  },
+  profileButtonActive: {
+    backgroundColor: "rgba(76,175,80,0.55)",
+    borderColor: "#4CAF50",
+    borderWidth: 2,
+  },
+  profileButtonIcon: {
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  profileButtonIconActive: {},
+  profileCoinText: {
+    color: "#FFD700",
+    fontSize: 13,
+    fontWeight: "bold",
+    lineHeight: 18,
+  },
+  profilePanel: {
+    position: "absolute",
+    bottom: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(10,10,10,0.94)",
+    borderRadius: 18,
+    padding: 14,
+    zIndex: 104,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.4)",
+  },
+  profileCoinRow: {
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  profileCoinBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,215,0,0.15)",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.5)",
+    gap: 8,
+  },
+  profileCoinEmoji: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  profileCoinValue: {
+    color: "#FFD700",
+    fontSize: 22,
+    fontWeight: "bold",
+    lineHeight: 28,
+  },
+  profileNameInput: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    color: "#fff",
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  profileStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  profileStat: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: "center",
+    minWidth: 80,
+  },
+  profileStatValue: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    lineHeight: 24,
+  },
+  profileStatLabel: {
+    color: "#bbb",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  profileFooter: {
+    alignItems: "center",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.15)",
+  },
+  profileFooterText: {
+    color: "#FFD700",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  lowCoinsMsg: {
+    position: "absolute",
+    bottom: 170,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(239,68,68,0.95)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    zIndex: 105,
+  },
+  lowCoinsMsgText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "bold",
+    lineHeight: 18,
   },
   clipboardPreviewEmoji: {
     fontSize: 26,

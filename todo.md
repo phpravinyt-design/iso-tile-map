@@ -59,6 +59,10 @@
 - [x] Add visible clipboard indicator bar (orange border) shown when item picked up via 5s long press: shows the actual picked item PNG preview (building/road/grass), title text (e.g. "Item picked up!"), and instruction "Tap a grass tile to shift it • 🗑️ to remove"
 - [x] Add 🗑️ remove button in clipboard bar: tapping it deletes the picked item permanently and closes the bar; also clears clipboard+message when item is shifted to a new tile
 - [x] Pickup message state (pickupMessage) now set on pick-up and cleared on shift; clipboard type carries origCol/origRow for future restore support
-- [ ] Add 5-second press progress bar above the pressed tile: animated fill while user holds tap; on completion item gets picked up (movable)
-- [ ] Cancel progress bar when user releases tap early or pans the map
-- [ ] Show progress bar positioned above the specific pressed tile (accounting for pan/zoom)
+- [x] Add 5-second press progress bar above the pressed tile: orange fill bar (zIndex 50, above tile) animates 0-100% over 5s while user holds tap; on completion item gets picked up via handleRemoveBuilding (movable via clipboard bar)
+- [x] Cancel progress bar when user releases tap early (onPressOut/cancelPressTimer) or pans the map (pan gesture onStart clears via ref to avoid TDZ)
+- [x] Progress bar positioned above the specific pressed tile: rendered inside SquareTile with left/right -10, top -14 offsets, automatically follows pan/zoom since tile positions are computed from gridToScreen
+- [x] Add currency system: user starts with 1000 coins, persisted via AsyncStorage (profile_coins + profile_name keys, separate from map_grid)
+- [x] Deduct 100 coins for every item placed (tile cycle, grass plant, road, tile texture, all buildings); toggle-off/removal free; coins floor at 0 with red low-coins flash warning (2.5s)
+- [x] Add Profile button (🧑 🪙 balance) in toolbar next to Items button that opens a Profile screen
+- [x] Profile screen: gold coin badge balance, editable profile name (max 20), 8 category stat cards (houses/trees/temples/community/decor/roads/grass/total), footer with total invested = items × 100
