@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Text,
   TextInput,
+  Dimensions,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -757,6 +758,44 @@ function PickupPop({
   );
 }
 
+// --- Claim Pop: same bounce + sparkle celebration, centered on screen (for task reward claims) ---
+function ClaimPop({
+  dims,
+  scaleValue,
+  opacityValue,
+}: {
+  dims: { width: number; height: number };
+  scaleValue: SharedValue<number>;
+  opacityValue: SharedValue<number>;
+}) {
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scaleValue.value }],
+    opacity: opacityValue.value,
+  }));
+
+  const size = Math.min(dims.width, dims.height) * 0.35;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: dims.width / 2 - size / 2,
+        top: dims.height / 2 - size / 2,
+        width: size,
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 200,
+      }}
+    >
+      <Animated.View style={animStyle}>
+        <Text style={{ fontSize: size * 0.5, lineHeight: size * 0.65 }}>✨</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 // --- PNG House: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
@@ -1237,6 +1276,10 @@ export default function IsometricMap() {
   const [popRow, setPopRow] = useState<number | null>(null);
   const popScale = useSharedValue(0);
   const popOpacity = useSharedValue(0);
+  const claimPopScale = useSharedValue(0);
+  const claimPopOpacity = useSharedValue(0);
+  const [claimPopActive, setClaimPopActive] = useState(false);
+  const screenDims = useMemo(() => Dimensions.get("window"), []);
   const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
   const [isItemPress, setIsItemPress] = useState(false);
   const cancelPressTimerRef = useRef<() => void>(() => {});
@@ -1403,6 +1446,30 @@ export default function IsometricMap() {
       setPopRow(null);
     }, 550);
   }, [popOpacity, popScale]);
+
+  // Celebration pop effect reused for other success moments (e.g. task reward claim)
+  const playClaimPopEffect = useCallback(() => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (e) {
+        // haptics unavailable, ignore
+      }
+    }
+  }, []);
+
+  const triggerClaimPopAnimation = useCallback(() => {
+    setClaimPopActive(true);
+    claimPopOpacity.value = 1;
+    claimPopScale.value = withSequence(
+      withTiming(1.3, { duration: 120, easing: Easing.out(Easing.back(1.7)) }),
+      withDelay(80, withTiming(0.4, { duration: 220, easing: Easing.inOut(Easing.cubic) }))
+    );
+    claimPopOpacity.value = withDelay(320, withTiming(0, { duration: 150 }));
+    setTimeout(() => {
+      setClaimPopActive(false);
+    }, 550);
+  }, [claimPopOpacity, claimPopScale]);
 
   // Handle tile/building placement
   const handleTilePress = useCallback(
@@ -1622,9 +1689,11 @@ export default function IsometricMap() {
       setTaskRewardMessage(`Claimed +${TASK_REWARD_COINS} 🪙`);
       setShowTaskReward(true);
       setTimeout(() => setShowTaskReward(false), 3500);
+      playClaimPopEffect();
+      triggerClaimPopAnimation();
       return updated;
     });
-  }, []);
+  }, [playClaimPopEffect, triggerClaimPopAnimation]);
 
   // Render ALL tiles (including grass tiles with individual PNG)
   const tiles = useMemo(() => {
@@ -1864,6 +1933,11 @@ export default function IsometricMap() {
           <Text style={styles.tasksHint}>💡 Tip: Place the required items on the map and progress updates automatically!</Text>
         </View>
       )}
+
+      {/* Claim celebration: same ✨ pop used for pickup, centered on screen for task claims */}
+      {claimPopActive ? (
+        <ClaimPop dims={screenDims} scaleValue={claimPopScale} opacityValue={claimPopOpacity} />
+      ) : null}
 
       {/* Task reward banner: brief flash when a task is completed */}
       {showTaskReward && (
