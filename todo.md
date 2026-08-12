@@ -59,3 +59,6 @@
 - [x] Add visible clipboard indicator bar (orange border) shown when item picked up via 5s long press: shows the actual picked item PNG preview (building/road/grass), title text (e.g. "Item picked up!"), and instruction "Tap a grass tile to shift it • 🗑️ to remove"
 - [x] Add 🗑️ remove button in clipboard bar: tapping it deletes the picked item permanently and closes the bar; also clears clipboard+message when item is shifted to a new tile
 - [x] Pickup message state (pickupMessage) now set on pick-up and cleared on shift; clipboard type carries origCol/origRow for future restore support
+- [ ] Add 5-second press progress bar above the pressed tile: animated fill while user holds tap; on completion item gets picked up (movable)
+- [ ] Cancel progress bar when user releases tap early or pans the map
+- [ ] Show progress bar positioned above the specific pressed tile (accounting for pan/zoom)

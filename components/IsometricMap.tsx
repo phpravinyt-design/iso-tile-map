@@ -447,14 +447,19 @@ function createDefaultGrid(): GridCell[][] {
   return grid;
 }
 
+// --- Long-Press Progress Bar above a pressed tile ---
+
+
 // --- Flat Square Tile Component ---
 // Each grass tile gets its own PNG image placed individually
-function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
+function SquareTile({ col, row, cell, scale, onPress, onLongPress, onDelayStart, onDelayEnd, isPressed, progress }: {
   col: number; row: number; cell: GridCell; scale: number; onPress: () => void; onLongPress?: () => void;
+  onDelayStart?: () => void; onDelayEnd?: () => void; isPressed?: boolean; progress?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const colors = TILE_COLORS[cell.tile];
   const ts = TILE_SIZE * scale;
+  const hasItem = cell.building !== "none" || !!cell.roadOverlay || !!cell.grassOverlay;
 
   return (
     <TouchableOpacity
@@ -462,6 +467,12 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={5000}
+      onPressIn={() => {
+        if (onDelayStart) onDelayStart();
+      }}
+      onPressOut={() => {
+        if (onDelayEnd) onDelayEnd();
+      }}
       style={{
         position: "absolute",
         left: pos.x - ts / 2,
@@ -471,6 +482,43 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
         zIndex: 1,
       }}
     >
+      {/* Long-press progress bar above this tile */}
+      {isPressed && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: -10,
+            right: -10,
+            top: -14,
+            height: 8,
+            zIndex: 50,
+          }}
+        >
+          <View style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: "rgba(0,0,0,0.45)",
+          }} />
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: ts + 20,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: "#F59E0B",
+              transform: [{ scaleX: Math.min(1, Math.max(0, (progress ?? 0) / 100)) }],
+              transformOrigin: "left center",
+            }}
+          />
+        </View>
+      )}
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
         // Each grass tile gets its own individual PNG - uses the tileTexture from the cell
@@ -842,6 +890,13 @@ export default function IsometricMap() {
   const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: RoadType; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
   const [pickupMessage, setPickupMessage] = useState<string | null>(null);
 
+  // Long-press progress bar state
+  const pressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pressProgress, setPressProgress] = useState(0); // 0-100
+  const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
+  const [isItemPress, setIsItemPress] = useState(false);
+  const cancelPressTimerRef = useRef<() => void>(() => {});
+
   // Pan gesture
   const panGesture = useMemo(
     () =>
@@ -856,6 +911,7 @@ export default function IsometricMap() {
           lastOffsetY.value = offsetY.value;
           panMoved.current = false;
           isPressing.current = false;
+          runOnJS(cancelPressTimerRef.current)();
         })
         .onUpdate((event) => {
           const dx = event.translationX;
@@ -929,6 +985,43 @@ export default function IsometricMap() {
       return newGrid;
     });
   }, []);
+
+  // Cancel the long-press progress timer (on release / pan start)
+  const cancelPressTimer = useCallback(() => {
+    if (pressTimerRef.current) {
+      clearInterval(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+    setPressProgress(0);
+    setPressTarget(null);
+  }, []);
+  cancelPressTimerRef.current = cancelPressTimer;
+
+  // Start the long-press progress timer: fills 0-100% over 5s then picks up the item
+  const startPressTimer = useCallback((col: number, row: number, item: boolean) => {
+    if (pressTimerRef.current) {
+      clearInterval(pressTimerRef.current);
+    }
+    setPressProgress(0);
+    setPressTarget({ col, row });
+    setIsItemPress(item);
+    let elapsed = 0;
+    const TOTAL = 5000;
+    const STEP = 50;
+    pressTimerRef.current = setInterval(() => {
+      elapsed += STEP;
+      const pct = Math.min(100, (elapsed / TOTAL) * 100);
+      setPressProgress(pct);
+      if (elapsed >= TOTAL) {
+        if (pressTimerRef.current) clearInterval(pressTimerRef.current);
+        pressTimerRef.current = null;
+        setPressProgress(0);
+        setPressTarget(null);
+        runOnJS(handleRemoveBuilding)(col, row);
+        runOnJS(cancelPressTimer)();
+      }
+    }, STEP);
+  }, [handleRemoveBuilding, cancelPressTimer]);
 
   // Handle tile/building placement
   const handleTilePress = useCallback(
@@ -1085,13 +1178,23 @@ export default function IsometricMap() {
       for (let col = 0; col < GRID_SIZE; col++) {
         const cell = grid[row][col];
         if (cell.tile === "none") continue;
+        const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
-          <SquareTile key={`tile-${row}-${col}`} col={col} row={row} cell={cell} scale={currentScale} onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)} />
+          <SquareTile
+            key={`tile-${row}-${col}`}
+            col={col} row={row} cell={cell} scale={currentScale}
+            onPress={() => handleTilePress(col, row)}
+            onLongPress={() => handleRemoveBuilding(col, row)}
+            onDelayStart={() => startPressTimer(col, row, true)}
+            onDelayEnd={() => cancelPressTimer()}
+            isPressed={isPressed}
+            progress={isPressed ? pressProgress : 0}
+          />
         );
       }
     }
     return elements;
-  }, [grid, currentScale, handleTilePress, handleRemoveBuilding]);
+  }, [grid, currentScale, handleTilePress, handleRemoveBuilding, pressTarget, pressProgress, startPressTimer, cancelPressTimer]);
 
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
@@ -1119,7 +1222,9 @@ export default function IsometricMap() {
         elements.push(
           <TouchableOpacity key={`empty-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
             style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 0 }}
-            onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)} />
+            onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)}
+            onPressIn={() => startPressTimer(col, row, false)}
+            onPressOut={() => cancelPressTimer()} />
         );
       }
     }
