@@ -1,0 +1,41 @@
+# Tiles Button Implementation Notes
+
+## Current State:
+- GRASS_TILE_PNG at line 67: single grass texture used for ALL grass tiles
+- SquareTile component at line 337: renders grass tile with GRASS_TILE_PNG
+- TILE_TYPES at line 82: ["grass", "water", "rock", "flower", "dirt", "none"]
+- GridCell at line 296: { tile, building, grassOverlay, roadOverlay, roadRotation }
+- No tile texture subtype field yet
+
+## New files:
+- /assets/images/cropped_tiles/lush_grass.jpg (1254x1254, ~526KB)
+- /assets/images/cropped_tiles/light_grass.png (363x363, ~211KB)  
+- /assets/images/cropped_tiles/sand.png (1029x1024, ~1038KB)
+
+## Plan:
+1. Add 3 tile texture imports (LUSH_GRASS_TILE, LIGHT_GRASS_TILE, SAND_TILE)
+2. Add TILE_TEXTURE_TYPES: ["lush_grass", "light_grass", "sand"]
+3. Add selectedTileTexture state
+4. Add showTileSelector state
+5. Add TILE_TEXTURE_SOURCES map
+6. Update GridCell to include tileTexture field
+7. Update createDefaultGrid to set tileTexture: "lush_grass" for grass tiles
+8. Update SquareTile to render the selected tile texture PNG instead of GRASS_TILE_PNG
+9. Update handleTilePress tile mode to use selectedTileTexture
+10. Add "tiles" to MODES
+11. Add MODE_LABELS entry for tiles: "🟩" or "🧱"
+12. Add tiles selector UI (similar to road selector)
+13. Add toolbar button for tiles
+14. Update save/load to handle tileTexture field
+
+## Key file locations:
+- Imports: lines 21-70
+- TILE_TYPES: line 82
+- MODES: line 250
+- TILE_COLORS: line 276
+- MODE_LABELS: line 285
+- GridCell: line 296
+- SquareTile: lines 337-404
+- State: lines 691-699
+- Toolbar: ~lines 1011-1185
+- Styles: ~lines 1189-1277

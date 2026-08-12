@@ -18,6 +18,11 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
 
+// 3 Tile texture PNGs from user's sheet
+const LUSH_GRASS_TILE_PNG = require("@/assets/images/cropped_tiles/lush_grass.jpg");
+const LIGHT_GRASS_TILE_PNG = require("@/assets/images/cropped_tiles/light_grass.png");
+const SAND_TILE_PNG = require("@/assets/images/cropped_tiles/sand.png");
+
 // Tree PNG assets - 11 tree types
 const TREE_PNG = require("@/assets/images/tree.png");
 const PALM_TREE_PNG = require("@/assets/images/palm_tree.png");
@@ -81,6 +86,17 @@ const MAX_ZOOM = 1.5;
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
+
+// Tile texture types (for the Tiles selector - user picks which grass/sand texture)
+const TILE_TEXTURE_TYPES = ["lush_grass", "light_grass", "sand"] as const;
+type TileTextureType = (typeof TILE_TEXTURE_TYPES)[number];
+
+// Tile texture PNG sources
+const TILE_TEXTURE_SOURCES: Record<string, any> = {
+  lush_grass: LUSH_GRASS_TILE_PNG,
+  light_grass: LIGHT_GRASS_TILE_PNG,
+  sand: SAND_TILE_PNG,
+};
 
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
@@ -247,7 +263,7 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
 }
 
 // Placement modes
-const MODES = ["tile", "community", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -284,6 +300,7 @@ const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: stri
 
 const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
+  tiles: "🧱",
   community: "🏛️",
   road: "🛣️",
   house_small: "🏠",
@@ -293,7 +310,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null; roadRotation: number };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null; roadRotation: number; tileTexture: TileTextureType };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -312,7 +329,7 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null, roadRotation: 0 }); continue; }
+      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass" }); continue; }
       let tile: TileType = "grass";
       if ((col * 7 + row * 3) % 41 === 0) tile = "water";
       else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
@@ -325,7 +342,7 @@ function createDefaultGrid(): GridCell[][] {
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
       }
-      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null, roadRotation: 0 });
+      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass" });
     }
     grid.push(rowArr);
   }
@@ -358,9 +375,9 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
     >
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
-        // Each grass tile gets its own individual PNG
+        // Each grass tile gets its own individual PNG - uses the tileTexture from the cell
         <Image
-          source={GRASS_TILE_PNG}
+          source={TILE_TEXTURE_SOURCES[cell.tileTexture] || GRASS_TILE_PNG}
           style={{ width: ts, height: ts }}
           contentFit="cover"
           pointerEvents="none"
@@ -697,6 +714,8 @@ export default function IsometricMap() {
   const [showCommunitySelector, setShowCommunitySelector] = useState(false);
   const [selectedRoadType, setSelectedRoadType] = useState<RoadType>("road_straight");
   const [showRoadSelector, setShowRoadSelector] = useState(false);
+  const [selectedTileType, setSelectedTileType] = useState<TileTextureType>("lush_grass");
+  const [showTileSelector, setShowTileSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -860,7 +879,13 @@ export default function IsometricMap() {
               newGrid[row][col].roadOverlay = roadToPlace;
               newGrid[row][col].roadRotation = 0;
             }
-          } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
+          } else if (mode === "tiles") {
+            // Tiles mode: apply the selected tile texture to this tile
+            const textureToPlace = selectedTileType;
+            if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
+              newGrid[row][col].tileTexture = textureToPlace;
+            }
+          } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -918,7 +943,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, moveClipboard]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, moveClipboard]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -1044,6 +1069,11 @@ export default function IsometricMap() {
               } else {
                 setShowRoadSelector(false);
               }
+              if (m === "tiles") {
+                setShowTileSelector(!showTileSelector);
+              } else {
+                setShowTileSelector(false);
+              }
               setMode(m);
             }}
             activeOpacity={0.7}
@@ -1147,6 +1177,38 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a house to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Tiles Sub-Selector (shown when tiles mode is active) */}
+      {mode === "tiles" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {TILE_TEXTURE_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedTileType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedTileType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={TILE_TEXTURE_SOURCES[t] || GRASS_TILE_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="cover"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a tile texture to select it</Text>
           </View>
         </View>
       )}
