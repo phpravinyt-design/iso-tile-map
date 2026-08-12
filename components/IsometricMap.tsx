@@ -68,6 +68,17 @@ const TEMPLE_DARK_STONE_PNG = require("@/assets/images/cropped_temples/temple_da
 const TEMPLE_GOLD_POOL_PNG = require("@/assets/images/cropped_temples/temple_gold_pool.png");
 const TEMPLE_BROWN_GOPURAM_PNG = require("@/assets/images/cropped_temples/temple_brown_gopuram.png");
 
+// 9 Decoration PNGs from user's sheet
+const DECORATION_FLOWER_ARCH_PNG = require("@/assets/images/cropped_decorations/flower_arch.png");
+const DECORATION_FOUNTAIN_PNG = require("@/assets/images/cropped_decorations/fountain.png");
+const DECORATION_BENCH_PNG = require("@/assets/images/cropped_decorations/bench.png");
+const DECORATION_TOPIARY_PNG = require("@/assets/images/cropped_decorations/topiary.png");
+const DECORATION_GAZEBO_PNG = require("@/assets/images/cropped_decorations/gazebo.png");
+const DECORATION_FLOWER_POT_PNG = require("@/assets/images/cropped_decorations/flower_pot.png");
+const DECORATION_SWING_PNG = require("@/assets/images/cropped_decorations/swing.png");
+const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decorations/waterfall_pond.png");
+const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
+
 // 9 Community Building PNGs from user's sheet
 const TOWN_HALL_PNG = require("@/assets/images/cropped_community/town_hall.png");
 const HOSPITAL_PNG = require("@/assets/images/cropped_community/hospital.png");
@@ -126,6 +137,9 @@ const BUILDING_TYPES = [
   "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram",
   // 3 road tile types
   "road_straight", "road_corner", "road_intersection",
+  // 9 decoration types
+  "flower_arch", "fountain", "bench", "topiary", "gazebo",
+  "flower_pot", "swing", "waterfall_pond", "flower_bed",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -156,6 +170,39 @@ const TEMPLE_SOURCES: Record<string, any> = {
   temple_dark_stone: TEMPLE_DARK_STONE_PNG,
   temple_gold_pool: TEMPLE_GOLD_POOL_PNG,
   temple_brown_gopuram: TEMPLE_BROWN_GOPURAM_PNG,
+};
+
+// Decoration types for selection (9 decorations)
+const DECORATION_TYPES = [
+  "flower_arch", "fountain", "bench", "topiary", "gazebo",
+  "flower_pot", "swing", "waterfall_pond", "flower_bed",
+] as const;
+type DecorationType = (typeof DECORATION_TYPES)[number];
+
+// Decoration PNG sources
+const DECORATION_SOURCES: Record<string, any> = {
+  flower_arch: DECORATION_FLOWER_ARCH_PNG,
+  fountain: DECORATION_FOUNTAIN_PNG,
+  bench: DECORATION_BENCH_PNG,
+  topiary: DECORATION_TOPIARY_PNG,
+  gazebo: DECORATION_GAZEBO_PNG,
+  flower_pot: DECORATION_FLOWER_POT_PNG,
+  swing: DECORATION_SWING_PNG,
+  waterfall_pond: DECORATION_WATERFALL_POND_PNG,
+  flower_bed: DECORATION_FLOWER_BED_PNG,
+};
+
+// Decoration emoji labels
+const DECORATION_EMOJIS: Record<string, string> = {
+  flower_arch: "🌸",
+  fountain: "⛲",
+  bench: "🪑",
+  topiary: "🌳",
+  gazebo: "🏯",
+  flower_pot: "🌺",
+  swing: "🛝",
+  waterfall_pond: "💧",
+  flower_bed: "🌷",
 };
 
 // Temple emoji labels
@@ -274,7 +321,7 @@ function PngCommunityGeneric({ col, row, scale, communityType }: {
       pointerEvents: "box-none",
     }}>
       <Image
-        source={COMMUNITY_SOURCES[communityType] || TEMPLE_SOURCES[communityType] || TOWN_HALL_PNG}
+        source={COMMUNITY_SOURCES[communityType] || TEMPLE_SOURCES[communityType] || DECORATION_SOURCES[communityType] || TOWN_HALL_PNG}
         style={{ width: bldSize, height: bldSize }}
         contentFit="contain"
         cachePolicy="memory"
@@ -312,7 +359,7 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
 }
 
 // Placement modes
-const MODES = ["tile", "tiles", "community", "temple", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "temple", "decoration", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -351,6 +398,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   tiles: "🧱",
   temple: "🛕",
+  decoration: "🌸",
   community: "🏛️",
   road: "🛣️",
   house_small: "🏠",
@@ -772,6 +820,8 @@ export default function IsometricMap() {
   const [showTileSelector, setShowTileSelector] = useState(false);
   const [selectedTempleType, setSelectedTempleType] = useState<TempleType>("temple_pink");
   const [showTempleSelector, setShowTempleSelector] = useState(false);
+  const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
+  const [showDecorationSelector, setShowDecorationSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -941,7 +991,7 @@ export default function IsometricMap() {
             if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
               newGrid[row][col].tileTexture = textureToPlace;
             }
-          } else if (mode === "community" || mode === "temple" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -985,6 +1035,14 @@ export default function IsometricMap() {
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                 }
+              } else if (mode === "decoration") {
+                // Decoration mode: place the user's selected decoration type
+                const buildingToPlace = selectedDecorationType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                }
               } else if (mode === "tree") {
                 // Tree mode: place the user's selected tree type
                 if (currentBuilding === selectedTreeType) {
@@ -1007,7 +1065,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, moveClipboard]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, moveClipboard]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -1142,6 +1200,11 @@ export default function IsometricMap() {
                 setShowTempleSelector(!showTempleSelector);
               } else {
                 setShowTempleSelector(false);
+              }
+              if (m === "decoration") {
+                setShowDecorationSelector(!showDecorationSelector);
+              } else {
+                setShowDecorationSelector(false);
               }
               setMode(m);
             }}
@@ -1310,6 +1373,38 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a temple to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Decoration Sub-Selector (shown when decoration mode is active) */}
+      {mode === "decoration" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {DECORATION_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedDecorationType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedDecorationType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={DECORATION_SOURCES[t] || DECORATION_FLOWER_ARCH_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap an item to select it</Text>
           </View>
         </View>
       )}
