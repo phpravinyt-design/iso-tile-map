@@ -839,7 +839,8 @@ export default function IsometricMap() {
   const MAX_SCALE = MAX_ZOOM;
 
   // Move clipboard: holds object picked up via long press (cut mode)
-  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: RoadType; roadRotation?: number } | null>(null);
+  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: RoadType; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
+  const [pickupMessage, setPickupMessage] = useState<string | null>(null);
 
   // Pan gesture
   const panGesture = useMemo(
@@ -907,17 +908,22 @@ export default function IsometricMap() {
         const cell = newGrid[row][col];
         // Pick up whatever is there into clipboard for moving
         if (cell.building !== "none") {
-          setMoveClipboard({ type: "building", buildingType: cell.building });
+          setMoveClipboard({ type: "building", buildingType: cell.building, origCol: col, origRow: row });
+          setPickupMessage("Item picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].building = "none";
         } else if (cell.roadOverlay) {
-          setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation });
+          setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation, origCol: col, origRow: row });
+          setPickupMessage("Road picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].roadOverlay = null;
           newGrid[row][col].roadRotation = 0;
         } else if (cell.grassOverlay) {
-          setMoveClipboard({ type: "grass" });
+          setMoveClipboard({ type: "grass", origCol: col, origRow: row });
+          setPickupMessage("Decoration picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].grassOverlay = false;
         } else {
+          // Tapping elsewhere while holding cancels the picked item
           setMoveClipboard(null);
+          setPickupMessage(null);
         }
       }
       return newGrid;
@@ -946,6 +952,7 @@ export default function IsometricMap() {
                 }
               }
               setMoveClipboard(null);
+              setPickupMessage(null);
               return newGrid;
             }
             const current = newGrid[row][col].tile;
@@ -969,6 +976,7 @@ export default function IsometricMap() {
                 }
               }
               setMoveClipboard(null);
+              setPickupMessage(null);
               return newGrid;
             }
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
@@ -1007,6 +1015,7 @@ export default function IsometricMap() {
                 }
               }
               setMoveClipboard(null);
+              setPickupMessage(null);
               return newGrid;
             }
             const currentTile = newGrid[row][col].tile;
@@ -1174,6 +1183,49 @@ export default function IsometricMap() {
           </GestureDetector>
         </View>
       </GestureHandlerRootView>
+
+      {/* Clipboard Indicator Bar (shown when an item is picked up via long press) */}
+      {moveClipboard && (
+        <View style={styles.clipboardBar}>
+          <View style={styles.clipboardPreview}>
+            {moveClipboard.type === "building" && moveClipboard.buildingType ? (
+              <Image
+                source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
+                style={styles.clipboardPreviewImage}
+                contentFit="contain"
+                cachePolicy="memory"
+              />
+            ) : moveClipboard.type === "road" ? (
+              <Image
+                source={ROAD_SOURCES[moveClipboard.roadType || ""] || ROAD_STRAIGHT_PNG}
+                style={styles.clipboardPreviewImage}
+                contentFit="contain"
+                cachePolicy="memory"
+              />
+            ) : (
+              <Text style={styles.clipboardPreviewEmoji}>🌿</Text>
+            )}
+          </View>
+          <View style={styles.clipboardInfo}>
+            <Text style={styles.clipboardText}>
+              {moveClipboard.type === "road" ? "Road picked up!" : moveClipboard.type === "grass" ? "Decoration picked up!" : "Item picked up!"}
+            </Text>
+            <Text style={styles.clipboardSubtext}>
+              Tap a grass tile to shift it • 🗑️ to remove
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.clipboardRemoveBtn}
+            onPress={() => {
+              setMoveClipboard(null);
+              setPickupMessage(null);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.clipboardRemoveBtnText}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Items Popup Panel (shown when Items menu is open) */}
       {showItemsMenu && (
@@ -1616,5 +1668,64 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
+  },
+  clipboardBar: {
+    position: "absolute",
+    bottom: 120,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(30,30,30,0.95)",
+    borderRadius: 16,
+    padding: 10,
+    zIndex: 103,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+  },
+  clipboardPreview: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+    flexShrink: 0,
+  },
+  clipboardPreviewImage: {
+    width: 44,
+    height: 44,
+  },
+  clipboardPreviewEmoji: {
+    fontSize: 26,
+  },
+  clipboardInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  clipboardText: {
+    color: "#F59E0B",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  clipboardSubtext: {
+    color: "#ccc",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  clipboardRemoveBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(239,68,68,0.25)",
+    borderWidth: 1,
+    borderColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  clipboardRemoveBtnText: {
+    fontSize: 20,
   },
 });
