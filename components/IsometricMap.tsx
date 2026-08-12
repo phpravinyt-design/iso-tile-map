@@ -45,6 +45,17 @@ const STONE_HOUSE_BLUE_ROOF_PNG = require("@/assets/images/cropped_houses/stone_
 // Town Market building PNG
 const TOWN_MARKET_PNG = require("@/assets/images/town_market.png");
 
+// 9 Community Building PNGs from user's sheet
+const TOWN_HALL_PNG = require("@/assets/images/cropped_community/town_hall.png");
+const HOSPITAL_PNG = require("@/assets/images/cropped_community/hospital.png");
+const SCHOOL_PNG = require("@/assets/images/cropped_community/school.png");
+const FIRE_STATION_PNG = require("@/assets/images/cropped_community/fire_station.png");
+const POLICE_STATION_PNG = require("@/assets/images/cropped_community/police_station.png");
+const MARKET_PNG = require("@/assets/images/cropped_community/market.png");
+const LIBRARY_PNG = require("@/assets/images/cropped_community/library.png");
+const TRAIN_STATION_PNG = require("@/assets/images/cropped_community/train_station.png");
+const PARK_PNG = require("@/assets/images/cropped_community/park.png");
+
 // Individual grass tile PNG - placed on each grass tile separately
 const GRASS_TILE_PNG = require("@/assets/images/grass_texture.png");
 
@@ -72,6 +83,9 @@ const BUILDING_TYPES = [
   "green_tree", "pine_tree", "willow_tree",
   "apple_tree", "cherry_blossom", "birch_tree",
   "autumn_tree", "blue_tree",
+  // 9 community building types
+  "town_hall", "hospital", "school", "fire_station",
+  "police_station", "market", "library", "train_station", "park",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -82,6 +96,13 @@ const HOUSE_TYPES = [
   "modern_white_house", "purple_mansion", "stone_house_blue_roof",
 ] as const;
 type HouseType = (typeof HOUSE_TYPES)[number];
+
+// Community building types (9 community buildings)
+const COMMUNITY_TYPES = [
+  "town_hall", "hospital", "school", "fire_station",
+  "police_station", "market", "library", "train_station", "park",
+] as const;
+type CommunityType = (typeof COMMUNITY_TYPES)[number];
 
 // House PNG sources
 const HOUSE_SOURCES: Record<string, any> = {
@@ -95,6 +116,60 @@ const HOUSE_SOURCES: Record<string, any> = {
   purple_mansion: PURPLE_MANSION_PNG,
   stone_house_blue_roof: STONE_HOUSE_BLUE_ROOF_PNG,
 };
+
+// Community building PNG sources
+const COMMUNITY_SOURCES: Record<string, any> = {
+  town_hall: TOWN_HALL_PNG,
+  hospital: HOSPITAL_PNG,
+  school: SCHOOL_PNG,
+  fire_station: FIRE_STATION_PNG,
+  police_station: POLICE_STATION_PNG,
+  market: MARKET_PNG,
+  library: LIBRARY_PNG,
+  train_station: TRAIN_STATION_PNG,
+  park: PARK_PNG,
+};
+
+// Community building emoji labels
+const COMMUNITY_EMOJIS: Record<string, string> = {
+  town_hall: "🏛️",
+  hospital: "🏥",
+  school: "🏫",
+  fire_station: "🚒",
+  police_station: "🚔",
+  market: "🛒",
+  library: "📚",
+  train_station: "🚂",
+  park: "🌳",
+};
+
+// Generic Community Building renderer
+function PngCommunityGeneric({ col, row, scale, communityType }: {
+  col: number; row: number; scale: number; communityType: string;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const bldSize = ts * 1.8;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - bldSize / 2,
+      top: pos.y - bldSize / 2,
+      width: bldSize,
+      height: bldSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={COMMUNITY_SOURCES[communityType] || TOWN_HALL_PNG}
+        style={{ width: bldSize, height: bldSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
 
 // Generic PNG House renderer
 function PngHouseGeneric({ col, row, scale, houseType }: {
@@ -125,7 +200,7 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
 }
 
 // Placement modes
-const MODES = ["tile", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "community", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -163,6 +238,7 @@ const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: stri
 
 const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
+  community: "🏛️",
   house_small: "🏠",
   house_big: "🏡",
   town_market: "🏪",
@@ -527,6 +603,10 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   if (buildingType in HOUSE_SOURCES) {
     return <PngHouseGeneric col={col} row={row} scale={scale} houseType={buildingType} />;
   }
+  // All community building types use the generic renderer
+  if (buildingType in COMMUNITY_SOURCES) {
+    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
@@ -543,6 +623,8 @@ export default function IsometricMap() {
   const [showTreeSelector, setShowTreeSelector] = useState(false);
   const [selectedHouseType, setSelectedHouseType] = useState<HouseType>("blue_house_red_roof");
   const [showHouseSelector, setShowHouseSelector] = useState(false);
+  const [selectedCommunityType, setSelectedCommunityType] = useState<CommunityType>("town_hall");
+  const [showCommunitySelector, setShowCommunitySelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -644,11 +726,19 @@ export default function IsometricMap() {
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
-          } else if (mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
+          } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
-              if (mode === "town_market") {
+              if (mode === "community") {
+                // Community building mode: use selectedCommunityType (the user's chosen community building)
+                const buildingToPlace = selectedCommunityType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                }
+              } else if (mode === "town_market") {
                 if (currentBuilding === "town_market") {
                   newGrid[row][col].building = "none";
                 } else {
@@ -676,7 +766,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -786,6 +876,38 @@ export default function IsometricMap() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Community Building Sub-Selector (shown when community mode is active) */}
+      {mode === "community" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {COMMUNITY_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedCommunityType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedCommunityType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={COMMUNITY_SOURCES[t] || TOWN_HALL_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a building to select it</Text>
+          </View>
+        </View>
+      )}
 
       {/* House Sub-Selector (shown when house mode is active) */}
       {(mode === "house_small" || mode === "house_big") && (

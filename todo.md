@@ -45,3 +45,4 @@
 - [x] Fix house placement - each house button should place the user's SELECTED house type, not always the same house PNG
 - [x] Limit zoom range to medium only (0.7x to 1.5x) - not too zoomed in or out
 - [x] Set app to open in landscape (rotate) mode instead of portrait
+- [x] Crop 9 community buildings from 3x3 sheet and add to toolbar (left of house button) - user can select and place on map
