@@ -53,3 +53,4 @@
 - [x] Move object feature: 5 second tap on any placed object picks it up (cut mode), then tap another location to place it there
 - [x] Add Tiles button (🧱) with 3 tile textures - lush grass, light grass, sand - user selects from sub-selector and taps tiles to apply; texture stored per-tile in tileTexture field and persists via AsyncStorage
 - [x] Add Temple button (🛕) left of house button with 9 temple PNGs cropped from user's 3x3 sheet - user selects from sub-selector and places on map like houses
+- [x] Fix temple button: PngCommunityGeneric now resolves temple sources (TEMPLE_SOURCES fallback) so placed temples show the correct PNG instead of town hall; verified selector opens, temple selection, and placement on a tile all work

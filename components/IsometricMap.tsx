@@ -274,7 +274,7 @@ function PngCommunityGeneric({ col, row, scale, communityType }: {
       pointerEvents: "box-none",
     }}>
       <Image
-        source={COMMUNITY_SOURCES[communityType] || TOWN_HALL_PNG}
+        source={COMMUNITY_SOURCES[communityType] || TEMPLE_SOURCES[communityType] || TOWN_HALL_PNG}
         style={{ width: bldSize, height: bldSize }}
         contentFit="contain"
         cachePolicy="memory"
