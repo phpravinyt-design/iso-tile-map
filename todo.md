@@ -94,3 +94,10 @@
 - [x] NPCs follow map pan/zoom (use gridToScreen like buildings, zIndex 15 between grass and buildings, sprite flip for direction)
 - [x] NPCs avoid buildings/roads, only walk on grass/dirt tiles, pick random walkable candidates within radius 3-5
 - [x] Verified in browser: 4 NPCs (farmer, child, woman, villager man) visible walking on grass tiles near center, TypeScript clean, 6 tests passing
+
+## Animal NPCs
+- [x] Generate animal sprite assets: Township-style cow, chicken, dog as transparent PNGs matching art style (resized to 200px, ~42KB each)
+- [x] Implement animal walking system: 3 animals (cow, chicken, dog) spawn and walk around map, slower speed (0.8 tiles/sec) and longer idle (2.5s) than humans
+- [x] Animals avoid buildings/roads, walk on grass/dirt tiles (reuse isTileWalkable + pickRandomWalkableTile)
+- [x] Animals follow pan/zoom (gridToScreen), direction-based sprite flip, zIndex 14 (below humans)
+- [x] Verified in browser: cow, chicken, dog visible walking alongside human NPCs; TypeScript clean, 6 tests passing

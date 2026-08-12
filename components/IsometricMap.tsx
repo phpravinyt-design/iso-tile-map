@@ -110,6 +110,18 @@ const NPC_VILLAGER_MAN_PNG = require("@/assets/images/npc_villager_man_small.png
 const NPC_VILLAGER_WOMAN_PNG = require("@/assets/images/npc_villager_woman_small.png");
 const NPC_CHILD_PNG = require("@/assets/images/npc_child_small.png");
 
+// --- Animal Sprites ---
+const NPC_COW_PNG = require("@/assets/images/npc_cow_small.png");
+const NPC_CHICKEN_PNG = require("@/assets/images/npc_chicken_small.png");
+const NPC_DOG_PNG = require("@/assets/images/npc_dog_small.png");
+
+// Animal sprite sources
+const ANIMAL_SOURCES: Record<string, any> = {
+  cow: NPC_COW_PNG,
+  chicken: NPC_CHICKEN_PNG,
+  dog: NPC_DOG_PNG,
+};
+
 // NPC sprite sources (4 different Township-style characters)
 const NPC_SOURCES: Record<string, any> = {
   farmer: NPC_FARMER_PNG,
@@ -123,6 +135,11 @@ const NPC_COUNT = 4;
 const NPC_WALK_SPEED = 1.2; // tiles per second
 const NPC_IDLE_TIME = 1500; // ms to wait before picking a new destination
 
+// Animal walking config
+const ANIMAL_COUNT = 3;
+const ANIMAL_WALK_SPEED = 0.8; // animals walk slower
+const ANIMAL_IDLE_TIME = 2500; // animals idle longer
+
 // NPC state interface
 interface NpcState {
   id: number;
@@ -133,6 +150,18 @@ interface NpcState {
   targetY: number;
   idleUntil: number;
   direction: 1 | -1; // for sprite flip
+}
+
+// Animal NPC state interface
+interface AnimalNpcState {
+  id: number;
+  type: "cow" | "chicken" | "dog";
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  idleUntil: number;
+  direction: 1 | -1;
 }
 
 // Check if a tile is walkable (grass or dirt, no building)
@@ -187,6 +216,35 @@ function NpcSprite({ npc, scale }: { npc: NpcState; scale: number }) {
       <Image
         source={NPC_SOURCES[npc.type] || NPC_FARMER_PNG}
         style={{ width: npcSize, height: npcSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
+// --- Animal Sprite Renderer ---
+function AnimalSprite({ animal, scale }: { animal: AnimalNpcState; scale: number }) {
+  const pos = gridToScreen(animal.x, animal.y, scale);
+  const ts = TILE_SIZE * scale;
+  const animalSize = ts * 0.55; // Animals are smaller than humans
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - animalSize / 2,
+        top: pos.y - animalSize / 2,
+        width: animalSize,
+        height: animalSize,
+        zIndex: 14, // Slightly below human NPCs
+        transform: animal.direction === -1 ? [{ scaleX: -1 }] : undefined,
+      }}
+    >
+      <Image
+        source={ANIMAL_SOURCES[animal.type] || NPC_COW_PNG}
+        style={{ width: animalSize, height: animalSize }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -1397,21 +1455,39 @@ export default function IsometricMap() {
     return initial;
   });
 
+  // --- Animal NPCs ---
+  const animalTypes: AnimalNpcState["type"][] = ["cow", "chicken", "dog"];
+  const [animals, setAnimals] = useState<AnimalNpcState[]>(() => {
+    const initial: AnimalNpcState[] = [];
+    for (let i = 0; i < ANIMAL_COUNT; i++) {
+      let x = 12 + Math.floor(Math.random() * 4);
+      let y = 12 + Math.floor(Math.random() * 4);
+      initial.push({
+        id: 100 + i,
+        type: animalTypes[i % animalTypes.length],
+        x,
+        y,
+        targetX: x,
+        targetY: y,
+        idleUntil: Date.now() + Math.random() * 3000,
+        direction: Math.random() > 0.5 ? 1 : -1,
+      });
+    }
+    return initial;
+  });
+
   // NPC movement tick (runs every ~100ms for smooth walking)
   useEffect(() => {
     const interval = setInterval(() => {
-      setNpcs((prevNpcs) => {
-        const now = Date.now();
-        return prevNpcs.map((npc) => {
-          // If idle, check if time to pick new destination
-          if (now < npc.idleUntil) return npc;
+      const now = Date.now();
 
-          // Calculate distance to target
+      // Update human NPCs
+      setNpcs((prevNpcs) => {
+        return prevNpcs.map((npc) => {
+          if (now < npc.idleUntil) return npc;
           const dx = npc.targetX - npc.x;
           const dy = npc.targetY - npc.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-
-          // If reached target, go idle
           if (dist < 0.15) {
             const target = pickRandomWalkableTile(grid, npc.x, npc.y);
             if (target) {
@@ -1423,12 +1499,9 @@ export default function IsometricMap() {
                 direction: target.x > npc.x ? 1 : target.x < npc.x ? -1 : npc.direction,
               };
             }
-            // Can't find target, stay idle
             return { ...npc, idleUntil: now + 2000 };
           }
-
-          // Move toward target
-          const speed = NPC_WALK_SPEED * 0.1; // tiles per tick (100ms)
+          const speed = NPC_WALK_SPEED * 0.1;
           const moveX = (dx / dist) * speed;
           const moveY = (dy / dist) * speed;
           return {
@@ -1436,6 +1509,38 @@ export default function IsometricMap() {
             x: npc.x + moveX,
             y: npc.y + moveY,
             direction: moveX > 0.01 ? 1 : moveX < -0.01 ? -1 : npc.direction,
+          };
+        });
+      });
+
+      // Update animal NPCs
+      setAnimals((prevAnimals) => {
+        return prevAnimals.map((animal) => {
+          if (now < animal.idleUntil) return animal;
+          const dx = animal.targetX - animal.x;
+          const dy = animal.targetY - animal.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 0.15) {
+            const target = pickRandomWalkableTile(grid, animal.x, animal.y);
+            if (target) {
+              return {
+                ...animal,
+                targetX: target.x,
+                targetY: target.y,
+                idleUntil: now + ANIMAL_IDLE_TIME,
+                direction: target.x > animal.x ? 1 : target.x < animal.x ? -1 : animal.direction,
+              };
+            }
+            return { ...animal, idleUntil: now + 2000 };
+          }
+          const speed = ANIMAL_WALK_SPEED * 0.1;
+          const moveX = (dx / dist) * speed;
+          const moveY = (dy / dist) * speed;
+          return {
+            ...animal,
+            x: animal.x + moveX,
+            y: animal.y + moveY,
+            direction: moveX > 0.01 ? 1 : moveX < -0.01 ? -1 : animal.direction,
           };
         });
       });
@@ -1886,6 +1991,13 @@ export default function IsometricMap() {
     ));
   }, [npcs, currentScale]);
 
+  // Render Animal NPCs (walking animals on the map)
+  const animalSprites = useMemo(() => {
+    return animals.map((animal) => (
+      <AnimalSprite key={`animal-${animal.id}`} animal={animal} scale={currentScale} />
+    ));
+  }, [animals, currentScale]);
+
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
     const elements: React.ReactNode[] = [];
@@ -1976,6 +2088,8 @@ export default function IsometricMap() {
               {buildings}
               {/* NPCs: walking characters on the map */}
               {npcSprites}
+              {/* Animal NPCs: walking animals */}
+              {animalSprites}
               {/* Pop animation: small scale bounce + sparkle shown when the 5s bar fills */}
               {popCol !== null && popRow !== null && (
                 <PickupPop
