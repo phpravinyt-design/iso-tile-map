@@ -108,6 +108,7 @@ const MAX_ZOOM = 1.5;
 // Currency system
 const STARTING_COINS = 1000;
 const ITEM_COST = 100;
+const SELL_REFUND = 50;
 // Daily reward system: 50 free coins once per day (date-keyed, user timezone)
 const DAILY_REWARD_KEY = "last_daily_reward";
 const STREAK_KEY = "login_streak";
@@ -1065,6 +1066,7 @@ export default function IsometricMap() {
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLowCoinsMsg, setShowLowCoinsMsg] = useState(false);
+  const [showSellMsg, setShowSellMsg] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [streakLevel, setStreakLevel] = useState(0);
   const [dailyRewardAmount, setDailyRewardAmount] = useState(50);
@@ -1253,6 +1255,12 @@ export default function IsometricMap() {
           // Tapping elsewhere while holding cancels the picked item
           setMoveClipboard(null);
           setPickupMessage(null);
+        }
+        // Sell refund: every pickup refunds 50 coins (item removed from map)
+        if (cell.building !== "none" || cell.roadOverlay || cell.grassOverlay) {
+          setCoins((c) => c + SELL_REFUND);
+          setShowSellMsg(true);
+          setTimeout(() => setShowSellMsg(false), 2000);
         }
       }
       return newGrid;
@@ -1676,6 +1684,13 @@ export default function IsometricMap() {
           >
             <Text style={styles.clipboardRemoveBtnText}>🗑️</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Sell refund banner (shown briefly when an item is removed/sold from the map) */}
+      {showSellMsg && (
+        <View style={styles.sellRefundMsg}>
+          <Text style={styles.sellRefundMsgText}>🏪 Item sold! +{SELL_REFUND} 🪙 refunded</Text>
         </View>
       )}
 
@@ -2443,6 +2458,24 @@ const styles = StyleSheet.create({
     zIndex: 105,
   },
   lowCoinsMsgText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "bold",
+    lineHeight: 18,
+  },
+  sellRefundMsg: {
+    position: "absolute",
+    bottom: 130,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(34,197,94,0.95)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    zIndex: 105,
+  },
+  sellRefundMsgText: {
     color: "#fff",
     fontSize: 13,
     fontWeight: "bold",
