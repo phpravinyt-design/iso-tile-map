@@ -57,6 +57,17 @@ const ROAD_STRAIGHT_PNG = require("@/assets/images/cropped_roads/road_straight.p
 const ROAD_CORNER_PNG = require("@/assets/images/cropped_roads/road_corner.png");
 const ROAD_INTERSECTION_PNG = require("@/assets/images/cropped_roads/road_intersection.png");
 
+// 9 Temple PNGs from user's sheet
+const TEMPLE_PINK_PNG = require("@/assets/images/cropped_temples/temple_pink.png");
+const TEMPLE_GOLD_TOWER_PNG = require("@/assets/images/cropped_temples/temple_gold_tower.png");
+const TEMPLE_BROWN_COMPLEX_PNG = require("@/assets/images/cropped_temples/temple_brown_complex.png");
+const TEMPLE_WHITE_MARBLE_PNG = require("@/assets/images/cropped_temples/temple_white_marble.png");
+const TEMPLE_DARK_BRONZE_PNG = require("@/assets/images/cropped_temples/temple_dark_bronze.png");
+const TEMPLE_GOLD_SMALL_PNG = require("@/assets/images/cropped_temples/temple_gold_small.png");
+const TEMPLE_DARK_STONE_PNG = require("@/assets/images/cropped_temples/temple_dark_stone.png");
+const TEMPLE_GOLD_POOL_PNG = require("@/assets/images/cropped_temples/temple_gold_pool.png");
+const TEMPLE_BROWN_GOPURAM_PNG = require("@/assets/images/cropped_temples/temple_brown_gopuram.png");
+
 // 9 Community Building PNGs from user's sheet
 const TOWN_HALL_PNG = require("@/assets/images/cropped_community/town_hall.png");
 const HOSPITAL_PNG = require("@/assets/images/cropped_community/hospital.png");
@@ -109,6 +120,10 @@ const BUILDING_TYPES = [
   // 9 community building types
   "town_hall", "hospital", "school", "fire_station",
   "police_station", "market", "library", "train_station", "park",
+  // 9 temple types
+  "temple_pink", "temple_gold_tower", "temple_brown_complex",
+  "temple_white_marble", "temple_dark_bronze", "temple_gold_small",
+  "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram",
   // 3 road tile types
   "road_straight", "road_corner", "road_intersection",
 ] as const;
@@ -121,6 +136,40 @@ const HOUSE_TYPES = [
   "modern_white_house", "purple_mansion", "stone_house_blue_roof",
 ] as const;
 type HouseType = (typeof HOUSE_TYPES)[number];
+
+// Temple types for selection (9 temples)
+const TEMPLE_TYPES = [
+  "temple_pink", "temple_gold_tower", "temple_brown_complex",
+  "temple_white_marble", "temple_dark_bronze", "temple_gold_small",
+  "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram",
+] as const;
+type TempleType = (typeof TEMPLE_TYPES)[number];
+
+// Temple PNG sources
+const TEMPLE_SOURCES: Record<string, any> = {
+  temple_pink: TEMPLE_PINK_PNG,
+  temple_gold_tower: TEMPLE_GOLD_TOWER_PNG,
+  temple_brown_complex: TEMPLE_BROWN_COMPLEX_PNG,
+  temple_white_marble: TEMPLE_WHITE_MARBLE_PNG,
+  temple_dark_bronze: TEMPLE_DARK_BRONZE_PNG,
+  temple_gold_small: TEMPLE_GOLD_SMALL_PNG,
+  temple_dark_stone: TEMPLE_DARK_STONE_PNG,
+  temple_gold_pool: TEMPLE_GOLD_POOL_PNG,
+  temple_brown_gopuram: TEMPLE_BROWN_GOPURAM_PNG,
+};
+
+// Temple emoji labels
+const TEMPLE_EMOJIS: Record<string, string> = {
+  temple_pink: "🕉️",
+  temple_gold_tower: "🏛️",
+  temple_brown_complex: "🛕",
+  temple_white_marble: "⚪",
+  temple_dark_bronze: "🟫",
+  temple_gold_small: "✨",
+  temple_dark_stone: "🪨",
+  temple_gold_pool: "💧",
+  temple_brown_gopuram: "🛕",
+};
 
 // Community building types (9 community buildings)
 const COMMUNITY_TYPES = [
@@ -263,7 +312,7 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
 }
 
 // Placement modes
-const MODES = ["tile", "tiles", "community", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "temple", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -301,6 +350,7 @@ const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: stri
 const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   tiles: "🧱",
+  temple: "🛕",
   community: "🏛️",
   road: "🛣️",
   house_small: "🏠",
@@ -665,6 +715,10 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   if (buildingType in COMMUNITY_SOURCES) {
     return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} />;
   }
+  // All temple types use the generic renderer
+  if (buildingType in TEMPLE_SOURCES) {
+    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} />;
+  }
   // All road tile types use the generic renderer
   if (buildingType in ROAD_SOURCES) {
     return <PngRoadGeneric col={col} row={row} scale={scale} roadType={buildingType} />;
@@ -716,6 +770,8 @@ export default function IsometricMap() {
   const [showRoadSelector, setShowRoadSelector] = useState(false);
   const [selectedTileType, setSelectedTileType] = useState<TileTextureType>("lush_grass");
   const [showTileSelector, setShowTileSelector] = useState(false);
+  const [selectedTempleType, setSelectedTempleType] = useState<TempleType>("temple_pink");
+  const [showTempleSelector, setShowTempleSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -885,7 +941,7 @@ export default function IsometricMap() {
             if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
               newGrid[row][col].tileTexture = textureToPlace;
             }
-          } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "community" || mode === "temple" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -921,6 +977,14 @@ export default function IsometricMap() {
                 } else {
                   newGrid[row][col].building = "town_market";
                 }
+              } else if (mode === "temple") {
+                // Temple mode: place the user's selected temple type
+                const buildingToPlace = selectedTempleType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                }
               } else if (mode === "tree") {
                 // Tree mode: place the user's selected tree type
                 if (currentBuilding === selectedTreeType) {
@@ -943,7 +1007,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, moveClipboard]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, moveClipboard]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -1073,6 +1137,11 @@ export default function IsometricMap() {
                 setShowTileSelector(!showTileSelector);
               } else {
                 setShowTileSelector(false);
+              }
+              if (m === "temple") {
+                setShowTempleSelector(!showTempleSelector);
+              } else {
+                setShowTempleSelector(false);
               }
               setMode(m);
             }}
@@ -1209,6 +1278,38 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a tile texture to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Temple Sub-Selector (shown when temple mode is active) */}
+      {mode === "temple" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {TEMPLE_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedTempleType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedTempleType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={TEMPLE_SOURCES[t] || TEMPLE_PINK_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a temple to select it</Text>
           </View>
         </View>
       )}
