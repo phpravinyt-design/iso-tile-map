@@ -586,35 +586,50 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress, onDelayStart,
   const hasItem = cell.building !== "none" || !!cell.roadOverlay || !!cell.grassOverlay;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={5000}
-      onPressIn={() => {
+    // Wrapper View owns the responder: responder callbacks survive parent pan gesture
+    // takeover, so the 5s hold timer is never silently cancelled mid-hold
+    <View
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={() => {
         if (onDelayStart) onDelayStart();
       }}
-      onPressOut={() => {
+      onResponderRelease={() => {
         if (onDelayEnd) onDelayEnd();
       }}
-      style={{
-        position: "absolute",
-        left: pos.x - ts / 2,
-        top: pos.y - ts / 2,
-        width: ts,
-        height: ts,
-        zIndex: 1,
+      onResponderTerminate={() => {
+        if (onDelayEnd) onDelayEnd();
       }}
+      style={{ position: "absolute", left: 0, top: 0 }}
     >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={5000}
+        onPressIn={() => {
+          if (onDelayStart) onDelayStart();
+        }}
+        onPressOut={() => {
+          if (onDelayEnd) onDelayEnd();
+        }}
+        style={{
+          position: "absolute",
+          left: pos.x - ts / 2,
+          top: pos.y - ts / 2,
+          width: ts,
+          height: ts,
+          zIndex: 1,
+        }}
+      >
       {/* Long-press progress bar above this tile */}
       {isPressed && (
         <View
           pointerEvents="none"
           style={{
             position: "absolute",
-            left: -10,
-            right: -10,
-            top: -14,
+            left: pos.x - ts / 2 - 10,
+            top: pos.y - ts / 2 - 14,
+            width: ts + 20,
             height: 8,
             zIndex: 50,
           }}
@@ -688,7 +703,8 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress, onDelayStart,
 
         </Svg>
       ))}
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1186,13 +1202,14 @@ export default function IsometricMap() {
           lastOffsetY.value = offsetY.value;
           panMoved.current = false;
           isPressing.current = false;
-          runOnJS(cancelPressTimerRef.current)();
         })
         .onUpdate((event) => {
           const dx = event.translationX;
           const dy = event.translationY;
           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
             panMoved.current = true;
+            // Cancel any running long-press pickup timer only when the map actually moves
+            runOnJS(cancelPressTimerRef.current)();
           }
           offsetX.value = lastOffsetX.value + event.translationX;
           offsetY.value = lastOffsetY.value + event.translationY;
