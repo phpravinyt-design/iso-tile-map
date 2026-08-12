@@ -143,6 +143,7 @@ interface DailyTask {
   required: number;
   progress: number;
   done: boolean;
+  claimed: boolean;
 }
 
 function simpleHash(str: string): number {
@@ -189,6 +190,7 @@ function generateTasksForDate(dateStr: string): DailyTask[] {
       required,
       progress: 0,
       done: false,
+      claimed: false,
     });
   }
   return tasks;
@@ -1002,6 +1004,7 @@ export default function IsometricMap() {
               ...t,
               progress: Math.min(placed, t.required),
               done: placed >= t.required || t.done,
+              claimed: t.claimed ?? false,
             };
           });
           setDailyTasks(synced);
@@ -1453,12 +1456,10 @@ export default function IsometricMap() {
           };
         });
         AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(updated)).catch(() => {});
-        // Award coins for newly completed tasks
+        // Flash banner when a task becomes complete (reward must be claimed via the Claim button)
         const newlyDone = updated.filter((t, i) => t.done && !prev[i].done);
         if (newlyDone.length > 0) {
-          const reward = newlyDone.length * TASK_REWARD_COINS;
-          setCoins((c) => c + reward);
-          setTaskRewardMessage(`Task Complete! +${reward} 🪙`);
+          setTaskRewardMessage(`Task Complete! Tap "Claim Reward" to get your 🪙`);
           setShowTaskReward(true);
           setTimeout(() => setShowTaskReward(false), 3500);
         }
@@ -1469,6 +1470,21 @@ export default function IsometricMap() {
   }, []);
 
   const [taskRewardMessage, setTaskRewardMessage] = useState("");
+
+  // Claim reward for a completed task (user taps the Claim Reward button)
+  const claimTaskReward = useCallback((taskId: number) => {
+    setDailyTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === taskId);
+      if (idx < 0 || !prev[idx].done || prev[idx].claimed) return prev;
+      const updated = prev.map((t) => (t.id === taskId ? { ...t, claimed: true } : t));
+      AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(updated)).catch(() => {});
+      setCoins((c) => c + TASK_REWARD_COINS);
+      setTaskRewardMessage(`Claimed +${TASK_REWARD_COINS} 🪙`);
+      setShowTaskReward(true);
+      setTimeout(() => setShowTaskReward(false), 3500);
+      return updated;
+    });
+  }, []);
 
   // Render ALL tiles (including grass tiles with individual PNG)
   const tiles = useMemo(() => {
@@ -1671,9 +1687,20 @@ export default function IsometricMap() {
                 <View style={styles.taskBarBg}>
                   <View style={[styles.taskBarFill, { width: `${ratio * 100}%` }]} />
                 </View>
-                <Text style={styles.taskRewardText}>
-                  {t.done ? `✅ Earned +${TASK_REWARD_COINS} 🪙` : `Reward: +${TASK_REWARD_COINS} 🪙`}
-                </Text>
+                <View style={styles.taskRewardRow}>
+                  <Text style={styles.taskRewardText}>
+                    {t.done ? (t.claimed ? "✅ Reward Claimed" : `Reward ready: +${TASK_REWARD_COINS} 🪙`) : `Reward: +${TASK_REWARD_COINS} 🪙`}
+                  </Text>
+                  {t.done && !t.claimed ? (
+                    <TouchableOpacity
+                      onPress={() => claimTaskReward(t.id)}
+                      style={styles.taskClaimBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.taskClaimBtnText}>Claim Reward 🪙</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
             );
           })}
@@ -2459,6 +2486,24 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: "#4ADE80",
     borderRadius: 4,
+  },
+  taskRewardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  taskClaimBtn: {
+    backgroundColor: "#F59E0B",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  taskClaimBtnText: {
+    color: "#1F2937",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
   },
   taskRewardText: {
     color: "rgba(255,255,255,0.6)",
