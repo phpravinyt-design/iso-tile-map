@@ -11,8 +11,14 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-g
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
+  withTiming,
+  withDelay,
   runOnJS,
+  Easing,
+  type SharedValue,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import Svg, { Rect, Circle, Polygon, G } from "react-native-svg";
 import { Image } from "expo-image";
 import { Platform } from "react-native";
@@ -708,6 +714,49 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress, onDelayStart,
   );
 }
 
+// --- Pickup Pop: small bounce + sparkle effect when the 5s progress bar fills ---
+function PickupPop({
+  col,
+  row,
+  scale,
+  scaleValue,
+  opacityValue,
+}: {
+  col: number;
+  row: number;
+  scale: number;
+  scaleValue: SharedValue<number>;
+  opacityValue: SharedValue<number>;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const size = ts * 1.4;
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scaleValue.value }],
+    opacity: opacityValue.value,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - size / 2,
+        top: pos.y - size / 2,
+        width: size,
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        ...animStyle,
+      }}
+    >
+      <Text style={{ fontSize: ts * 0.55, lineHeight: ts * 0.7 }}>✨</Text>
+    </Animated.View>
+  );
+}
+
 // --- PNG House: Small House (top-down view) ---
 function SmallHouse({ col, row, scale }: { col: number; row: number; scale: number }) {
   const pos = gridToScreen(col, row, scale);
@@ -1184,6 +1233,10 @@ export default function IsometricMap() {
   // Long-press progress bar state
   const pressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pressProgress, setPressProgress] = useState(0); // 0-100
+  const [popCol, setPopCol] = useState<number | null>(null);
+  const [popRow, setPopRow] = useState<number | null>(null);
+  const popScale = useSharedValue(0);
+  const popOpacity = useSharedValue(0);
   const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
   const [isItemPress, setIsItemPress] = useState(false);
   const cancelPressTimerRef = useRef<() => void>(() => {});
@@ -1317,9 +1370,39 @@ export default function IsometricMap() {
         setPressTarget(null);
         runOnJS(handleRemoveBuilding)(col, row);
         runOnJS(cancelPressTimer)();
+        runOnJS(playPopEffect)();
+        runOnJS(triggerPopAnimation)(col, row);
       }
     }, STEP);
   }, [handleRemoveBuilding, cancelPressTimer]);
+
+  // Pop sound + haptic feedback when the progress bar fully completes
+  const playPopEffect = useCallback(() => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (e) {
+        // haptics unavailable, ignore
+      }
+    }
+  }, []);
+
+  // Small pop animation at the picked-up tile: quick scale bounce + fade out
+  const triggerPopAnimation = useCallback((col: number, row: number) => {
+    setPopCol(col);
+    setPopRow(row);
+    popOpacity.value = 1;
+    popScale.value = withSequence(
+      withTiming(1.3, { duration: 120, easing: Easing.out(Easing.back(1.7)) }),
+      withDelay(80, withTiming(0.4, { duration: 220, easing: Easing.inOut(Easing.cubic) }))
+    );
+    popOpacity.value = withDelay(320, withTiming(0, { duration: 150 }));
+    // clear the pop marker after the animation ends
+    setTimeout(() => {
+      setPopCol(null);
+      setPopRow(null);
+    }, 550);
+  }, [popOpacity, popScale]);
 
   // Handle tile/building placement
   const handleTilePress = useCallback(
@@ -1656,6 +1739,16 @@ export default function IsometricMap() {
               {/* Road overlays rendered on top of grass tiles */}
               {roadOverlays}
               {buildings}
+              {/* Pop animation: small scale bounce + sparkle shown when the 5s bar fills */}
+              {popCol !== null && popRow !== null && (
+                <PickupPop
+                  col={popCol}
+                  row={popRow}
+                  scale={currentScale}
+                  scaleValue={popScale}
+                  opacityValue={popOpacity}
+                />
+              )}
             </Animated.View>
           </GestureDetector>
         </View>
