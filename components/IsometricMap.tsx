@@ -104,6 +104,96 @@ const GRASS_TILE_PNG = require("@/assets/images/grass_texture.png");
 // Grass plant PNG asset - used as a building/object on tiles
 const GRASS_PLANT_PNG = require("@/assets/images/grass_plant.png");
 
+// --- NPC Character Sprites ---
+const NPC_FARMER_PNG = require("@/assets/images/npc_farmer_small.png");
+const NPC_VILLAGER_MAN_PNG = require("@/assets/images/npc_villager_man_small.png");
+const NPC_VILLAGER_WOMAN_PNG = require("@/assets/images/npc_villager_woman_small.png");
+const NPC_CHILD_PNG = require("@/assets/images/npc_child_small.png");
+
+// NPC sprite sources (4 different Township-style characters)
+const NPC_SOURCES: Record<string, any> = {
+  farmer: NPC_FARMER_PNG,
+  villager_man: NPC_VILLAGER_MAN_PNG,
+  villager_woman: NPC_VILLAGER_WOMAN_PNG,
+  child: NPC_CHILD_PNG,
+};
+
+// NPC walking config
+const NPC_COUNT = 4;
+const NPC_WALK_SPEED = 1.2; // tiles per second
+const NPC_IDLE_TIME = 1500; // ms to wait before picking a new destination
+
+// NPC state interface
+interface NpcState {
+  id: number;
+  type: "farmer" | "villager_man" | "villager_woman" | "child";
+  x: number; // grid column (float)
+  y: number; // grid row (float)
+  targetX: number;
+  targetY: number;
+  idleUntil: number;
+  direction: 1 | -1; // for sprite flip
+}
+
+// Check if a tile is walkable (grass or dirt, no building)
+function isTileWalkable(grid: GridCell[][], row: number, col: number): boolean {
+  if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return false;
+  const cell = grid[row][col];
+  // Walkable on grass and dirt tiles, not on water/rock/none, and no building
+  if (cell.tile !== "grass" && cell.tile !== "dirt") return false;
+  if (cell.building !== "none" && cell.building !== "tree_png") return false;
+  if (cell.roadOverlay) return false;
+  return true;
+}
+
+// Pick a random walkable tile near the NPC
+function pickRandomWalkableTile(grid: GridCell[][], currentX: number, currentY: number): { x: number; y: number } | null {
+  // Try random tiles within a radius of 3-5
+  const radius = 3 + (Math.floor(Math.random() * 3));
+  const candidates: { x: number; y: number }[] = [];
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const nx = Math.round(currentX) + dx;
+      const ny = Math.round(currentY) + dy;
+      if (isTileWalkable(grid, ny, nx)) {
+        candidates.push({ x: nx, y: ny });
+      }
+    }
+  }
+  if (candidates.length === 0) return null;
+  // Pick a random candidate
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// --- NPC Sprite Renderer (follows pan/zoom via gridToScreen) ---
+function NpcSprite({ npc, scale }: { npc: NpcState; scale: number }) {
+  const pos = gridToScreen(npc.x, npc.y, scale);
+  const ts = TILE_SIZE * scale;
+  const npcSize = ts * 0.7; // NPCs are smaller than buildings
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - npcSize / 2,
+        top: pos.y - npcSize / 2,
+        width: npcSize,
+        height: npcSize,
+        zIndex: 15, // Above grass, below buildings
+        transform: npc.direction === -1 ? [{ scaleX: -1 }] : undefined,
+      }}
+    >
+      <Image
+        source={NPC_SOURCES[npc.type] || NPC_FARMER_PNG}
+        style={{ width: npcSize, height: npcSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // --- Constants ---
 // Flat top-down square tiles (1:1 aspect ratio) - Township style
 const TILE_SIZE = 90;
@@ -1284,6 +1374,75 @@ export default function IsometricMap() {
   const [isItemPress, setIsItemPress] = useState(false);
   const cancelPressTimerRef = useRef<() => void>(() => {});
 
+  // --- NPC System ---
+  const npcTypes: NpcState["type"][] = ["farmer", "villager_man", "villager_woman", "child"];
+  const [npcs, setNpcs] = useState<NpcState[]>(() => {
+    // Spawn NPCs at random walkable positions near center
+    const initial: NpcState[] = [];
+    for (let i = 0; i < NPC_COUNT; i++) {
+      // Place near center, find walkable
+      let x = 12 + Math.floor(Math.random() * 4);
+      let y = 12 + Math.floor(Math.random() * 4);
+      initial.push({
+        id: i,
+        type: npcTypes[i % npcTypes.length],
+        x,
+        y,
+        targetX: x,
+        targetY: y,
+        idleUntil: Date.now() + Math.random() * 3000,
+        direction: Math.random() > 0.5 ? 1 : -1,
+      });
+    }
+    return initial;
+  });
+
+  // NPC movement tick (runs every ~100ms for smooth walking)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNpcs((prevNpcs) => {
+        const now = Date.now();
+        return prevNpcs.map((npc) => {
+          // If idle, check if time to pick new destination
+          if (now < npc.idleUntil) return npc;
+
+          // Calculate distance to target
+          const dx = npc.targetX - npc.x;
+          const dy = npc.targetY - npc.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          // If reached target, go idle
+          if (dist < 0.15) {
+            const target = pickRandomWalkableTile(grid, npc.x, npc.y);
+            if (target) {
+              return {
+                ...npc,
+                targetX: target.x,
+                targetY: target.y,
+                idleUntil: now + NPC_IDLE_TIME,
+                direction: target.x > npc.x ? 1 : target.x < npc.x ? -1 : npc.direction,
+              };
+            }
+            // Can't find target, stay idle
+            return { ...npc, idleUntil: now + 2000 };
+          }
+
+          // Move toward target
+          const speed = NPC_WALK_SPEED * 0.1; // tiles per tick (100ms)
+          const moveX = (dx / dist) * speed;
+          const moveY = (dy / dist) * speed;
+          return {
+            ...npc,
+            x: npc.x + moveX,
+            y: npc.y + moveY,
+            direction: moveX > 0.01 ? 1 : moveX < -0.01 ? -1 : npc.direction,
+          };
+        });
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [grid]);
+
   // Pan gesture
   const panGesture = useMemo(
     () =>
@@ -1720,6 +1879,13 @@ export default function IsometricMap() {
     return elements;
   }, [grid, currentScale, handleTilePress, handleRemoveBuilding, pressTarget, pressProgress, startPressTimer, cancelPressTimer]);
 
+  // Render NPCs (walking characters on the map)
+  const npcSprites = useMemo(() => {
+    return npcs.map((npc) => (
+      <NpcSprite key={`npc-${npc.id}`} npc={npc} scale={currentScale} />
+    ));
+  }, [npcs, currentScale]);
+
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
     const elements: React.ReactNode[] = [];
@@ -1808,6 +1974,8 @@ export default function IsometricMap() {
               {/* Road overlays rendered on top of grass tiles */}
               {roadOverlays}
               {buildings}
+              {/* NPCs: walking characters on the map */}
+              {npcSprites}
               {/* Pop animation: small scale bounce + sparkle shown when the 5s bar fills */}
               {popCol !== null && popRow !== null && (
                 <PickupPop

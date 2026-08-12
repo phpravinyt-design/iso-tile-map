@@ -87,3 +87,10 @@
 
 ## Follow-up
 - [x] Claim celebration: reusing the pickup pop celebration for Daily Task "Claim Reward" — ClaimPop component (centered screen ✨ sparkle, bounce 1→1.3 with back easing then fade ~550ms, zIndex 200) added; claimTaskReward calls playClaimPopEffect (medium haptic) + triggerClaimPopAnimation before banner; tsc clean, 6 long-press tests passing, app renders verified
+
+## NPC Feature
+- [x] Generate NPC character sprite assets: 4 Township-style characters (farmer, villager_man, villager_woman, child) as transparent PNGs in assets/images/
+- [x] Implement NPC system: 4 NPCs spawn near center, walk between random walkable tiles (grass/dirt, avoiding buildings/roads), smooth 100ms tick movement at 1.2 tiles/sec, idle 1.5s between walks
+- [x] NPCs follow map pan/zoom (use gridToScreen like buildings, zIndex 15 between grass and buildings, sprite flip for direction)
+- [x] NPCs avoid buildings/roads, only walk on grass/dirt tiles, pick random walkable candidates within radius 3-5
+- [x] Verified in browser: 4 NPCs (farmer, child, woman, villager man) visible walking on grass tiles near center, TypeScript clean, 6 tests passing
