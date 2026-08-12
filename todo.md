@@ -47,3 +47,4 @@
 - [x] Set app to open in landscape (rotate) mode instead of portrait
 - [x] Crop 9 community buildings from 3x3 sheet and add to toolbar (left of house button) - user can select and place on map
 - [x] Add Roads button (left of house button) with 3 road tile types - straight, corner/T-junction, intersection - user selects and places on map
+- [x] Remove the old road tile type from tile paint modes, and make road PNG render as an overlay ON grass tiles (grass stays underneath, road sits on top)

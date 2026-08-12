@@ -77,7 +77,7 @@ const MIN_ZOOM = 0.7;
 const MAX_ZOOM = 1.5;
 
 // Tile types (ground)
-const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "road", "none"] as const;
+const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
 
 // Building types (placed ON tiles)
@@ -277,7 +277,6 @@ const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: stri
   rock: { base: "#95a5a6", detail: "#7f8c8d", accent: "#bdc3c7" },
   flower: { base: "#6ab04c", detail: "#e74c3c", accent: "#f9ca24" },
   dirt: { base: "#b08968", detail: "#8d6e63", accent: "#ddb892" },
-  road: { base: "#6b6b6b", detail: "#555555", accent: "#8a8a8a" },
   none: { base: WATER_BG, detail: WATER_BG, accent: WATER_BG },
 };
 
@@ -292,7 +291,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -311,7 +310,7 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false }); continue; }
+      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null }); continue; }
       let tile: TileType = "grass";
       if ((col * 7 + row * 3) % 41 === 0) tile = "water";
       else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
@@ -324,7 +323,7 @@ function createDefaultGrid(): GridCell[][] {
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
       }
-      rowArr.push({ tile, building, grassOverlay: false });
+      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null });
     }
     grid.push(rowArr);
   }
@@ -395,13 +394,7 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress }: {
               <Polygon points={`${ts*0.6},${ts*0.5} ${ts*0.7},${ts*0.4} ${ts*0.75},${ts*0.55} ${ts*0.65},${ts*0.6}`} fill={colors.detail} />
             </>
           )}
-          {cell.tile === "road" && (
-            <>
-              <Rect x={ts * 0.35} y={ts * 0.1} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
-              <Rect x={ts * 0.35} y={ts * 0.4} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
-              <Rect x={ts * 0.35} y={ts * 0.7} width={ts * 0.08} height={ts * 0.15} fill="#e8e8e8" opacity={0.7} />
-            </>
-          )}
+
         </Svg>
       ))}
     </TouchableOpacity>
@@ -779,22 +772,19 @@ export default function IsometricMap() {
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
           } else if (mode === "road") {
-            // Road mode: place the user's selected road tile type
-            const currentTile = newGrid[row][col].tile;
-            if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
-              const roadToPlace = selectedRoadType as BuildingType;
-              if (newGrid[row][col].building === roadToPlace) {
-                newGrid[row][col].building = "none";
-                newGrid[row][col].tile = "grass";
-              } else {
-                newGrid[row][col].building = roadToPlace;
-                newGrid[row][col].tile = "road";
-              }
+            // Road mode: road PNG overlays ON grass tile (grass stays underneath)
+            const roadToPlace = selectedRoadType as RoadType;
+            if (newGrid[row][col].roadOverlay === roadToPlace) {
+              newGrid[row][col].roadOverlay = null;
+            } else {
+              newGrid[row][col].roadOverlay = roadToPlace;
             }
           } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
-            if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
+            if (currentTile === "grass" || currentTile === "dirt") {
+              // Clear road overlay if placing a building on top
+              newGrid[row][col].roadOverlay = null;
               if (mode === "community") {
                 // Community building mode: use selectedCommunityType (the user's chosen community building)
                 const buildingToPlace = selectedCommunityType as BuildingType;
@@ -882,6 +872,22 @@ export default function IsometricMap() {
     return elements;
   }, [grid, currentScale, handleTilePress, handleRemoveBuilding]);
 
+  // Road overlays (render ON grass tiles)
+  const roadOverlays = useMemo(() => {
+    const overlays: React.ReactNode[] = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cell = grid[row][col];
+        if (cell.roadOverlay) {
+          overlays.push(
+            <PngRoadGeneric key={`road-${row}-${col}`} col={col} row={row} scale={currentScale} roadType={cell.roadOverlay} />
+          );
+        }
+      }
+    }
+    return overlays;
+  }, [grid, currentScale]);
+
   // Grass overlays
   const grassOverlays = useMemo(() => {
     const overlays: React.ReactNode[] = [];
@@ -896,6 +902,9 @@ export default function IsometricMap() {
     }
     return overlays;
   }, [grid, currentScale]);
+
+  // Render road overlays
+  const roadRender = roadOverlays;
 
   const gridBounds = useMemo(() => {
     const totalSize = GRID_SIZE * TILE_SIZE + TILE_SIZE * 2;
@@ -913,6 +922,8 @@ export default function IsometricMap() {
               {emptyHitAreas}
               {/* Grass overlays rendered between tiles and buildings */}
               {grassOverlays}
+              {/* Road overlays rendered on top of grass tiles */}
+              {roadOverlays}
               {buildings}
             </Animated.View>
           </GestureDetector>
