@@ -428,28 +428,29 @@ function gridToScreen(col: number, row: number, scale: number) {
   return { x, y };
 }
 
+// Map save version - bumped when the saved map schema/format changes.
+// Old saves with a different version are ignored so the map always starts fresh.
+const MAP_SAVE_VERSION = 2;
+const MAP_SAVE_KEY = `map_grid_v${MAP_SAVE_VERSION}`;
+
+// Clean start map: everything empty except ONE tree and ONE house
+// (placed at fixed spots near the center). User buys everything else with coins.
+const START_TREE_POS = { row: 14, col: 13 } as const;
+const START_HOUSE_POS = { row: 14, col: 16 } as const;
+
 function createDefaultGrid(): GridCell[][] {
   const grid: GridCell[][] = [];
   for (let row = 0; row < GRID_SIZE; row++) {
     const rowArr: GridCell[] = [];
     for (let col = 0; col < GRID_SIZE; col++) {
-      const cx = GRID_SIZE / 2 - 0.5;
-      const cy = GRID_SIZE / 2 - 0.5;
-      const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass" }); continue; }
-      let tile: TileType = "grass";
-      if ((col * 7 + row * 3) % 41 === 0) tile = "water";
-      else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
-      else if ((col * 3 + row * 5) % 31 === 0) tile = "flower";
-      else if ((col * 2 + row * 7) % 43 === 0) tile = "dirt";
       let building: BuildingType = "none";
-      if (tile === "grass" && (col * 11 + row * 7) % 53 === 0) {
-        building = "tree_png";
+      if (row === START_TREE_POS.row && col === START_TREE_POS.col) {
+        building = "tree_png" as BuildingType;
       }
-      if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
-        building = "house_small";
+      if (row === START_HOUSE_POS.row && col === START_HOUSE_POS.col) {
+        building = "house_small" as BuildingType;
       }
-      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass" });
+      rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass" });
     }
     grid.push(rowArr);
   }
@@ -843,7 +844,7 @@ export default function IsometricMap() {
 
   // Load saved map on mount
   useEffect(() => {
-    AsyncStorage.getItem("map_grid").then((saved) => {
+    AsyncStorage.getItem(MAP_SAVE_KEY).then((saved) => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved) as GridCell[][];
@@ -855,6 +856,10 @@ export default function IsometricMap() {
         }
       }
       setLoaded(true);
+    });
+    // Clear out old save keys from previous versions so stale maps never restore
+    ["map_grid", "map_grid_v1"].forEach((oldKey) => {
+      AsyncStorage.removeItem(oldKey).catch(() => {});
     });
     // Load saved coin balance (profile currency)
     AsyncStorage.getItem("profile_coins").then((saved) => {
@@ -869,7 +874,7 @@ export default function IsometricMap() {
   // Save map on change (debounced via useEffect)
   useEffect(() => {
     if (loaded) {
-      AsyncStorage.setItem("map_grid", JSON.stringify(grid)).catch(() => {});
+      AsyncStorage.setItem(MAP_SAVE_KEY, JSON.stringify(grid)).catch(() => {});
     }
   }, [grid, loaded]);
 

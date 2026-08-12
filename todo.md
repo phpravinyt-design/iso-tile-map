@@ -66,3 +66,5 @@
 - [x] Deduct 100 coins for every item placed (tile cycle, grass plant, road, tile texture, all buildings); toggle-off/removal free; coins floor at 0 with red low-coins flash warning (2.5s)
 - [x] Add Profile button (🧑 🪙 balance) in toolbar next to Items button that opens a Profile screen
 - [x] Profile screen: gold coin badge balance, editable profile name (max 20), 8 category stat cards (houses/trees/temples/community/decor/roads/grass/total), footer with total invested = items × 100
+- [x] Make map start clean: only ONE tree (tree_png at row14,col13) + ONE house (house_small at row14,col16) pre-placed at app start, everything else empty grass with lush_grass texture; user buys everything with coins
+- [x] Bump save schema version (MAP_SAVE_VERSION=2, key map_grid_v2) so old saved maps do not restore; old keys (map_grid, map_grid_v1) cleared on load
