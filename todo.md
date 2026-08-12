@@ -74,3 +74,7 @@
 - [x] Login Streak system: consecutive daily logins increase daily reward - streak 1-2 = 50, streak 3-6 = 60, streak 7+ = 70 coins (capped) via rewardForStreak()
 - [x] Streak resets to 0 if a day is missed (last reward date is not yesterday); persists via login_streak AsyncStorage key
 - [x] Reward banner shows "🔥 Streak N! +NN 🪙" when streak > 1; Profile screen shows streak card and next reward amount
+- [x] Daily Tasks system: Tasks button opens a panel with 3 daily tasks, each a random item (house/tree/temple/community/decoration/road) with a required count (1-3) — tasks generated deterministically per day via loop-free hash shuffle (fixed Metro SSR hang caused by retry loop)
+- [x] Completing a task (placing the required number of that item on the map) rewards 100 coins with a reward banner (verified: '✅ Done! ✅ Earned +100 🪙' after placing required houses; progress auto-updates after every placement)
+- [x] Tasks refresh automatically each new day (date-keyed via AsyncStorage, keys daily_tasks/daily_tasks_date); track per-task progress and completed state
+- [x] Show task progress in panel (e.g., "Place 2 Houses: 1/2") with progress bars; tasks complete automatically when required count reached (no manual claim needed); new tasks regenerate at midnight

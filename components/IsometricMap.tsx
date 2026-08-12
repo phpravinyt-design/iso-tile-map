@@ -119,6 +119,80 @@ function rewardForStreak(streak: number): number {
   if (streak >= 3) return 60;
   return 50;
 }
+
+// Daily Tasks system: 3 tasks per day, each asks to place a random item (1-3 copies)
+const DAILY_TASKS_KEY = "daily_tasks";
+const DAILY_TASKS_DATE_KEY = "daily_tasks_date";
+const TASK_REWARD_COINS = 100;
+
+// Task item categories with representative types and emoji labels
+const TASK_ITEM_CATEGORIES: { category: string; types: string[]; label: string }[] = [
+  { category: "houses", types: ["house_small", "house_big", "town_market"], label: "House" },
+  { category: "trees", types: ["tree_png", "palm_tree", "green_tree", "pine_tree", "willow_tree", "apple_tree", "cherry_blossom", "birch_tree", "autumn_tree", "blue_tree"], label: "Tree" },
+  { category: "temples", types: ["temple_pink", "temple_gold_tower", "temple_brown_complex", "temple_white_marble", "temple_dark_bronze", "temple_gold_small", "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram"], label: "Temple" },
+  { category: "community", types: ["town_hall", "hospital", "school", "fire_station", "police_station", "market", "library", "train_station", "park"], label: "Community Building" },
+  { category: "decorations", types: ["flower_arch", "fountain", "bench", "topiary", "gazebo", "flower_pot", "swing", "waterfall_pond", "flower_bed"], label: "Decoration" },
+  { category: "roads", types: ["road_straight", "road_corner", "road_intersection"], label: "Road" },
+];
+
+// Generate today's tasks from the date string (deterministic so all users' daily view is consistent)
+interface DailyTask {
+  id: number;
+  category: string;
+  label: string;
+  required: number;
+  progress: number;
+  done: boolean;
+}
+
+function simpleHash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+// Count how many items of a task category are currently placed on the map
+function countCategoryItems(grid: GridCell[][], category: string): number {
+  let count = 0;
+  const cat = TASK_ITEM_CATEGORIES.find((c) => c.category === category);
+  if (!cat) return 0;
+  for (const row of grid) {
+    for (const cell of row) {
+      const type = cell.building as string;
+      if (type && type !== "none" && cat.types.includes(type)) count += 1;
+    }
+  }
+  return count;
+}
+
+function generateTasksForDate(dateStr: string): DailyTask[] {
+  // Pick 3 distinct categories deterministically for the day, without any
+  // retry loops (loop-free Fisher-Yates shuffle of the category indices).
+  const n = TASK_ITEM_CATEGORIES.length;
+  const indices = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i -= 1) {
+    const j = simpleHash(dateStr + ":pick" + i) % (i + 1);
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  const tasks: DailyTask[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const cat = TASK_ITEM_CATEGORIES[indices[i]];
+    const required = 1 + (simpleHash(dateStr + ":req" + i) % 3);
+    tasks.push({
+      id: i,
+      category: cat.category,
+      label: cat.label,
+      required,
+      progress: 0,
+      done: false,
+    });
+  }
+  return tasks;
+}
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
@@ -909,6 +983,38 @@ export default function IsometricMap() {
     AsyncStorage.getItem("profile_name").then((saved) => {
       if (saved) setProfileName(saved);
     });
+    // Daily tasks: load today's tasks, refresh if it's a new day, and sync progress with the current map
+    const today = new Date().toISOString().slice(0, 10);
+    AsyncStorage.getItem(DAILY_TASKS_DATE_KEY).then((taskDate) => {
+      if (taskDate === today) {
+        // Same day: load saved tasks and update progress against current grid
+        AsyncStorage.getItem(DAILY_TASKS_KEY).then((savedTasks) => {
+          let tasks: DailyTask[] | null = null;
+          if (savedTasks) {
+            try { tasks = JSON.parse(savedTasks); } catch {}
+          }
+          if (!tasks || !Array.isArray(tasks) || tasks.length < 3) {
+            tasks = generateTasksForDate(today);
+          }
+          const synced = tasks.map((t) => {
+            const placed = countCategoryItems(grid, t.category);
+            return {
+              ...t,
+              progress: Math.min(placed, t.required),
+              done: placed >= t.required || t.done,
+            };
+          });
+          setDailyTasks(synced);
+          AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(synced)).catch(() => {});
+        });
+      } else {
+        // New day: generate fresh tasks (progress starts at 0)
+        const fresh = generateTasksForDate(today);
+        setDailyTasks(fresh);
+        AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(fresh)).catch(() => {});
+        AsyncStorage.setItem(DAILY_TASKS_DATE_KEY, today).catch(() => {});
+      }
+    });
   }, []);
 
   // Save map on change (debounced via useEffect)
@@ -927,6 +1033,9 @@ export default function IsometricMap() {
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [streakLevel, setStreakLevel] = useState(0);
   const [dailyRewardAmount, setDailyRewardAmount] = useState(50);
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(generateTasksForDate(new Date().toISOString().slice(0, 10)));
+  const [showTasks, setShowTasks] = useState(false);
+  const [showTaskReward, setShowTaskReward] = useState(false);
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Flash a low-coins warning when the user places an item with little balance
@@ -1324,9 +1433,42 @@ export default function IsometricMap() {
         }
         return newGrid;
       });
+      // Daily tasks: refresh progress against the new grid (after placement)
+      advanceDailyTasks();
     },
     [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, moveClipboard]
   );
+
+  // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
+  const advanceDailyTasks = useCallback(() => {
+    setGrid((g) => {
+      setDailyTasks((prev) => {
+        const updated = prev.map((t) => {
+          if (t.done) return t;
+          const placed = countCategoryItems(g, t.category);
+          return {
+            ...t,
+            progress: Math.min(placed, t.required),
+            done: placed >= t.required,
+          };
+        });
+        AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(updated)).catch(() => {});
+        // Award coins for newly completed tasks
+        const newlyDone = updated.filter((t, i) => t.done && !prev[i].done);
+        if (newlyDone.length > 0) {
+          const reward = newlyDone.length * TASK_REWARD_COINS;
+          setCoins((c) => c + reward);
+          setTaskRewardMessage(`Task Complete! +${reward} 🪙`);
+          setShowTaskReward(true);
+          setTimeout(() => setShowTaskReward(false), 3500);
+        }
+        return updated;
+      });
+      return g; // no grid change, just trigger task refresh
+    });
+  }, []);
+
+  const [taskRewardMessage, setTaskRewardMessage] = useState("");
 
   // Render ALL tiles (including grass tiles with individual PNG)
   const tiles = useMemo(() => {
@@ -1505,6 +1647,47 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Daily Tasks panel (shown when Tasks button is tapped) */}
+      {showTasks && (
+        <View style={styles.profilePanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>📋 Daily Tasks</Text>
+            <TouchableOpacity onPress={() => setShowTasks(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.tasksSubtitle}>Complete tasks to earn +{TASK_REWARD_COINS} 🪙 each. Refreshes tomorrow!</Text>
+          {dailyTasks.map((t, i) => {
+            const ratio = Math.min(t.progress / Math.max(t.required, 1), 1);
+            const catEmoji = t.category === "houses" ? "🏠" : t.category === "trees" ? "🌳" : t.category === "temples" ? "🛕" : t.category === "community" ? "🏛️" : t.category === "decorations" ? "🌸" : "🛣️";
+            return (
+              <View key={i} style={styles.taskCard}>
+                <View style={styles.taskRow}>
+                  <Text style={styles.taskLabel}>{catEmoji} Place {t.required} {t.label}{t.required > 1 ? "s" : ""}</Text>
+                  <Text style={t.done ? styles.taskDoneText : styles.taskCountText}>
+                    {t.done ? "✅ Done!" : `${t.progress}/${t.required}`}
+                  </Text>
+                </View>
+                <View style={styles.taskBarBg}>
+                  <View style={[styles.taskBarFill, { width: `${ratio * 100}%` }]} />
+                </View>
+                <Text style={styles.taskRewardText}>
+                  {t.done ? `✅ Earned +${TASK_REWARD_COINS} 🪙` : `Reward: +${TASK_REWARD_COINS} 🪙`}
+                </Text>
+              </View>
+            );
+          })}
+          <Text style={styles.tasksHint}>💡 Tip: Place the required items on the map and progress updates automatically!</Text>
+        </View>
+      )}
+
+      {/* Task reward banner: brief flash when a task is completed */}
+      {showTaskReward && (
+        <View style={styles.taskRewardMsg}>
+          <Text style={styles.taskRewardMsgText}>🏆 {taskRewardMessage}</Text>
+        </View>
+      )}
+
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (
         <View style={styles.profilePanel}>
@@ -1648,11 +1831,20 @@ export default function IsometricMap() {
         {/* Profile button with coin balance */}
         <TouchableOpacity
           style={[styles.profileButton, showProfile && styles.profileButtonActive]}
-          onPress={() => setShowProfile(!showProfile)}
+          onPress={() => { setShowProfile(!showProfile); setShowTasks(false); }}
           activeOpacity={0.7}
         >
           <Text style={[styles.profileButtonIcon, showProfile && styles.profileButtonIconActive]}>🧑</Text>
           <Text style={styles.profileCoinText}>🪙 {coins.toLocaleString()}</Text>
+        </TouchableOpacity>
+        {/* Daily Tasks button */}
+        <TouchableOpacity
+          style={[styles.profileButton, showTasks && styles.profileButtonActive]}
+          onPress={() => { setShowTasks(!showTasks); setShowProfile(false); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, showTasks && styles.profileButtonIconActive]}>📋</Text>
+          <Text style={styles.profileCoinText}>Tasks</Text>
         </TouchableOpacity>
         {MODES.includes(mode) && (
           <View style={[styles.modeButton, styles.modeButtonActive, { width: 70, justifyContent: "center" }]}>
@@ -2212,6 +2404,89 @@ const styles = StyleSheet.create({
     borderColor: "#FFD700",
   },
   dailyRewardMsgText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    lineHeight: 22,
+  },
+  tasksSubtitle: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  taskCard: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  taskRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  taskLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+    flex: 1,
+    paddingRight: 6,
+  },
+  taskCountText: {
+    color: "#FFD700",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  taskDoneText: {
+    color: "#4ADE80",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  taskBarBg: {
+    height: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  taskBarFill: {
+    height: 8,
+    backgroundColor: "#4ADE80",
+    borderRadius: 4,
+  },
+  taskRewardText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  tasksHint: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 6,
+  },
+  taskRewardMsg: {
+    position: "absolute",
+    bottom: 300,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(180,83,9,0.95)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    zIndex: 106,
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  taskRewardMsgText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
