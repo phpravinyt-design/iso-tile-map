@@ -15,6 +15,8 @@ import Animated, {
 import Svg, { Rect, Circle, Polygon, G } from "react-native-svg";
 import { Image } from "expo-image";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect } from "react";
 
 // Tree PNG assets - 11 tree types
 const TREE_PNG = require("@/assets/images/tree.png");
@@ -661,6 +663,31 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
 // --- Main Component ---
 export default function IsometricMap() {
   const [grid, setGrid] = useState<GridCell[][]>(createDefaultGrid);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load saved map on mount
+  useEffect(() => {
+    AsyncStorage.getItem("map_grid").then((saved) => {
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as GridCell[][];
+          if (parsed && Array.isArray(parsed) && parsed.length === GRID_SIZE) {
+            setGrid(parsed);
+          }
+        } catch (e) {
+          // Invalid data, use default
+        }
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  // Save map on change (debounced via useEffect)
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem("map_grid", JSON.stringify(grid)).catch(() => {});
+    }
+  }, [grid, loaded]);
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
   const [showTreeSelector, setShowTreeSelector] = useState(false);

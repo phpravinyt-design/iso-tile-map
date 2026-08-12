@@ -49,3 +49,4 @@
 - [x] Add Roads button (left of house button) with 3 road tile types - straight, corner/T-junction, intersection - user selects and places on map
 - [x] Remove the old road tile type from tile paint modes, and make road PNG render as an overlay ON grass tiles (grass stays underneath, road sits on top)
 - [x] Add rotation for corner road tile - 4 directions so roads can turn smoothly
+- [x] Map save with AsyncStorage - persist the user's map so it survives app restarts
