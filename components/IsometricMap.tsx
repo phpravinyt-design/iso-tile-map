@@ -135,6 +135,20 @@ const NPC_COUNT = 4;
 const NPC_WALK_SPEED = 1.2; // tiles per second
 const NPC_IDLE_TIME = 1500; // ms to wait before picking a new destination
 
+// Speech bubble messages for NPCs and animals
+const NPC_MESSAGES: Record<string, string[]> = {
+  farmer: ["Beautiful farm! 🌾", "Time to harvest! 🌾", "Nice weather today! ☀️", "Growing crops! 🥕", "Welcome to town! 👋"],
+  villager_man: ["Great town! 🏘️", "Love it here! ❤️", "What a nice day! 😊", "Hello neighbor! 👋", "So peaceful! 🍃"],
+  villager_woman: ["Lovely flowers! 🌸", "Pretty town! 🏡", "Feeling happy! 😄", "Nice to meet you! 👋", "What a lovely day! 🌞"],
+  child: ["Yay! Fun! 🎉", "Let's play! 🎈", "I love this town! 💕", "So many trees! 🌳", "Whee! 🏃"],
+};
+
+const ANIMAL_MESSAGES: Record<string, string[]> = {
+  cow: ["🐄 Moo!", "🌾 Yummy grass!", "🐄 Moooo! 🥛", "Nice field! 🌿"],
+  chicken: ["🐔 Cluck!", "🥚 Egg time!", "🐔 Bawk bawk!", "🌾 Peck peck!"],
+  dog: ["🐕 Woof!", "🦴 Good boy!", "🐕 Woof woof!", "🎾 Fetch!", "🐾 *wags tail*"],
+};
+
 // Animal walking config
 const ANIMAL_COUNT = 3;
 const ANIMAL_WALK_SPEED = 0.8; // animals walk slower
@@ -195,14 +209,15 @@ function pickRandomWalkableTile(grid: GridCell[][], currentX: number, currentY: 
 }
 
 // --- NPC Sprite Renderer (follows pan/zoom via gridToScreen) ---
-function NpcSprite({ npc, scale }: { npc: NpcState; scale: number }) {
+function NpcSprite({ npc, scale, onTap }: { npc: NpcState; scale: number; onTap: (id: number, type: string, x: number, y: number) => void }) {
   const pos = gridToScreen(npc.x, npc.y, scale);
   const ts = TILE_SIZE * scale;
   const npcSize = ts * 0.7; // NPCs are smaller than buildings
 
   return (
-    <View
-      pointerEvents="none"
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => onTap(npc.id, npc.type, npc.x, npc.y)}
       style={{
         position: "absolute",
         left: pos.x - npcSize / 2,
@@ -219,19 +234,20 @@ function NpcSprite({ npc, scale }: { npc: NpcState; scale: number }) {
         contentFit="contain"
         cachePolicy="memory"
       />
-    </View>
+    </TouchableOpacity>
   );
 }
 
 // --- Animal Sprite Renderer ---
-function AnimalSprite({ animal, scale }: { animal: AnimalNpcState; scale: number }) {
+function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale: number; onTap: (id: number, type: string, x: number, y: number) => void }) {
   const pos = gridToScreen(animal.x, animal.y, scale);
   const ts = TILE_SIZE * scale;
   const animalSize = ts * 0.55; // Animals are smaller than humans
 
   return (
-    <View
-      pointerEvents="none"
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => onTap(animal.id, animal.type, animal.x, animal.y)}
       style={{
         position: "absolute",
         left: pos.x - animalSize / 2,
@@ -248,7 +264,7 @@ function AnimalSprite({ animal, scale }: { animal: AnimalNpcState; scale: number
         contentFit="contain"
         cachePolicy="memory"
       />
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -1432,6 +1448,31 @@ export default function IsometricMap() {
   const [isItemPress, setIsItemPress] = useState(false);
   const cancelPressTimerRef = useRef<() => void>(() => {});
 
+  // Speech bubble state
+  const [activeBubble, setActiveBubble] = useState<{ id: number; message: string; isAnimal: boolean; x: number; y: number } | null>(null);
+  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleNpcTap = useCallback((id: number, type: string, x: number, y: number) => {
+    if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+    const msgs = NPC_MESSAGES[type] || NPC_MESSAGES["farmer"];
+    const msg = msgs[Math.floor(Math.random() * msgs.length)];
+    setActiveBubble({ id, message: msg, isAnimal: false, x, y });
+    bubbleTimerRef.current = setTimeout(() => setActiveBubble(null), 2000);
+  }, []);
+
+  const handleAnimalTap = useCallback((id: number, type: string, x: number, y: number) => {
+    if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+    const msgs = ANIMAL_MESSAGES[type] || ANIMAL_MESSAGES["dog"];
+    const msg = msgs[Math.floor(Math.random() * msgs.length)];
+    setActiveBubble({ id, message: msg, isAnimal: true, x, y });
+    bubbleTimerRef.current = setTimeout(() => setActiveBubble(null), 2000);
+  }, []);
+
+  // Cleanup bubble timer on unmount
+  useEffect(() => {
+    return () => { if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current); };
+  }, []);
+
   // --- NPC System ---
   const npcTypes: NpcState["type"][] = ["farmer", "villager_man", "villager_woman", "child"];
   const [npcs, setNpcs] = useState<NpcState[]>(() => {
@@ -1987,16 +2028,16 @@ export default function IsometricMap() {
   // Render NPCs (walking characters on the map)
   const npcSprites = useMemo(() => {
     return npcs.map((npc) => (
-      <NpcSprite key={`npc-${npc.id}`} npc={npc} scale={currentScale} />
+      <NpcSprite key={`npc-${npc.id}`} npc={npc} scale={currentScale} onTap={handleNpcTap} />
     ));
-  }, [npcs, currentScale]);
+  }, [npcs, currentScale, handleNpcTap]);
 
   // Render Animal NPCs (walking animals on the map)
   const animalSprites = useMemo(() => {
     return animals.map((animal) => (
-      <AnimalSprite key={`animal-${animal.id}`} animal={animal} scale={currentScale} />
+      <AnimalSprite key={`animal-${animal.id}`} animal={animal} scale={currentScale} onTap={handleAnimalTap} />
     ));
-  }, [animals, currentScale]);
+  }, [animals, currentScale, handleAnimalTap]);
 
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   const buildings = useMemo(() => {
@@ -2090,6 +2131,47 @@ export default function IsometricMap() {
               {npcSprites}
               {/* Animal NPCs: walking animals */}
               {animalSprites}
+              {/* Speech bubble for tapped NPC/animal */}
+              {activeBubble && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: gridToScreen(activeBubble.x, activeBubble.y, currentScale).x - 60,
+                    top: gridToScreen(activeBubble.x, activeBubble.y, currentScale).y - 65,
+                    zIndex: 200,
+                  }}
+                >
+                  <View style={{
+                    backgroundColor: "white",
+                    borderRadius: 12,
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 3,
+                    elevation: 3,
+                  }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: "#333", textAlign: "center" }}>
+                      {activeBubble.message}
+                    </Text>
+                  </View>
+                  {/* Bubble tail */}
+                  <View style={{
+                    width: 0,
+                    height: 0,
+                    borderLeftWidth: 6,
+                    borderRightWidth: 6,
+                    borderTopWidth: 8,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                    borderTopColor: "white",
+                    alignSelf: "center",
+                    marginTop: 2,
+                  }} />
+                </View>
+              )}
               {/* Pop animation: small scale bounce + sparkle shown when the 5s bar fills */}
               {popCol !== null && popRow !== null && (
                 <PickupPop

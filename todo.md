@@ -101,3 +101,9 @@
 - [x] Animals avoid buildings/roads, walk on grass/dirt tiles (reuse isTileWalkable + pickRandomWalkableTile)
 - [x] Animals follow pan/zoom (gridToScreen), direction-based sprite flip, zIndex 14 (below humans)
 - [x] Verified in browser: cow, chicken, dog visible walking alongside human NPCs; TypeScript clean, 6 tests passing
+
+## NPC Tap Interaction
+- [x] Make NPC and animal sprites tappable (TouchableOpacity + onPress replaces View)
+- [x] Show speech bubble above tapped NPC/animal: white rounded bubble with tail pointer, random cute message from NPC_MESSAGES/ANIMAL_MESSAGES pools
+- [x] Speech bubble auto-clears after 2000ms via setTimeout (ref cleanup on unmount and on re-tap)
+- [x] Verified in browser: app renders correctly with tappable NPCs/animals and speech bubble rendering; TypeScript clean
