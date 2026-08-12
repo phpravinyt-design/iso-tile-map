@@ -446,13 +446,39 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
       <Image
         source={HOUSE_SOURCES[houseType] || HOUSE_PNG}
         style={{ width: houseSize, height: houseSize }}
-        contentFit="contain"
+                contentFit="contain"
         cachePolicy="memory"
       />
     </View>
   );
 }
 
+// Generic decoration renderer (all 9 decoration PNGs)
+function PngDecorationGeneric({ col, row, scale, decorationType }: {
+  col: number; row: number; scale: number; decorationType: string;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const size = ts * 1.5;
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - size / 2,
+      top: pos.y - size / 2,
+      width: size,
+      height: size,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={DECORATION_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
+        style={{ width: size, height: size }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
 // Placement modes
 const MODES = ["tile", "tiles", "community", "temple", "decoration", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
@@ -917,6 +943,10 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   // All road tile types use the generic renderer
   if (buildingType in ROAD_SOURCES) {
     return <PngRoadGeneric col={col} row={row} scale={scale} roadType={buildingType} />;
+  }
+  // All decoration types use the generic renderer
+  if (buildingType in DECORATION_SOURCES) {
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} />;
   }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
