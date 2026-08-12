@@ -822,6 +822,7 @@ export default function IsometricMap() {
   const [showTempleSelector, setShowTempleSelector] = useState(false);
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
   const [showDecorationSelector, setShowDecorationSelector] = useState(false);
+  const [showItemsMenu, setShowItemsMenu] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -1174,47 +1175,76 @@ export default function IsometricMap() {
         </View>
       </GestureHandlerRootView>
 
+      {/* Items Popup Panel (shown when Items menu is open) */}
+      {showItemsMenu && (
+        <View style={styles.itemsPanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>Items</Text>
+            <TouchableOpacity onPress={() => setShowItemsMenu(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.itemsGrid}>
+            {MODES.map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.itemsGridButton, mode === m && styles.modeButtonActive]}
+                onPress={() => {
+                  if (m === "tree") {
+                    setShowTreeSelector(!showTreeSelector);
+                  } else {
+                    setShowTreeSelector(false);
+                  }
+                  if (m === "road") {
+                    setShowRoadSelector(!showRoadSelector);
+                  } else {
+                    setShowRoadSelector(false);
+                  }
+                  if (m === "tiles") {
+                    setShowTileSelector(!showTileSelector);
+                  } else {
+                    setShowTileSelector(false);
+                  }
+                  if (m === "temple") {
+                    setShowTempleSelector(!showTempleSelector);
+                  } else {
+                    setShowTempleSelector(false);
+                  }
+                  if (m === "decoration") {
+                    setShowDecorationSelector(!showDecorationSelector);
+                  } else {
+                    setShowDecorationSelector(false);
+                  }
+                  setMode(m);
+                  setShowItemsMenu(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modeIcon, mode === m && styles.modeIconActive]}>
+                  {MODE_LABELS[m]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Placement Mode Toolbar */}
       <View style={styles.toolbar}>
-        {MODES.map((m) => (
-          <TouchableOpacity
-            key={m}
-            style={[styles.modeButton, mode === m && styles.modeButtonActive]}
-            onPress={() => {
-              if (m === "tree") {
-                setShowTreeSelector(!showTreeSelector);
-              } else {
-                setShowTreeSelector(false);
-              }
-              if (m === "road") {
-                setShowRoadSelector(!showRoadSelector);
-              } else {
-                setShowRoadSelector(false);
-              }
-              if (m === "tiles") {
-                setShowTileSelector(!showTileSelector);
-              } else {
-                setShowTileSelector(false);
-              }
-              if (m === "temple") {
-                setShowTempleSelector(!showTempleSelector);
-              } else {
-                setShowTempleSelector(false);
-              }
-              if (m === "decoration") {
-                setShowDecorationSelector(!showDecorationSelector);
-              } else {
-                setShowDecorationSelector(false);
-              }
-              setMode(m);
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.modeIcon, mode === m && styles.modeIconActive]}>
-              {MODE_LABELS[m]}
+        <TouchableOpacity
+          style={[styles.modeButton, showItemsMenu && styles.modeButtonActive, { width: 56 }]}
+          onPress={() => setShowItemsMenu(!showItemsMenu)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.modeIcon, showItemsMenu && styles.modeIconActive]}>🔧</Text>
+        </TouchableOpacity>
+        {MODES.includes(mode) && (
+          <View style={[styles.modeButton, styles.modeButtonActive, { width: 70, justifyContent: "center" }]}>
+            <Text style={[styles.modeIcon, styles.modeIconActive, { fontSize: 16 }]}>
+              {MODE_LABELS[mode]}
             </Text>
-          </TouchableOpacity>
-        ))}
+          </View>
+        )}
       </View>
 
       {/* Community Building Sub-Selector (shown when community mode is active) */}
@@ -1531,5 +1561,60 @@ const styles = StyleSheet.create({
   treeSelectedText: {
     color: "#aaa",
     fontSize: 11,
+  },
+  itemsPanel: {
+    position: "absolute",
+    bottom: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(10,10,10,0.92)",
+    borderRadius: 18,
+    padding: 12,
+    zIndex: 102,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  itemsPanelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.15)",
+  },
+  itemsPanelTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  itemsPanelClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  itemsPanelCloseText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  itemsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  itemsGridButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
 });
