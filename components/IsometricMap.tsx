@@ -45,6 +45,11 @@ const STONE_HOUSE_BLUE_ROOF_PNG = require("@/assets/images/cropped_houses/stone_
 // Town Market building PNG
 const TOWN_MARKET_PNG = require("@/assets/images/town_market.png");
 
+// 3 Road tile PNGs from user's sheet
+const ROAD_STRAIGHT_PNG = require("@/assets/images/cropped_roads/road_straight.png");
+const ROAD_CORNER_PNG = require("@/assets/images/cropped_roads/road_corner.png");
+const ROAD_INTERSECTION_PNG = require("@/assets/images/cropped_roads/road_intersection.png");
+
 // 9 Community Building PNGs from user's sheet
 const TOWN_HALL_PNG = require("@/assets/images/cropped_community/town_hall.png");
 const HOSPITAL_PNG = require("@/assets/images/cropped_community/hospital.png");
@@ -86,6 +91,8 @@ const BUILDING_TYPES = [
   // 9 community building types
   "town_hall", "hospital", "school", "fire_station",
   "police_station", "market", "library", "train_station", "park",
+  // 3 road tile types
+  "road_straight", "road_corner", "road_intersection",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -103,6 +110,10 @@ const COMMUNITY_TYPES = [
   "police_station", "market", "library", "train_station", "park",
 ] as const;
 type CommunityType = (typeof COMMUNITY_TYPES)[number];
+
+// Road tile types (3 road tiles from user's sheet)
+const ROAD_TYPES = ["road_straight", "road_corner", "road_intersection"] as const;
+type RoadType = (typeof ROAD_TYPES)[number];
 
 // House PNG sources
 const HOUSE_SOURCES: Record<string, any> = {
@@ -142,6 +153,40 @@ const COMMUNITY_EMOJIS: Record<string, string> = {
   train_station: "🚂",
   park: "🌳",
 };
+
+// Road tile PNG sources
+const ROAD_SOURCES: Record<string, any> = {
+  road_straight: ROAD_STRAIGHT_PNG,
+  road_corner: ROAD_CORNER_PNG,
+  road_intersection: ROAD_INTERSECTION_PNG,
+};
+
+// Generic Road tile renderer (covers the whole tile)
+function PngRoadGeneric({ col, row, scale, roadType }: {
+  col: number; row: number; scale: number; roadType: string;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - ts / 2,
+      top: pos.y - ts / 2,
+      width: ts,
+      height: ts,
+      zIndex: 2,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={ROAD_SOURCES[roadType] || ROAD_STRAIGHT_PNG}
+        style={{ width: ts, height: ts }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
 
 // Generic Community Building renderer
 function PngCommunityGeneric({ col, row, scale, communityType }: {
@@ -200,7 +245,7 @@ function PngHouseGeneric({ col, row, scale, houseType }: {
 }
 
 // Placement modes
-const MODES = ["tile", "community", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "community", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -239,6 +284,7 @@ const TILE_COLORS: Record<TileType, { base: string; detail: string; accent: stri
 const MODE_LABELS: Record<PlaceMode, string> = {
   tile: "🖌️",
   community: "🏛️",
+  road: "🛣️",
   house_small: "🏠",
   house_big: "🏡",
   town_market: "🏪",
@@ -607,6 +653,10 @@ function BuildingOnTile({ col, row, buildingType, scale }: {
   if (buildingType in COMMUNITY_SOURCES) {
     return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} />;
   }
+  // All road tile types use the generic renderer
+  if (buildingType in ROAD_SOURCES) {
+    return <PngRoadGeneric col={col} row={row} scale={scale} roadType={buildingType} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} />;
@@ -625,6 +675,8 @@ export default function IsometricMap() {
   const [showHouseSelector, setShowHouseSelector] = useState(false);
   const [selectedCommunityType, setSelectedCommunityType] = useState<CommunityType>("town_hall");
   const [showCommunitySelector, setShowCommunitySelector] = useState(false);
+  const [selectedRoadType, setSelectedRoadType] = useState<RoadType>("road_straight");
+  const [showRoadSelector, setShowRoadSelector] = useState(false);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -726,6 +778,19 @@ export default function IsometricMap() {
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
+          } else if (mode === "road") {
+            // Road mode: place the user's selected road tile type
+            const currentTile = newGrid[row][col].tile;
+            if (currentTile === "grass" || currentTile === "dirt" || currentTile === "road") {
+              const roadToPlace = selectedRoadType as BuildingType;
+              if (newGrid[row][col].building === roadToPlace) {
+                newGrid[row][col].building = "none";
+                newGrid[row][col].tile = "grass";
+              } else {
+                newGrid[row][col].building = roadToPlace;
+                newGrid[row][col].tile = "road";
+              }
+            }
           } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
@@ -766,7 +831,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
@@ -866,6 +931,11 @@ export default function IsometricMap() {
               } else {
                 setShowTreeSelector(false);
               }
+              if (m === "road") {
+                setShowRoadSelector(!showRoadSelector);
+              } else {
+                setShowRoadSelector(false);
+              }
               setMode(m);
             }}
             activeOpacity={0.7}
@@ -905,6 +975,38 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a building to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Road Sub-Selector (shown when road mode is active) */}
+      {mode === "road" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {ROAD_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedRoadType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedRoadType(t);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={ROAD_SOURCES[t] || ROAD_STRAIGHT_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a road to select it</Text>
           </View>
         </View>
       )}
