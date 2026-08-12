@@ -1452,6 +1452,65 @@ export default function IsometricMap() {
   const [activeBubble, setActiveBubble] = useState<{ id: number; message: string; isAnimal: boolean; x: number; y: number } | null>(null);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Day/Night Cycle ---
+  const [timeOfDay, setTimeOfDay] = useState(0.3); // 0=midnight, 0.5=noon, 1=midnight (24h cycle)
+  const [isNight, setIsNight] = useState(false);
+  const dayNightTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Day/night timer: slowly advance time of day (full cycle every 5 minutes for demo)
+  useEffect(() => {
+    dayNightTimerRef.current = setInterval(() => {
+      setTimeOfDay((prev) => {
+        const next = prev + 0.001; // Full cycle ~1000 ticks
+        if (next >= 1) return 0;
+        return next;
+      });
+    }, 300); // Update every 300ms
+    return () => {
+      if (dayNightTimerRef.current) clearInterval(dayNightTimerRef.current);
+    };
+  }, []);
+
+  // Determine if it's night (0.85 to 0.15 range)
+  useEffect(() => {
+    const night = timeOfDay > 0.85 || timeOfDay < 0.15;
+    setIsNight(night);
+  }, [timeOfDay]);
+
+  // Calculate night darkness (0 = full day, 0.45 = full night)
+  const nightOpacity = useMemo(() => {
+    if (timeOfDay >= 0.15 && timeOfDay <= 0.85) return 0;
+    if (timeOfDay > 0.85) {
+      // Transition from day to night (0.85 -> 1.0)
+      return Math.min(0.45, (timeOfDay - 0.85) / 0.15 * 0.45);
+    }
+    // Transition from night to day (0.0 -> 0.15)
+    return Math.max(0, (0.15 - timeOfDay) / 0.15 * 0.45);
+  }, [timeOfDay]);
+
+  // Sun/Moon emoji indicator
+  const celestialEmoji = timeOfDay > 0.15 && timeOfDay < 0.85 ? "☀️" : "🌙";
+
+  // Find nearest building for NPCs to go home at night
+  const nearestBuilding = useCallback(() => {
+    let bestDist = Infinity;
+    let bestPos = { x: 12, y: 12 };
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        if (grid[row][col].building !== "none") {
+          const dx = col - 12;
+          const dy = row - 12;
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestPos = { x: col, y: row };
+          }
+        }
+      }
+    }
+    return bestPos;
+  }, [grid]);
+
   const handleNpcTap = useCallback((id: number, type: string, x: number, y: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
     const msgs = NPC_MESSAGES[type] || NPC_MESSAGES["farmer"];
@@ -1524,12 +1583,31 @@ export default function IsometricMap() {
 
       // Update human NPCs
       setNpcs((prevNpcs) => {
+        const isNightNow = timeOfDay > 0.85 || timeOfDay < 0.15;
         return prevNpcs.map((npc) => {
           if (now < npc.idleUntil) return npc;
           const dx = npc.targetX - npc.x;
           const dy = npc.targetY - npc.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 0.15) {
+            // At night, NPCs walk toward nearest building instead of random
+            if (isNightNow) {
+              const homePos = nearestBuilding();
+              const hdx = homePos.x - npc.x;
+              const hdy = homePos.y - npc.y;
+              const homeDist = Math.sqrt(hdx * hdx + hdy * hdy);
+              if (homeDist > 0.5) {
+                return {
+                  ...npc,
+                  targetX: homePos.x,
+                  targetY: homePos.y,
+                  idleUntil: now + 300, // Keep moving toward home
+                  direction: hdx > 0 ? 1 : hdx < 0 ? -1 : npc.direction,
+                };
+              }
+              // Near home, idle at night
+              return { ...npc, idleUntil: now + 3000 };
+            }
             const target = pickRandomWalkableTile(grid, npc.x, npc.y);
             if (target) {
               return {
@@ -1562,6 +1640,10 @@ export default function IsometricMap() {
           const dy = animal.targetY - animal.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 0.15) {
+            // Animals stay put at night, only wander during day
+            if (isNight) {
+              return { ...animal, idleUntil: now + 5000 };
+            }
             const target = pickRandomWalkableTile(grid, animal.x, animal.y);
             if (target) {
               return {
@@ -1587,7 +1669,7 @@ export default function IsometricMap() {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [grid]);
+  }, [grid, timeOfDay, isNight, nearestBuilding]);
 
   // Pan gesture
   const panGesture = useMemo(
@@ -2131,6 +2213,21 @@ export default function IsometricMap() {
               {npcSprites}
               {/* Animal NPCs: walking animals */}
               {animalSprites}
+              {/* Night overlay: dark blue tint during nighttime */}
+              {nightOpacity > 0 && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: `rgba(15, 20, 50, ${nightOpacity})`,
+                    zIndex: 100,
+                  }}
+                />
+              )}
               {/* Speech bubble for tapped NPC/animal */}
               {activeBubble && (
                 <View
@@ -2186,6 +2283,20 @@ export default function IsometricMap() {
           </GestureDetector>
         </View>
       </GestureHandlerRootView>
+
+      {/* Time of Day indicator (sun/moon) */}
+      <View style={{
+        position: "absolute",
+        top: 8,
+        right: 12,
+        zIndex: 250,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+      }}>
+        <Text style={{ fontSize: 22 }}>{celestialEmoji}</Text>
+      </View>
 
       {/* Clipboard Indicator Bar (shown when an item is picked up via long press) */}
       {moveClipboard && (

@@ -107,3 +107,11 @@
 - [x] Show speech bubble above tapped NPC/animal: white rounded bubble with tail pointer, random cute message from NPC_MESSAGES/ANIMAL_MESSAGES pools
 - [x] Speech bubble auto-clears after 2000ms via setTimeout (ref cleanup on unmount and on re-tap)
 - [x] Verified in browser: app renders correctly with tappable NPCs/animals and speech bubble rendering; TypeScript clean
+
+## Day/Night Cycle
+- [x] Add time-of-day state (timeOfDay 0-1 float, starts at 0.3 daytime)
+- [x] Add night overlay: rgba(15,20,50, 0-0.45) View at zIndex 100 inside Animated.View, transitions smoothly
+- [x] NPCs walk toward nearestBuilding (scans grid for any placed building) at night; animals stay idle at night
+- [x] Normal random walking resumes when isNight=false (timeOfDay 0.15-0.85)
+- [x] Sun ☀️ / Moon 🌙 indicator in top-right corner (zIndex 250, dark pill background)
+- [x] Verified in browser: sun indicator visible top-right, app renders correctly; TypeScript clean; day/night transitions work via 300ms interval
