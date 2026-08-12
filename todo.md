@@ -68,3 +68,6 @@
 - [x] Profile screen: gold coin badge balance, editable profile name (max 20), 8 category stat cards (houses/trees/temples/community/decor/roads/grass/total), footer with total invested = items × 100
 - [x] Make map start clean: only ONE tree (tree_png at row14,col13) + ONE house (house_small at row14,col16) pre-placed at app start, everything else empty grass with lush_grass texture; user buys everything with coins
 - [x] Bump save schema version (MAP_SAVE_VERSION=2, key map_grid_v2) so old saved maps do not restore; old keys (map_grid, map_grid_v1) cleared on load
+- [x] Daily Reward system: 50 free coins granted once per day on app open; last-reward date persisted via AsyncStorage (date-keyed "last_daily_reward": "YYYY-MM-DD")
+- [x] Green+gold reward banner ("🎁 Daily Reward! +50 🪙", bottom:210, 3.5s) shown when reward granted; verified balance shows 1050 on first open
+- [x] Skip reward if already claimed today; applies on app open and across restarts; new date at midnight (user timezone) grants next reward

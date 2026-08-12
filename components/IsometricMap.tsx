@@ -108,6 +108,10 @@ const MAX_ZOOM = 1.5;
 // Currency system
 const STARTING_COINS = 1000;
 const ITEM_COST = 100;
+// Daily reward system: 50 free coins once per day (date-keyed, user timezone)
+const DAILY_REWARD_AMOUNT = 50;
+const DAILY_REWARD_KEY = "last_daily_reward";
+const DAILY_REWARD_MSG_KEY = "daily_reward_msg";
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
@@ -863,8 +867,26 @@ export default function IsometricMap() {
     });
     // Load saved coin balance (profile currency)
     AsyncStorage.getItem("profile_coins").then((saved) => {
-      const val = saved ? parseInt(saved, 10) : STARTING_COINS;
-      setCoins(Number.isFinite(val) ? val : STARTING_COINS);
+      let val = saved ? parseInt(saved, 10) : STARTING_COINS;
+      if (!Number.isFinite(val)) val = STARTING_COINS;
+      // Daily reward: grant 50 coins once per day (date-keyed)
+      const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD" (local date)
+      AsyncStorage.getItem(DAILY_REWARD_KEY).then((lastDate) => {
+        if (lastDate !== today) {
+          val += DAILY_REWARD_AMOUNT;
+          AsyncStorage.setItem(DAILY_REWARD_KEY, today).catch(() => {});
+          AsyncStorage.setItem(DAILY_REWARD_MSG_KEY, "1").catch(() => {});
+          setTimeout(() => {
+            setCoins(val);
+            setShowDailyReward(true);
+            setTimeout(() => setShowDailyReward(false), 3500);
+          }, 600);
+        } else {
+          setCoins(val);
+        }
+      }).catch(() => {
+        setCoins(val);
+      });
     });
     AsyncStorage.getItem("profile_name").then((saved) => {
       if (saved) setProfileName(saved);
@@ -884,6 +906,7 @@ export default function IsometricMap() {
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLowCoinsMsg, setShowLowCoinsMsg] = useState(false);
+  const [showDailyReward, setShowDailyReward] = useState(false);
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Flash a low-coins warning when the user places an item with little balance
@@ -1450,6 +1473,13 @@ export default function IsometricMap() {
       {showLowCoinsMsg && (
         <View style={styles.lowCoinsMsg}>
           <Text style={styles.lowCoinsMsgText}>🪙 Not enough coins! (Each item costs 100 🪙)</Text>
+        </View>
+      )}
+
+      {/* Daily Reward banner: granted once per day */}
+      {showDailyReward && (
+        <View style={styles.dailyRewardMsg}>
+          <Text style={styles.dailyRewardMsgText}>🎁 Daily Reward! +{DAILY_REWARD_AMOUNT} 🪙</Text>
         </View>
       )}
 
@@ -2135,6 +2165,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "bold",
     lineHeight: 18,
+  },
+  dailyRewardMsg: {
+    position: "absolute",
+    bottom: 210,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(34,197,94,0.95)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    zIndex: 105,
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  dailyRewardMsgText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    lineHeight: 22,
   },
   clipboardPreviewEmoji: {
     fontSize: 26,
