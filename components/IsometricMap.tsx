@@ -162,8 +162,8 @@ const ROAD_SOURCES: Record<string, any> = {
 };
 
 // Generic Road tile renderer (covers the whole tile)
-function PngRoadGeneric({ col, row, scale, roadType }: {
-  col: number; row: number; scale: number; roadType: string;
+function PngRoadGeneric({ col, row, scale, roadType, rotation = 0 }: {
+  col: number; row: number; scale: number; roadType: string; rotation?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -180,7 +180,7 @@ function PngRoadGeneric({ col, row, scale, roadType }: {
     }}>
       <Image
         source={ROAD_SOURCES[roadType] || ROAD_STRAIGHT_PNG}
-        style={{ width: ts, height: ts }}
+        style={{ width: ts, height: ts, transform: [{ rotate: `${rotation}deg` }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -291,7 +291,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null; roadRotation: number };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -310,7 +310,7 @@ function createDefaultGrid(): GridCell[][] {
       const cx = GRID_SIZE / 2 - 0.5;
       const cy = GRID_SIZE / 2 - 0.5;
       const dist = Math.abs(col - cx) + Math.abs(row - cy);
-      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null }); continue; }
+      if (dist > GRID_SIZE / 2 + 1) { rowArr.push({ tile: "none", building: "none", grassOverlay: false, roadOverlay: null, roadRotation: 0 }); continue; }
       let tile: TileType = "grass";
       if ((col * 7 + row * 3) % 41 === 0) tile = "water";
       else if ((col * 5 + row * 2) % 37 === 0) tile = "rock";
@@ -323,7 +323,7 @@ function createDefaultGrid(): GridCell[][] {
       if (tile === "grass" && building === "none" && (col * 13 + row * 11) % 67 === 0) {
         building = "house_small";
       }
-      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null });
+      rowArr.push({ tile, building, grassOverlay: false, roadOverlay: null, roadRotation: 0 });
     }
     grid.push(rowArr);
   }
@@ -750,6 +750,8 @@ export default function IsometricMap() {
       if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
         newGrid[row][col].building = "none";
         newGrid[row][col].grassOverlay = false;
+        newGrid[row][col].roadOverlay = null;
+        newGrid[row][col].roadRotation = 0;
       }
       return newGrid;
     });
@@ -773,11 +775,17 @@ export default function IsometricMap() {
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
           } else if (mode === "road") {
             // Road mode: road PNG overlays ON grass tile (grass stays underneath)
+            // For corner roads, cycle rotation 0→90→180→270 on each tap
             const roadToPlace = selectedRoadType as RoadType;
-            if (newGrid[row][col].roadOverlay === roadToPlace) {
+            if (newGrid[row][col].roadOverlay === roadToPlace && roadToPlace !== "road_corner") {
               newGrid[row][col].roadOverlay = null;
+              newGrid[row][col].roadRotation = 0;
+            } else if (newGrid[row][col].roadOverlay === roadToPlace && roadToPlace === "road_corner") {
+              // Rotate corner by 90 degrees
+              newGrid[row][col].roadRotation = (newGrid[row][col].roadRotation + 90) % 360;
             } else {
               newGrid[row][col].roadOverlay = roadToPlace;
+              newGrid[row][col].roadRotation = 0;
             }
           } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
             const currentTile = newGrid[row][col].tile;
@@ -880,7 +888,7 @@ export default function IsometricMap() {
         const cell = grid[row][col];
         if (cell.roadOverlay) {
           overlays.push(
-            <PngRoadGeneric key={`road-${row}-${col}`} col={col} row={row} scale={currentScale} roadType={cell.roadOverlay} />
+            <PngRoadGeneric key={`road-${row}-${col}`} col={col} row={row} scale={currentScale} roadType={cell.roadOverlay} rotation={cell.roadRotation} />
           );
         }
       }
