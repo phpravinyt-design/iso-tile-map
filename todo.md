@@ -50,3 +50,4 @@
 - [x] Remove the old road tile type from tile paint modes, and make road PNG render as an overlay ON grass tiles (grass stays underneath, road sits on top)
 - [x] Add rotation for corner road tile - 4 directions so roads can turn smoothly
 - [x] Map save with AsyncStorage - persist the user's map so it survives app restarts
+- [x] Move object feature: 5 second tap on any placed object picks it up (cut mode), then tap another location to place it there

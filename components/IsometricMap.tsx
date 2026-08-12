@@ -712,6 +712,9 @@ export default function IsometricMap() {
   const MIN_SCALE = MIN_ZOOM;
   const MAX_SCALE = MAX_ZOOM;
 
+  // Move clipboard: holds object picked up via long press (cut mode)
+  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: RoadType; roadRotation?: number } | null>(null);
+
   // Pan gesture
   const panGesture = useMemo(
     () =>
@@ -770,15 +773,26 @@ export default function IsometricMap() {
     ],
   }));
 
-  // Handle long press to remove building/object
+  // Handle long press to pick up (cut) building/object for moving
   const handleRemoveBuilding = useCallback((col: number, row: number) => {
     setGrid((prev) => {
       const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
       if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
-        newGrid[row][col].building = "none";
-        newGrid[row][col].grassOverlay = false;
-        newGrid[row][col].roadOverlay = null;
-        newGrid[row][col].roadRotation = 0;
+        const cell = newGrid[row][col];
+        // Pick up whatever is there into clipboard for moving
+        if (cell.building !== "none") {
+          setMoveClipboard({ type: "building", buildingType: cell.building });
+          newGrid[row][col].building = "none";
+        } else if (cell.roadOverlay) {
+          setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation });
+          newGrid[row][col].roadOverlay = null;
+          newGrid[row][col].roadRotation = 0;
+        } else if (cell.grassOverlay) {
+          setMoveClipboard({ type: "grass" });
+          newGrid[row][col].grassOverlay = false;
+        } else {
+          setMoveClipboard(null);
+        }
       }
       return newGrid;
     });
@@ -792,6 +806,22 @@ export default function IsometricMap() {
         const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
         if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
           if (mode === "tile") {
+            // If we have a picked-up object, place it here
+            if (moveClipboard) {
+              if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
+                if (moveClipboard.type === "building") {
+                  newGrid[row][col].building = moveClipboard.buildingType || "none";
+                  newGrid[row][col].roadOverlay = null;
+                } else if (moveClipboard.type === "road") {
+                  newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
+                  newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                } else if (moveClipboard.type === "grass") {
+                  newGrid[row][col].grassOverlay = true;
+                }
+              }
+              setMoveClipboard(null);
+              return newGrid;
+            }
             const current = newGrid[row][col].tile;
             const typeIndex = TILE_TYPES.indexOf(current as TileType);
             const nextType = TILE_TYPES[(typeIndex + 1) % TILE_TYPES.length];
@@ -799,6 +829,22 @@ export default function IsometricMap() {
             if (nextType === "none") newGrid[row][col].building = "none";
             if (nextType === "water") newGrid[row][col].building = "none";
           } else if (mode === "grass_plant") {
+            // If we have a picked-up object, place it here first
+            if (moveClipboard) {
+              if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
+                if (moveClipboard.type === "building") {
+                  newGrid[row][col].building = moveClipboard.buildingType || "none";
+                  newGrid[row][col].roadOverlay = null;
+                } else if (moveClipboard.type === "road") {
+                  newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
+                  newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                } else if (moveClipboard.type === "grass") {
+                  newGrid[row][col].grassOverlay = true;
+                }
+              }
+              setMoveClipboard(null);
+              return newGrid;
+            }
             newGrid[row][col].grassOverlay = !newGrid[row][col].grassOverlay;
           } else if (mode === "road") {
             // Road mode: road PNG overlays ON grass tile (grass stays underneath)
@@ -815,6 +861,22 @@ export default function IsometricMap() {
               newGrid[row][col].roadRotation = 0;
             }
           } else if (mode === "community" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree" || mode === "house_selector") {
+            // If we have a picked-up object, place it here first
+            if (moveClipboard) {
+              if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
+                if (moveClipboard.type === "building") {
+                  newGrid[row][col].building = moveClipboard.buildingType || "none";
+                  newGrid[row][col].roadOverlay = null;
+                } else if (moveClipboard.type === "road") {
+                  newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
+                  newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                } else if (moveClipboard.type === "grass") {
+                  newGrid[row][col].grassOverlay = true;
+                }
+              }
+              setMoveClipboard(null);
+              return newGrid;
+            }
             const currentTile = newGrid[row][col].tile;
             const currentBuilding = newGrid[row][col].building;
             if (currentTile === "grass" || currentTile === "dirt") {
@@ -856,7 +918,7 @@ export default function IsometricMap() {
         return newGrid;
       });
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, moveClipboard]
   );
 
   // Render ALL tiles (including grass tiles with individual PNG)
