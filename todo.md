@@ -71,3 +71,6 @@
 - [x] Daily Reward system: 50 free coins granted once per day on app open; last-reward date persisted via AsyncStorage (date-keyed "last_daily_reward": "YYYY-MM-DD")
 - [x] Green+gold reward banner ("🎁 Daily Reward! +50 🪙", bottom:210, 3.5s) shown when reward granted; verified balance shows 1050 on first open
 - [x] Skip reward if already claimed today; applies on app open and across restarts; new date at midnight (user timezone) grants next reward
+- [x] Login Streak system: consecutive daily logins increase daily reward - streak 1-2 = 50, streak 3-6 = 60, streak 7+ = 70 coins (capped) via rewardForStreak()
+- [x] Streak resets to 0 if a day is missed (last reward date is not yesterday); persists via login_streak AsyncStorage key
+- [x] Reward banner shows "🔥 Streak N! +NN 🪙" when streak > 1; Profile screen shows streak card and next reward amount

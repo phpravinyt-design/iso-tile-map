@@ -109,9 +109,16 @@ const MAX_ZOOM = 1.5;
 const STARTING_COINS = 1000;
 const ITEM_COST = 100;
 // Daily reward system: 50 free coins once per day (date-keyed, user timezone)
-const DAILY_REWARD_AMOUNT = 50;
 const DAILY_REWARD_KEY = "last_daily_reward";
-const DAILY_REWARD_MSG_KEY = "daily_reward_msg";
+const STREAK_KEY = "login_streak";
+
+// Login streak system: consecutive daily logins increase the reward
+// Streak 1-2 = 50, streak 3-6 = 60, streak 7+ = 70 coins
+function rewardForStreak(streak: number): number {
+  if (streak >= 7) return 70;
+  if (streak >= 3) return 60;
+  return 50;
+}
 // Tile types (ground)
 const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const;
 type TileType = (typeof TILE_TYPES)[number];
@@ -869,21 +876,32 @@ export default function IsometricMap() {
     AsyncStorage.getItem("profile_coins").then((saved) => {
       let val = saved ? parseInt(saved, 10) : STARTING_COINS;
       if (!Number.isFinite(val)) val = STARTING_COINS;
-      // Daily reward: grant 50 coins once per day (date-keyed)
+      // Daily reward + login streak: one grant per day, reward grows with streak
       const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD" (local date)
       AsyncStorage.getItem(DAILY_REWARD_KEY).then((lastDate) => {
-        if (lastDate !== today) {
-          val += DAILY_REWARD_AMOUNT;
+        AsyncStorage.getItem(STREAK_KEY).then((lastStreak) => {
+          let streak = lastStreak ? parseInt(lastStreak, 10) : 0;
+          if (!Number.isFinite(streak) || streak < 0) streak = 0;
+          if (lastDate === today) {
+            setCoins(val);
+            return;
+          }
+          // Consecutive day? (yesterday) keep streak; otherwise reset to 0
+          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          if (lastDate !== yesterday) streak = 0;
+          streak += 1; // new streak level for today's claim
+          const reward = rewardForStreak(streak);
+          val += reward;
           AsyncStorage.setItem(DAILY_REWARD_KEY, today).catch(() => {});
-          AsyncStorage.setItem(DAILY_REWARD_MSG_KEY, "1").catch(() => {});
+          AsyncStorage.setItem(STREAK_KEY, String(streak)).catch(() => {});
           setTimeout(() => {
             setCoins(val);
+            setStreakLevel(streak);
+            setDailyRewardAmount(reward);
             setShowDailyReward(true);
             setTimeout(() => setShowDailyReward(false), 3500);
           }, 600);
-        } else {
-          setCoins(val);
-        }
+        });
       }).catch(() => {
         setCoins(val);
       });
@@ -907,6 +925,8 @@ export default function IsometricMap() {
   const [showProfile, setShowProfile] = useState(false);
   const [showLowCoinsMsg, setShowLowCoinsMsg] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  const [streakLevel, setStreakLevel] = useState(0);
+  const [dailyRewardAmount, setDailyRewardAmount] = useState(50);
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Flash a low-coins warning when the user places an item with little balance
@@ -1479,7 +1499,9 @@ export default function IsometricMap() {
       {/* Daily Reward banner: granted once per day */}
       {showDailyReward && (
         <View style={styles.dailyRewardMsg}>
-          <Text style={styles.dailyRewardMsgText}>🎁 Daily Reward! +{DAILY_REWARD_AMOUNT} 🪙</Text>
+          <Text style={styles.dailyRewardMsgText}>
+            {streakLevel > 1 ? `🔥 Streak ${streakLevel}! ` : "🎁 "}Daily Reward! +{dailyRewardAmount} 🪙
+          </Text>
         </View>
       )}
 
@@ -1542,6 +1564,15 @@ export default function IsometricMap() {
               <Text style={styles.profileStatValue}>{itemStats.totalItems}</Text>
               <Text style={styles.profileStatLabel}>📦 Total</Text>
             </View>
+            <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{streakLevel > 0 ? `🔥${streakLevel}` : "-"}</Text>
+              <Text style={styles.profileStatLabel}>Streak</Text>
+            </View>
+          </View>
+          <View style={styles.profileFooter}>
+            <Text style={styles.profileFooterText}>
+              🎁 Next daily reward: {streakLevel >= 7 ? 70 : streakLevel >= 3 ? 60 : 50} 🪙 (Streak 7+ = 70 🪙)
+            </Text>
           </View>
           <View style={styles.profileFooter}>
             <Text style={styles.profileFooterText}>
