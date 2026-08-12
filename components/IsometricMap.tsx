@@ -618,10 +618,12 @@ function SquareTile({ col, row, cell, scale, onPress, onLongPress, onDelayStart,
       )}
       {/* Tile rendering */}
       {cell.tile === "grass" ? (
-        // Each grass tile gets its own individual PNG - uses the tileTexture from the cell
+        // Each grass tile gets its own individual PNG - uses the tileTexture from the cell.
+        // Overlap adjacent tiles by 2px on every side so no hairline joint/seam is ever visible
+        // between neighboring tiles (same-texture areas become one continuous lawn).
         <Image
           source={TILE_TEXTURE_SOURCES[cell.tileTexture] || GRASS_TILE_PNG}
-          style={{ width: ts, height: ts }}
+          style={{ position: "absolute", left: -2, top: -2, width: ts + 4, height: ts + 4 }}
           contentFit="cover"
           pointerEvents="none"
         />
