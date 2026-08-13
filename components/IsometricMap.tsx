@@ -2860,22 +2860,36 @@ export default function IsometricMap() {
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const cell = grid[row][col];
-        // Only create hit areas for grass/dirt tiles that DON'T have a building on them
-        // (buildings have their own TouchableOpacity overlay above)
+        // Only create hit areas for grass/dirt tiles
         if (cell.tile !== "grass" && cell.tile !== "dirt") continue;
-        if (cell.building !== "none") continue;
+        // Farmland tiles: tap opens crop selector (acts like a button) - even if they have a crop on them
+        const isFarmland = cell.tileTexture === "farmland";
+        // Farmland with a crop building: skip normal hit area, will use separate farmlandCropHitAreas
+        const hasCropBuilding = isFarmland && cell.building !== "none" && CROP_EMOJIS[cell.building as CropType];
+        if (cell.building !== "none" && !hasCropBuilding) continue; // Skip tiles with non-crop buildings
         const pos = gridToScreen(col, row, currentScale);
         const ts = TILE_SIZE * currentScale;
-        // Farmland tiles: tap opens crop selector (acts like a button)
-        const isFarmland = cell.tileTexture === "farmland";
-        elements.push(
-          <TouchableOpacity key={`grass-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
-            style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 2 }}
-            onPress={() => isFarmland ? handleFarmlandTap(col, row) : handleTilePress(col, row)}
-            onLongPress={() => handleRemoveBuilding(col, row)}
-            onPressIn={() => startPressTimer(col, row, true)}
-            onPressOut={() => cancelPressTimer()} />
-        );
+        if (isFarmland) {
+          // Farmland tiles: tap opens crop selector (acts like a button)
+          elements.push(
+            <TouchableOpacity key={`grass-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
+              style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 3 }}
+              onPress={() => handleFarmlandTap(col, row)}
+              onLongPress={() => handleRemoveBuilding(col, row)}
+              onPressIn={() => startPressTimer(col, row, true)}
+              onPressOut={() => cancelPressTimer()} />
+          );
+        } else {
+          // Regular grass tiles: tap places items based on current mode
+          elements.push(
+            <TouchableOpacity key={`grass-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
+              style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 2 }}
+              onPress={() => handleTilePress(col, row)}
+              onLongPress={() => handleRemoveBuilding(col, row)}
+              onPressIn={() => startPressTimer(col, row, true)}
+              onPressOut={() => cancelPressTimer()} />
+          );
+        }
       }
     }
     return elements;
