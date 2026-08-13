@@ -816,6 +816,48 @@ const NPC_SHOPKEEPER_PNG = require("@/assets/images/npc_grocery_girl.png");
 const NPC_CHEF_PNG = require("@/assets/images/npc_chef.png");
 const NPC_VET_PNG = require("@/assets/images/npc_vet.png");
 
+// Typing animation: animated "..." dots that bounce sequentially
+function TypingDots() {
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const dot3 = useSharedValue(0);
+
+  const a1 = useAnimatedStyle(() => ({ opacity: 0.35 + (dot1.value as number) * 0.65 }));
+  const a2 = useAnimatedStyle(() => ({ opacity: 0.35 + (dot2.value as number) * 0.65 }));
+  const a3 = useAnimatedStyle(() => ({ opacity: 0.35 + (dot3.value as number) * 0.65 }));
+
+  // Bounce each dot opacity between 0 and 1 repeatedly, staggered per dot
+  useEffect(() => {
+    const pulse = (val: SharedValue<number>, delay: number) => {
+      val.value = 0;
+      const interval = setInterval(() => {
+        val.value = withSequence(
+          withDelay(delay, withTiming(1, { duration: 400 })),
+          withTiming(0, { duration: 400 })
+        );
+      }, 800 + delay * 2);
+      return interval;
+    };
+    const i1 = pulse(dot1, 0);
+    const i2 = pulse(dot2, 130);
+    const i3 = pulse(dot3, 260);
+    return () => {
+      clearInterval(i1);
+      clearInterval(i2);
+      clearInterval(i3);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={{ flexDirection: "row", gap: 4, paddingHorizontal: 4 }}>
+      <Animated.Text style={[{ fontSize: 18, lineHeight: 22, color: "#687076" }, a1]}>.</Animated.Text>
+      <Animated.Text style={[{ fontSize: 18, lineHeight: 22, color: "#687076" }, a2]}>.</Animated.Text>
+      <Animated.Text style={[{ fontSize: 18, lineHeight: 22, color: "#687076" }, a3]}>.</Animated.Text>
+    </View>
+  );
+}
+
 // Building chat: character + dialog per community building
 interface BuildingChatLine {
   from: "npc" | "user";
@@ -1961,6 +2003,10 @@ export default function IsometricMap() {
     userReplied: boolean;
   } | null>(null);
   const chatScrollRef = useRef<ScrollView>(null);
+
+  // Chat typing animation state
+  const [chatTyping, setChatTyping] = useState(false);
+  const chatTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -4235,14 +4281,12 @@ export default function IsometricMap() {
                   key={i}
                   style={m.from === "npc" ? chatStyles.msgRowNpc : chatStyles.msgRowUser}
                 >
-                  {m.from === "npc" && (
-                    <Image
-                      source={BUILDING_CHAT_NPCS[chatPanel.buildingType].sprite}
-                      style={chatStyles.msgAvatar}
-                      contentFit="contain"
-                      cachePolicy="memory"
-                    />
-                  )}
+                  <Image
+                    source={BUILDING_CHAT_NPCS[chatPanel.buildingType].sprite}
+                    style={m.from === "npc" ? chatStyles.msgAvatar : chatStyles.msgAvatarUser}
+                    contentFit="contain"
+                    cachePolicy="memory"
+                  />
                   <View
                     style={
                       m.from === "npc"
@@ -4256,6 +4300,22 @@ export default function IsometricMap() {
                   </View>
                 </View>
               ))}
+              {/* Typing animation: animated "..." dots while the character is composing */}
+              {chatTyping && (
+                <View style={chatStyles.msgRowNpc}>
+                  <Image
+                    source={BUILDING_CHAT_NPCS[chatPanel.buildingType].sprite}
+                    style={chatStyles.msgAvatar}
+                    contentFit="contain"
+                    cachePolicy="memory"
+                  />
+                  <View style={chatStyles.bubbleTyping}>
+                    <Text style={chatStyles.msgTextNpc}>
+                      <TypingDots />
+                    </Text>
+                  </View>
+                </View>
+              )}
             </ScrollView>
             <View style={chatStyles.replyRow}>
               {chatPanel.userReplied ? (
@@ -4270,18 +4330,35 @@ export default function IsometricMap() {
                     onPress={() => {
                       const npc = BUILDING_CHAT_NPCS[chatPanel.buildingType];
                       const response = r.responses[Math.floor(Math.random() * r.responses.length)];
+                      // Close chat panel on double response? No — append user reply first,
+                      // show typing animation, then deliver NPC reply after a delay.
                       setChatPanel((prev) => {
                         if (!prev) return prev;
-                        const next = [
-                          ...prev.messages,
-                          { from: "user" as const, text: r.label },
-                          { from: "npc" as const, text: response },
-                        ];
-                        return { ...prev, messages: next, userReplied: true };
+                        return {
+                          ...prev,
+                          messages: [...prev.messages, { from: "user" as const, text: r.label }],
+                          userReplied: true,
+                        };
                       });
                       if (Platform.OS !== "web") {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       }
+                      // Typing animation: character "composes" their reply
+                      setChatTyping(true);
+                      if (chatTypingTimerRef.current) clearTimeout(chatTypingTimerRef.current);
+                      chatTypingTimerRef.current = setTimeout(() => {
+                        setChatTyping(false);
+                        setChatPanel((prev) => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            messages: [...prev.messages, { from: "npc" as const, text: response }],
+                          };
+                        });
+                        if (Platform.OS !== "web") {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        }
+                      }, 900);
                     }}
                     activeOpacity={0.7}
                   >
@@ -4908,6 +4985,11 @@ const chatStyles = StyleSheet.create({
     height: 38,
     marginRight: 6,
   },
+  msgAvatarUser: {
+    width: 30,
+    height: 38,
+    marginLeft: 6,
+  },
   bubbleNpc: {
     backgroundColor: "#f0f2f5",
     borderRadius: 14,
@@ -4923,6 +5005,14 @@ const chatStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     maxWidth: "82%",
+  },
+  bubbleTyping: {
+    backgroundColor: "#f0f2f5",
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 56,
   },
   msgTextNpc: {
     fontSize: 14,

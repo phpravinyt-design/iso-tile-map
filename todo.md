@@ -258,3 +258,9 @@
 - [x] User quick-reply buttons so the user can "talk" back; character responds
 - [x] Chat panel has close button; tap backdrop to dismiss after conversation
 - [x] Verify: TypeScript clean, 6 tests passing, app renders, chat opens for each building type, placement mode unaffected
+
+## Chat Panel Enhancements (avatars + typing animation)
+- [x] Character avatar on EVERY message row (NPC messages show avatar; user messages keep right-aligned bubble)
+- [x] Typing animation: after user taps reply, show "typing..." indicator with animated bouncing dots for ~900ms before the NPC message appears
+- [x] Typing dots bubble styled like NPC bubble; avatar shown on typing row too
+- [x] Verify TypeScript clean, 6 tests passing, app renders
