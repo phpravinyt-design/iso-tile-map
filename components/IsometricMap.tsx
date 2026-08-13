@@ -3470,7 +3470,36 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             {tappedFarmlandPos ? (
-              <Text style={styles.treeSelectedText}>🌾 Select a crop to plant here</Text>
+              <View style={styles.cropSelectorActions}>
+                <Text style={styles.treeSelectedText}>🌾 Select a crop to plant here</Text>
+                {/* Harvest button - removes crop and gives +25 coins */}
+                <TouchableOpacity
+                  style={styles.harvestButton}
+                  onPress={() => {
+                    if (!tappedFarmlandPos) return;
+                    setGrid((prev) => {
+                      const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+                      const { col, row } = tappedFarmlandPos;
+                      if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+                        const cell = newGrid[row][col];
+                        if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType]) {
+                          // Harvest: remove crop and give +25 coins
+                          cell.building = "none";
+                          setCoins((c) => c + 25);
+                          if (Platform.OS !== "web") {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                          }
+                        }
+                      }
+                      return newGrid;
+                    });
+                    setTappedFarmlandPos(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.harvestButtonText}>🌾 Harvest (+25)</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <Text style={styles.treeSelectedText}>🌾 Tap a crop to select, then tap farmland to plant</Text>
             )}
@@ -3699,6 +3728,23 @@ const styles = StyleSheet.create({
   treeSelectedText: {
     color: "#aaa",
     fontSize: 11,
+  },
+  cropSelectorActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  harvestButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  harvestButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   itemsPanel: {
     position: "absolute",

@@ -207,3 +207,6 @@
 ## Farmland Tile Tap Feature
 - [x] Farmland tiles on map act as a button - tapping them opens emoji crop selector
 - [x] Selected emoji crop gets placed on top of the tapped farmland tile
+
+## Harvest Feature
+- [x] Tap a crop emoji on the map to harvest: +25 coins, remove crop from tile
