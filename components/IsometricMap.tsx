@@ -219,7 +219,7 @@ const VEHICLE_SOURCES: Record<string, any> = {
 };
 
 // Vehicle config
-const VEHICLE_COUNT = 2;
+const VEHICLE_COUNT = 3;
 const VEHICLE_WALK_SPEED = 2.0; // faster than NPCs
 const VEHICLE_IDLE_TIME = 500; // shorter idle on roads
 
@@ -1864,7 +1864,7 @@ export default function IsometricMap() {
   });
 
   // --- Vehicle NPCs (road-only) ---
-  const vehicleTypes: VehicleState["type"][] = ["car", "truck"];
+  const vehicleTypes: VehicleState["type"][] = ["car", "truck", "bus"];
   const [vehicles, setVehicles] = useState<VehicleState[]>([]);
 
   // Spawn vehicles when roads exist on the map

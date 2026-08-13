@@ -172,3 +172,6 @@
 - [x] Implement road-following system: VehicleState interface, getRoadTiles/getConnectedRoads helpers, VEHICLE_COUNT=2, VEHICLE_WALK_SPEED=2.0, spawn only when roads exist, movement only on connected road tiles, rotation follows direction, avoids backtracking
 - [x] Vehicles render at zIndex 16 (above NPCs/animals), sprite rotates to match travel direction
 - [x] Verified: TypeScript clean, app renders correctly with NPCs/animals walking; vehicles spawn when roads are placed
+
+## More Vehicle Types
+- [x] Added bus to vehicle pool, increased VEHICLE_COUNT to 3 (car, truck, bus now all available)
