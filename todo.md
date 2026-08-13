@@ -147,3 +147,9 @@
 - [x] Yellow highlight with 2px gold border, pulsing opacity via withRepeat/withSequence animation
 - [x] Only shows when cell.building === "none" && cell.roadOverlay === null (no building or road already there)
 - [x] Verified: TypeScript clean, 6 tests passing, app renders correctly. Web pointermove tracks hover position for snap preview.
+
+## Triple-Tap Flip
+- [x] Added flip state per item: GridCell.flipped boolean, persisted via AsyncStorage (same grid save)
+- [x] Triple-tap on any item flips it: tripleTapRef tracks taps within 400ms, 3 taps = flip via scaleX(-1)
+- [x] Flip persists: GridCell.flipped is part of grid state, saved with MAP_SAVE_KEY v2
+- [x] Verified: TypeScript clean, app renders correctly with NPCs and buildings visible
