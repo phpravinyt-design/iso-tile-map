@@ -544,6 +544,29 @@ function getCropGrowthTime(cropType: CropType): number {
   return CROP_GROWTH_TIMES[cropType] || 50000;
 }
 
+// Sell prices per crop type (coins per vegetable)
+const CROP_SELL_PRICES: Record<CropType, number> = {
+  crop_carrot: 5,        // Fast, cheap
+  crop_potato: 7,        // Fast, cheap
+  crop_garlic: 8,        // Medium-fast
+  crop_wheat: 8,         // Medium
+  crop_corn: 9,          // Medium
+  crop_peanut: 9,        // Medium
+  crop_tomato: 10,       // Standard
+  crop_eggplant: 10,     // Standard
+  crop_cucumber: 10,     // Standard
+  crop_strawberry: 12,   // Slightly rare
+  crop_chili: 12,        // Slightly rare
+  crop_mushroom: 14,     // Rare
+  crop_broccoli: 18,     // Slow, valuable
+  crop_watermelon: 25,   // Very slow, most valuable
+};
+
+// Get sell price for a crop type (default 10)
+function getCropSellPrice(cropType: CropType): number {
+  return CROP_SELL_PRICES[cropType] || 10;
+}
+
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
   "house_small", "house_big", "town_market", "none",
@@ -3243,8 +3266,8 @@ export default function IsometricMap() {
                         marginTop: 4,
                       }}
                       onPress={() => {
-                        // Sell all of this crop type for 10 coins each
-                        const sellCoins = count * 10;
+                        // Sell all of this crop type at crop-specific price
+                        const sellCoins = count * getCropSellPrice(crop as CropType);
                         setCoins((c) => c + sellCoins);
                         const updated = { ...harvestedItems };
                         delete updated[crop];
@@ -3256,7 +3279,7 @@ export default function IsometricMap() {
                       activeOpacity={0.7}
                     >
                       <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>
-                        Sell All ({count * 10})
+                        Sell All ({count * getCropSellPrice(crop as CropType)})
                       </Text>
                     </TouchableOpacity>
                   )}

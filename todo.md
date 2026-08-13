@@ -231,3 +231,7 @@
 ## Different Growth Times Per Crop
 - [x] Add CROP_GROWTH_TIMES mapping with different durations per crop type
 - [x] Use crop-specific growth time in the growth timer and progress bar
+
+## Different Sell Prices Per Crop
+- [x] Add CROP_SELL_PRICES mapping with different values per crop type
+- [x] Use crop-specific sell price in backpack Sell All button
