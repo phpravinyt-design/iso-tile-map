@@ -192,3 +192,9 @@
 - [ ] Add crop sub-selector that opens when user selects farmland tile texture
 - [ ] User can tap on farmland tiles to place selected crop type (rendered as building overlay on farmland)
 - [ ] Persist crops via building field in GridCell
+
+## Crop Growth System
+- [x] Crop 4 growth stages from tomato sheet: seedling → small plant → green tomatoes → ripe red tomatoes
+- [x] Implement growth timer: each stage lasts 10 seconds, transitions to next
+- [x] Final stage (ripe) stays permanent
+- [x] Persist growth stage in GridCell data

@@ -514,6 +514,18 @@ const CROP_SOURCES: Record<string, any> = {
   okra: require("@/assets/images/crop_okra.png"),
 };
 
+// Growth stage images for tomato (4 stages)
+const TOMATO_GROWTH_STAGES = [
+  require("@/assets/images/growth_stage_1.png"), // Stage 1: seedling
+  require("@/assets/images/growth_stage_2.png"), // Stage 2: early green
+  require("@/assets/images/growth_stage_3.png"), // Stage 3: mid green
+  require("@/assets/images/growth_stage_4.png"), // Stage 4: ripe red (final)
+];
+
+// Growth duration per stage in seconds
+const GROWTH_STAGE_DURATION = 10; // 10 seconds per stage
+const MAX_GROWTH_STAGE = 3; // 0-indexed: stages 0,1,2,3 (4 total)
+
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
   "house_small", "house_big", "town_market", "none",
@@ -802,13 +814,22 @@ function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
   );
 }
 
-// Generic decoration renderer (all 9 decoration PNGs)
-function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false }: {
-  col: number; row: number; scale: number; decorationType: string; flipped?: boolean;
+// Generic decoration renderer (all 9 decoration PNGs) + crop growth stages
+function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false, growthStage = -1 }: {
+  col: number; row: number; scale: number; decorationType: string; flipped?: boolean; growthStage?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
   const size = ts * 1.5;
+  
+  // Determine which image source to use
+  let source = DECORATION_SOURCES[decorationType] || CROP_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG;
+  
+  // If this is a crop type and has a growth stage, use growth stage images
+  if (decorationType === "tomato" && growthStage >= 0 && growthStage < TOMATO_GROWTH_STAGES.length) {
+    source = TOMATO_GROWTH_STAGES[growthStage];
+  }
+  
   return (
     <View style={{
       position: "absolute",
@@ -820,7 +841,7 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
       pointerEvents: "box-none",
     }}>
       <Image
-        source={DECORATION_SOURCES[decorationType] || CROP_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
+        source={source}
         style={{ width: size, height: size, transform: [{ scaleX: flipped ? -1 : 1 }] }}
         contentFit="contain"
         cachePolicy="memory"
@@ -880,7 +901,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: string; flipped: boolean };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: string; flipped: boolean; cropGrowthStage: number };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -913,7 +934,7 @@ function createDefaultGrid(): GridCell[][] {
       if (row === START_HOUSE_POS.row && col === START_HOUSE_POS.col) {
         building = "house_small" as BuildingType;
       }
-      rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass", flipped: false });
+      rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass", flipped: false, cropGrowthStage: 0 });
     }
     grid.push(rowArr);
   }
@@ -1368,8 +1389,8 @@ function TownMarket({ col, row, scale, flipped = false }: { col: number; row: nu
 }
 
 // --- Building Component Selector ---
-function BuildingOnTile({ col, row, buildingType, scale, flipped = false }: {
-  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean;
+function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growthStage = -1 }: {
+  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean; growthStage?: number;
 }) {
   // All tree types use the generic renderer
   if (buildingType in TREE_SOURCES) {
@@ -1401,7 +1422,7 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false }: {
   }
   // All crop types use the generic renderer (rendered like decorations on farmland)
   if (buildingType in CROP_SOURCES) {
-    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} growthStage={growthStage} />;
   }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -1423,7 +1444,14 @@ export default function IsometricMap() {
         try {
           const parsed = JSON.parse(saved) as GridCell[][];
           if (parsed && Array.isArray(parsed) && parsed.length === GRID_SIZE) {
-            setGrid(parsed);
+            // Migrate: add cropGrowthStage to old cells that don't have it
+            const migrated = parsed.map((rowArr) =>
+              rowArr.map((cell) => ({
+                ...cell,
+                cropGrowthStage: cell.cropGrowthStage ?? (cell.building in CROP_SOURCES ? MAX_GROWTH_STAGE : 0),
+              }))
+            );
+            setGrid(migrated);
           }
         } catch (e) {
           // Invalid data, use default
@@ -1584,6 +1612,27 @@ export default function IsometricMap() {
       AsyncStorage.setItem("profile_name", profileName).catch(() => {});
     }
   }, [profileName, loaded]);
+
+  // Crop growth timer: increment growth stage every GROWTH_STAGE_DURATION seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setGrid((prevGrid) => {
+        let changed = false;
+        const newGrid = prevGrid.map((rowArr) =>
+          rowArr.map((cell) => {
+            // Only grow crop types that haven't reached max stage
+            if (cell.building !== "none" && cell.building in CROP_SOURCES && cell.cropGrowthStage < MAX_GROWTH_STAGE) {
+              changed = true;
+              return { ...cell, cropGrowthStage: cell.cropGrowthStage + 1 };
+            }
+            return cell;
+          })
+        );
+        return changed ? newGrid : prevGrid;
+      });
+    }, GROWTH_STAGE_DURATION * 1000);
+    return () => clearInterval(interval);
+  }, []);
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
   const [showTreeSelector, setShowTreeSelector] = useState(false);
@@ -2287,6 +2336,7 @@ export default function IsometricMap() {
                 if (moveClipboard.type === "building") {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
+                  newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
@@ -2316,6 +2366,7 @@ export default function IsometricMap() {
                 if (moveClipboard.type === "building") {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
+                  newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
@@ -2360,6 +2411,7 @@ export default function IsometricMap() {
                 if (newGrid[row][col].building !== cropAsBuilding) {
                   newGrid[row][col].building = cropAsBuilding;
                   newGrid[row][col].roadOverlay = null;
+                  newGrid[row][col].cropGrowthStage = 0; // Reset growth to stage 1 (seedling)
                   if (coins < ITEM_COST) flashLowCoins();
                   setCoins((c) => Math.max(0, c - ITEM_COST));
                 }
@@ -2379,6 +2431,7 @@ export default function IsometricMap() {
                 if (moveClipboard.type === "building") {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
+                  newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
@@ -2605,7 +2658,7 @@ export default function IsometricMap() {
         const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
           <View key={`bld-wrap-${row}-${col}`}>
-            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} />
+            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} growthStage={cell.cropGrowthStage ?? 0} />
             {/* Long-press hit area for item selection */}
             <TouchableOpacity
               activeOpacity={0.3}
