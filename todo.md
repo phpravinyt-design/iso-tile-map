@@ -122,3 +122,9 @@
 - [x] Added road_wide_straight and road_wide_corner to ROAD_TYPES (5 total now) + ROAD_SOURCES mapping
 - [x] Rendering works via existing PngRoadGeneric renderer (uses ROAD_SOURCES lookup); grid roadOverlay changed from RoadType to string for flexibility; moveClipboard roadType also string
 - [x] Verified: TypeScript clean, app renders correctly, Daily Reward banner working
+
+## New Tile Texture (Sand-Grass Transition)
+- [x] Processed: resized to 256x256 PNG (~103KB), saved as tile_sand_grass.png
+- [x] Added to TILE_TEXTURE_TYPES as "sand_grass" + TILE_TEXTURE_SOURCES mapping (4 tile options now)
+- [x] Rendering works via existing tile texture renderer (TILE_TEXTURE_SOURCES lookup); grid tileTexture changed from TileTextureType to string
+- [x] Verified: TypeScript clean, app renders correctly, NPCs walking

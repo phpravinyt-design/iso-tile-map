@@ -30,6 +30,7 @@ import { useEffect } from "react";
 const LUSH_GRASS_TILE_PNG = require("@/assets/images/cropped_tiles/lush_grass.jpg");
 const LIGHT_GRASS_TILE_PNG = require("@/assets/images/cropped_tiles/light_grass.png");
 const SAND_TILE_PNG = require("@/assets/images/cropped_tiles/sand.png");
+const SAND_GRASS_TILE_PNG = require("@/assets/images/tile_sand_grass.png");
 
 // Tree PNG assets - 11 tree types
 const TREE_PNG = require("@/assets/images/tree.png");
@@ -376,7 +377,7 @@ const TILE_TYPES = ["grass", "water", "rock", "flower", "dirt", "none"] as const
 type TileType = (typeof TILE_TYPES)[number];
 
 // Tile texture types (for the Tiles selector - user picks which grass/sand texture)
-const TILE_TEXTURE_TYPES = ["lush_grass", "light_grass", "sand"] as const;
+const TILE_TEXTURE_TYPES = ["lush_grass", "light_grass", "sand", "sand_grass"] as const;
 type TileTextureType = (typeof TILE_TEXTURE_TYPES)[number];
 
 // Tile texture PNG sources
@@ -384,6 +385,7 @@ const TILE_TEXTURE_SOURCES: Record<string, any> = {
   lush_grass: LUSH_GRASS_TILE_PNG,
   light_grass: LIGHT_GRASS_TILE_PNG,
   sand: SAND_TILE_PNG,
+  sand_grass: SAND_GRASS_TILE_PNG,
 };
 
 // Building types (placed ON tiles)
@@ -708,7 +710,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: TileTextureType };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: string };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
