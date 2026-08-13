@@ -2004,6 +2004,35 @@ export default function IsometricMap() {
   } | null>(null);
   const chatScrollRef = useRef<ScrollView>(null);
 
+  // Chat panel slide animation (enter: slide-up, close: slide-down)
+  const chatSlideY = useSharedValue(480);
+  const chatOpacity = useSharedValue(0);
+  const chatClosingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeChatPanelAnimated = useCallback(() => {
+    chatSlideY.value = withTiming(480, { duration: 250, easing: Easing.in(Easing.cubic) });
+    chatOpacity.value = withTiming(0, { duration: 250 });
+    if (chatClosingTimerRef.current) clearTimeout(chatClosingTimerRef.current);
+    chatClosingTimerRef.current = setTimeout(() => {
+      setChatPanel(null);
+    }, 260);
+  }, []);
+
+  // Slide-up enter animation when a chat panel opens
+  useEffect(() => {
+    if (chatPanel) {
+      chatSlideY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.cubic) });
+      chatOpacity.value = withTiming(1, { duration: 250 });
+    } else {
+      chatSlideY.value = 480;
+      chatOpacity.value = 0;
+    }
+    return () => {
+      if (chatClosingTimerRef.current) clearTimeout(chatClosingTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatPanel]);
+
   // Chat typing animation state
   const [chatTyping, setChatTyping] = useState(false);
   const chatTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4239,10 +4268,19 @@ export default function IsometricMap() {
         <View style={chatStyles.backdrop} pointerEvents="box-none">
           <TouchableOpacity
             style={chatStyles.backdropTouchable}
-            onPress={() => setChatPanel(null)}
+            onPress={closeChatPanelAnimated}
             activeOpacity={1}
           />
-          <View style={chatStyles.panel} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              chatStyles.panel,
+              {
+                transform: [{ translateY: chatSlideY }],
+                opacity: chatOpacity,
+              },
+            ]}
+            pointerEvents="box-none"
+          >
             <View style={chatStyles.panelHeader}>
               <View style={chatStyles.headerRow}>
                 <Image
@@ -4261,7 +4299,7 @@ export default function IsometricMap() {
                 </View>
               </View>
               <TouchableOpacity
-                onPress={() => setChatPanel(null)}
+                onPress={closeChatPanelAnimated}
                 activeOpacity={0.6}
                 style={chatStyles.closeBtn}
               >
@@ -4367,7 +4405,7 @@ export default function IsometricMap() {
                 ))
               )}
             </View>
-          </View>
+          </Animated.View>
         </View>
       )}
     </View>

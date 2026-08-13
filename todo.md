@@ -264,3 +264,8 @@
 - [x] Typing animation: after user taps reply, show "typing..." indicator with animated bouncing dots for ~900ms before the NPC message appears
 - [x] Typing dots bubble styled like NPC bubble; avatar shown on typing row too
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Chat Panel Close Animation (slide-down on close button)
+- [x] Replace instant chat panel close with an animated slide-down exit (250ms) when ✕ close button or backdrop is tapped
+- [x] Chat panel slides up on open (250ms) and slides down on close for a smooth enter/exit pair
+- [x] Verify TypeScript clean, 6 tests passing, app renders
