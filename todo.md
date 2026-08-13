@@ -203,3 +203,7 @@
 - [x] Remove 9 crop image buttons and replace with 14 emoji crop buttons
 - [x] When tapping farmland tile, show emoji crop selector
 - [x] Crops render as emoji (🍅🍆🥔🌾🍓🥒🥕🌽🍉🌶️🥦🥜🧄🍄) on the map
+
+## Farmland Tile Tap Feature
+- [x] Farmland tiles on map act as a button - tapping them opens emoji crop selector
+- [x] Selected emoji crop gets placed on top of the tapped farmland tile

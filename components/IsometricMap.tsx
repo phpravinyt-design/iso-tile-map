@@ -1650,6 +1650,7 @@ export default function IsometricMap() {
   const [selectedTileType, setSelectedTileType] = useState<TileTextureType>("lush_grass");
   const [showTileSelector, setShowTileSelector] = useState(false);
   const [selectedCropType, setSelectedCropType] = useState<CropType>("crop_tomato");
+  const [tappedFarmlandPos, setTappedFarmlandPos] = useState<{ col: number; row: number } | null>(null);
   const [selectedTempleType, setSelectedTempleType] = useState<TempleType>("temple_pink");
   const [showTempleSelector, setShowTempleSelector] = useState(false);
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
@@ -2327,6 +2328,34 @@ export default function IsometricMap() {
     }, 550);
   }, [claimPopOpacity, claimPopScale]);
 
+  // Handle farmland tile tap: opens crop selector for placing emoji crops on farmland
+  const handleFarmlandTap = useCallback((col: number, row: number) => {
+    if (Platform.OS !== "web" && panMoved.current) return;
+    setTappedFarmlandPos({ col, row });
+  }, []);
+
+  // Handle crop selection from farmland tap (places crop on the tapped tile)
+  const handleCropSelectFromTap = useCallback((crop: CropType) => {
+    setSelectedCropType(crop);
+    if (!tappedFarmlandPos) return;
+    setGrid((prev) => {
+      const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+      const { col, row } = tappedFarmlandPos;
+      if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+        const cropAsBuilding = crop as BuildingType;
+        if (newGrid[row][col].building !== cropAsBuilding) {
+          newGrid[row][col].building = cropAsBuilding;
+          newGrid[row][col].roadOverlay = null;
+          newGrid[row][col].cropGrowthStage = 0;
+          if (coins < ITEM_COST) flashLowCoins();
+          setCoins((c) => Math.max(0, c - ITEM_COST));
+        }
+      }
+      return newGrid;
+    });
+    setTappedFarmlandPos(null);
+  }, [tappedFarmlandPos, coins, flashLowCoins]);
+
   // Handle tile/building placement
   const handleTilePress = useCallback(
     (col: number, row: number) => {
@@ -2757,17 +2786,20 @@ export default function IsometricMap() {
         if (cell.building !== "none") continue;
         const pos = gridToScreen(col, row, currentScale);
         const ts = TILE_SIZE * currentScale;
+        // Farmland tiles: tap opens crop selector (acts like a button)
+        const isFarmland = cell.tileTexture === "farmland";
         elements.push(
           <TouchableOpacity key={`grass-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
             style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 2 }}
-            onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)}
+            onPress={() => isFarmland ? handleFarmlandTap(col, row) : handleTilePress(col, row)}
+            onLongPress={() => handleRemoveBuilding(col, row)}
             onPressIn={() => startPressTimer(col, row, true)}
             onPressOut={() => cancelPressTimer()} />
         );
       }
     }
     return elements;
-  }, [grid, currentScale, handleTilePress, handleRemoveBuilding, startPressTimer, cancelPressTimer]);
+  }, [grid, currentScale, handleTilePress, handleRemoveBuilding, startPressTimer, cancelPressTimer, handleFarmlandTap]);
 
   // Empty hit areas for "none" tiles
   const emptyHitAreas = useMemo(() => {
@@ -3407,8 +3439,8 @@ export default function IsometricMap() {
         </View>
       )}
 
-      {/* Crop Sub-Selector (shown when tiles mode + farmland texture is selected) */}
-      {mode === "tiles" && selectedTileType === "farmland" && (
+      {/* Crop Sub-Selector (shown when tiles mode + farmland texture is selected, OR when a farmland tile is tapped) */}
+      {(mode === "tiles" && selectedTileType === "farmland") || tappedFarmlandPos !== null ? (
         <View style={[styles.treeSelectorWrapper, { bottom: 190 }]}>
           <ScrollView
             horizontal
@@ -3420,7 +3452,13 @@ export default function IsometricMap() {
                 key={c}
                 style={[styles.treeOption, selectedCropType === c && styles.treeOptionActive]}
                 onPress={() => {
-                  setSelectedCropType(c);
+                  if (tappedFarmlandPos) {
+                    // When tapped from farmland tile, place crop immediately on that tile
+                    handleCropSelectFromTap(c);
+                  } else {
+                    // When in tiles mode, just update selected crop type
+                    setSelectedCropType(c);
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -3431,10 +3469,14 @@ export default function IsometricMap() {
             ))}
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
-            <Text style={styles.treeSelectedText}>🌾 Tap a crop to select, then tap farmland to plant</Text>
+            {tappedFarmlandPos ? (
+              <Text style={styles.treeSelectedText}>🌾 Select a crop to plant here</Text>
+            ) : (
+              <Text style={styles.treeSelectedText}>🌾 Tap a crop to select, then tap farmland to plant</Text>
+            )}
           </View>
         </View>
-      )}
+      ) : null}
 
       {/* Temple Sub-Selector (shown when temple mode is active) */}
       {mode === "temple" && (
