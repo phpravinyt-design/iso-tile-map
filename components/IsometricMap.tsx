@@ -493,38 +493,33 @@ const TILE_TEXTURE_SOURCES: Record<string, any> = {
   farmland: FARMLAND_TILE_PNG,
 };
 
-// Crop types (vegetables that can be placed on farmland tiles)
+// Crop types (emoji-based crops that can be placed on farmland tiles)
 const CROP_TYPES = [
-  "tomato", "eggplant", "carrot",
-  "cabbage", "chili", "onion",
-  "potato", "cucumber", "okra"
+  "crop_tomato", "crop_eggplant", "crop_potato",
+  "crop_wheat", "crop_strawberry", "crop_cucumber",
+  "crop_carrot", "crop_corn", "crop_watermelon",
+  "crop_chili", "crop_broccoli", "crop_peanut",
+  "crop_garlic", "crop_mushroom"
 ] as const;
 type CropType = (typeof CROP_TYPES)[number];
 
-// Crop PNG sources
-const CROP_SOURCES: Record<string, any> = {
-  tomato: require("@/assets/images/crop_tomato.png"),
-  eggplant: require("@/assets/images/crop_eggplant.png"),
-  carrot: require("@/assets/images/crop_carrot.png"),
-  cabbage: require("@/assets/images/crop_cabbage.png"),
-  chili: require("@/assets/images/crop_chili.png"),
-  onion: require("@/assets/images/crop_onion.png"),
-  potato: require("@/assets/images/crop_potato.png"),
-  cucumber: require("@/assets/images/crop_cucumber.png"),
-  okra: require("@/assets/images/crop_okra.png"),
+// Crop emoji display
+const CROP_EMOJIS: Record<string, string> = {
+  crop_tomato: "🍅",
+  crop_eggplant: "🍆",
+  crop_potato: "🥔",
+  crop_wheat: "🌾",
+  crop_strawberry: "🍓",
+  crop_cucumber: "🥒",
+  crop_carrot: "🥕",
+  crop_corn: "🌽",
+  crop_watermelon: "🍉",
+  crop_chili: "🌶️",
+  crop_broccoli: "🥦",
+  crop_peanut: "🥜",
+  crop_garlic: "🧄",
+  crop_mushroom: "🍄‍",
 };
-
-// Growth stage images for tomato (4 stages)
-const TOMATO_GROWTH_STAGES = [
-  require("@/assets/images/growth_stage_1.png"), // Stage 1: seedling
-  require("@/assets/images/growth_stage_2.png"), // Stage 2: early green
-  require("@/assets/images/growth_stage_3.png"), // Stage 3: mid green
-  require("@/assets/images/growth_stage_4.png"), // Stage 4: ripe red (final)
-];
-
-// Growth duration per stage in seconds
-const GROWTH_STAGE_DURATION = 10; // 10 seconds per stage
-const MAX_GROWTH_STAGE = 3; // 0-indexed: stages 0,1,2,3 (4 total)
 
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
@@ -550,10 +545,12 @@ const BUILDING_TYPES = [
   "steel_factory", "oil_refinery", "food_factory",
   "recycling_plant", "dairy_factory", "yarn_factory",
   "chemical_plant", "wood_factory", "tech_factory",
-  // 9 crop types (placed on farmland)
-  "tomato", "eggplant", "carrot",
-  "cabbage", "chili", "onion",
-  "potato", "cucumber", "okra",
+  // 14 emoji crop types (placed on farmland)
+  "crop_tomato", "crop_eggplant", "crop_potato",
+  "crop_wheat", "crop_strawberry", "crop_cucumber",
+  "crop_carrot", "crop_corn", "crop_watermelon",
+  "crop_chili", "crop_broccoli", "crop_peanut",
+  "crop_garlic", "crop_mushroom",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -814,22 +811,13 @@ function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
   );
 }
 
-// Generic decoration renderer (all 9 decoration PNGs) + crop growth stages
-function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false, growthStage = -1 }: {
-  col: number; row: number; scale: number; decorationType: string; flipped?: boolean; growthStage?: number;
+// Generic decoration renderer (all 9 decoration PNGs)
+function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false }: {
+  col: number; row: number; scale: number; decorationType: string; flipped?: boolean;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
   const size = ts * 1.5;
-  
-  // Determine which image source to use
-  let source = DECORATION_SOURCES[decorationType] || CROP_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG;
-  
-  // If this is a crop type and has a growth stage, use growth stage images
-  if (decorationType === "tomato" && growthStage >= 0 && growthStage < TOMATO_GROWTH_STAGES.length) {
-    source = TOMATO_GROWTH_STAGES[growthStage];
-  }
-  
   return (
     <View style={{
       position: "absolute",
@@ -841,11 +829,43 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
       pointerEvents: "box-none",
     }}>
       <Image
-        source={source}
+        source={DECORATION_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
         style={{ width: size, height: size, transform: [{ scaleX: flipped ? -1 : 1 }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
+    </View>
+  );
+}
+
+// Emoji crop renderer (renders emoji on farmland tiles)
+function EmojiCrop({ col, row, scale, cropType, flipped = false }: {
+  col: number; row: number; scale: number; cropType: string; flipped?: boolean;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const emojiSize = ts * 0.8;
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - emojiSize / 2,
+      top: pos.y - emojiSize / 2,
+      width: emojiSize,
+      height: emojiSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+      alignItems: "center",
+      justifyContent: "center",
+    }}>
+      <Text
+        style={{
+          fontSize: emojiSize * 0.7,
+          lineHeight: emojiSize * 0.9,
+          transform: [{ scaleX: flipped ? -1 : 1 }],
+        }}
+      >
+        {CROP_EMOJIS[cropType] || "🌱"}
+      </Text>
     </View>
   );
 }
@@ -1420,9 +1440,9 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   if (buildingType in INDUSTRY_SOURCES) {
     return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
   }
-  // All crop types use the generic renderer (rendered like decorations on farmland)
-  if (buildingType in CROP_SOURCES) {
-    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} growthStage={growthStage} />;
+  // All crop types render as emoji on farmland
+  if (buildingType in CROP_EMOJIS) {
+    return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} />;
   }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -1444,12 +1464,17 @@ export default function IsometricMap() {
         try {
           const parsed = JSON.parse(saved) as GridCell[][];
           if (parsed && Array.isArray(parsed) && parsed.length === GRID_SIZE) {
-            // Migrate: add cropGrowthStage to old cells that don't have it
+            // Migrate: convert old crop types to new emoji crop types and add cropGrowthStage
+            const OLD_CROP_MAP: Record<string, string> = {
+              "tomato": "crop_tomato", "eggplant": "crop_eggplant", "carrot": "crop_carrot",
+              "cabbage": "crop_broccoli", "chili": "crop_chili", "onion": "crop_garlic",
+              "potato": "crop_potato", "cucumber": "crop_cucumber", "okra": "crop_peanut",
+            };
             const migrated = parsed.map((rowArr) =>
-              rowArr.map((cell) => ({
-                ...cell,
-                cropGrowthStage: cell.cropGrowthStage ?? (cell.building in CROP_SOURCES ? MAX_GROWTH_STAGE : 0),
-              }))
+              rowArr.map((cell) => {
+                const newBuilding = (OLD_CROP_MAP[cell.building] || cell.building) as BuildingType;
+                return { ...cell, building: newBuilding, cropGrowthStage: cell.cropGrowthStage ?? 0 };
+              })
             );
             setGrid(migrated);
           }
@@ -1613,26 +1638,6 @@ export default function IsometricMap() {
     }
   }, [profileName, loaded]);
 
-  // Crop growth timer: increment growth stage every GROWTH_STAGE_DURATION seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setGrid((prevGrid) => {
-        let changed = false;
-        const newGrid = prevGrid.map((rowArr) =>
-          rowArr.map((cell) => {
-            // Only grow crop types that haven't reached max stage
-            if (cell.building !== "none" && cell.building in CROP_SOURCES && cell.cropGrowthStage < MAX_GROWTH_STAGE) {
-              changed = true;
-              return { ...cell, cropGrowthStage: cell.cropGrowthStage + 1 };
-            }
-            return cell;
-          })
-        );
-        return changed ? newGrid : prevGrid;
-      });
-    }, GROWTH_STAGE_DURATION * 1000);
-    return () => clearInterval(interval);
-  }, []);
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
   const [showTreeSelector, setShowTreeSelector] = useState(false);
@@ -1644,7 +1649,7 @@ export default function IsometricMap() {
   const [showRoadSelector, setShowRoadSelector] = useState(false);
   const [selectedTileType, setSelectedTileType] = useState<TileTextureType>("lush_grass");
   const [showTileSelector, setShowTileSelector] = useState(false);
-  const [selectedCropType, setSelectedCropType] = useState<CropType>("tomato");
+  const [selectedCropType, setSelectedCropType] = useState<CropType>("crop_tomato");
   const [selectedTempleType, setSelectedTempleType] = useState<TempleType>("temple_pink");
   const [showTempleSelector, setShowTempleSelector] = useState(false);
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
@@ -2980,12 +2985,16 @@ export default function IsometricMap() {
         <View style={styles.clipboardBar}>
           <View style={styles.clipboardPreview}>
             {moveClipboard.type === "building" && moveClipboard.buildingType ? (
-              <Image
-                source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || CROP_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
-                style={styles.clipboardPreviewImage}
-                contentFit="contain"
-                cachePolicy="memory"
-              />
+              CROP_EMOJIS[moveClipboard.buildingType] ? (
+                <Text style={{ fontSize: 28 }}>{CROP_EMOJIS[moveClipboard.buildingType]}</Text>
+              ) : (
+                <Image
+                  source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
+                  style={styles.clipboardPreviewImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              )
             ) : moveClipboard.type === "road" ? (
               <Image
                 source={ROAD_SOURCES[moveClipboard.roadType || ""] || ROAD_STRAIGHT_PNG}
@@ -3415,17 +3424,14 @@ export default function IsometricMap() {
                 }}
                 activeOpacity={0.7}
               >
-                <Image
-                  source={CROP_SOURCES[c] || GRASS_TILE_PNG}
-                  style={styles.treeOptionImage}
-                  contentFit="contain"
-                  cachePolicy="memory"
-                />
+                <Text style={{ fontSize: 28 }}>
+                  {CROP_EMOJIS[c] || "🌱"}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
-            <Text style={styles.treeSelectedText}>🌱 Tap a crop to select, then tap farmland to plant</Text>
+            <Text style={styles.treeSelectedText}>🌾 Tap a crop to select, then tap farmland to plant</Text>
           </View>
         </View>
       )}

@@ -198,3 +198,8 @@
 - [x] Implement growth timer: each stage lasts 10 seconds, transitions to next
 - [x] Final stage (ripe) stays permanent
 - [x] Persist growth stage in GridCell data
+
+## Emoji Crop Buttons
+- [x] Remove 9 crop image buttons and replace with 14 emoji crop buttons
+- [x] When tapping farmland tile, show emoji crop selector
+- [x] Crops render as emoji (🍅🍆🥔🌾🍓🥒🥕🌽🍉🌶️🥦🥜🧄🍄) on the map
