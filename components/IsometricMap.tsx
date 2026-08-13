@@ -805,6 +805,122 @@ const COMMUNITY_EMOJIS: Record<string, string> = {
   park: "🌳",
 };
 
+// Building chat NPC sprites (9 characters, one per community building)
+const NPC_MAYOR_PNG = require("@/assets/images/npc_mayor.png");
+const NPC_DOCTOR_PNG = require("@/assets/images/npc_doctor.png");
+const NPC_POLICEWOMAN_PNG = require("@/assets/images/npc_policewoman.png");
+const NPC_BUILDER_PNG = require("@/assets/images/npc_builder.png");
+const NPC_FARMER_BIG_PNG = require("@/assets/images/npc_farmer.png");
+const NPC_TEACHER_PNG = require("@/assets/images/npc_woman_farmer.png");
+const NPC_SHOPKEEPER_PNG = require("@/assets/images/npc_grocery_girl.png");
+const NPC_CHEF_PNG = require("@/assets/images/npc_chef.png");
+const NPC_VET_PNG = require("@/assets/images/npc_vet.png");
+
+// Building chat: character + dialog per community building
+interface BuildingChatLine {
+  from: "npc" | "user";
+  text: string;
+}
+interface BuildingChatNpc {
+  sprite: any;
+  name: string;
+  emoji: string;
+  opening: string;
+  replies: { label: string; responses: string[] }[];
+}
+const BUILDING_CHAT_NPCS: Record<string, BuildingChatNpc> = {
+  town_hall: {
+    sprite: NPC_MAYOR_PNG,
+    name: "Mayor",
+    emoji: "🏛️",
+    opening: "Namaste! 🎩 Main is shahar ka Mayor hoon. Aapka swagat hai!",
+    replies: [
+      { label: "Shahar kaisa hai?", responses: ["Bahut achha hai! 🌟 Aapke buildings ki wajah se shahar khil utha hai!", "Population badh rahi hai, koi complain nahi! 😄"] },
+      { label: "Koi kaam hai?", responses: ["Aur community buildings banaiye, taaki shahar aur behtar bane! 🏗️"] },
+    ],
+  },
+  hospital: {
+    sprite: NPC_DOCTOR_PNG,
+    name: "Dr. Sharma",
+    emoji: "🏥",
+    opening: "Hello! 🩺 Main Doctor hoon. Aapki tabiyat kaisi hai?",
+    replies: [
+      { label: "Main thik hoon", responses: ["Bahut achha! 😊 Swasth rehna hi sabse badi daulat hai!", "Achhi khabar hai! Roz exercise kijiye. 💪"] },
+      { label: "Thoda thaka hua hoon", responses: ["Aapne bahut kaam kiya hai! 🌿 Aaram kijiye aur paani piiye. Jaldi thik ho jayenge!"] },
+    ],
+  },
+  police_station: {
+    sprite: NPC_POLICEWOMAN_PNG,
+    name: "Officer Priya",
+    emoji: "🚔",
+    opening: "Salute! 👮‍♀️ Main Police Officer Priya. Shahar bilkul safe hai aapki wajah se!",
+    replies: [
+      { label: "Achi khabar!", responses: ["Ji sir/ma'am! 🛡️ Crime bilkul zero. Saari credit aapki hai!"] },
+      { label: "Kuch zaroorat hai?", responses: ["Roads par vehicles chal rahi hain, sab niyam maan rahe hain! 🚦 Bas aise hi rakhiye."] },
+    ],
+  },
+  fire_station: {
+    sprite: NPC_BUILDER_PNG,
+    name: "Engineer Rohit",
+    emoji: "🚒",
+    opening: "Thumbs up! 👷 Main Engineer Rohit. Fire station mein sab ready hai!",
+    replies: [
+      { label: "Equipment theek hai?", responses: ["Haan ji! 🧯 Har cheez check ho gayi. Koi aag ho to hum 2 minute mein pahunch jayenge!"] },
+      { label: "Safety tips batao", responses: ["Aag se door rakhiye, electrical wires check karwate rahiye. 🔥 Pehle safety!"] },
+    ],
+  },
+  market: {
+    sprite: NPC_FARMER_BIG_PNG,
+    name: "Farmer Balram",
+    emoji: "🛒",
+    opening: "Arre aaiye aaiye! 🧑‍🌾 Main Farmer Balram. Meri sabziyan dekho!",
+    replies: [
+      { label: "Kya bechte ho?", responses: ["🥕🍅🥔 Gajar, tamatar, aloo... jo aap ugaate hain woh main bechta hoon! Achhe daam milte hain!"] },
+      { label: "Daam achhe milenge?", responses: ["Best daam! 💰 Aap jitna zyada harvest karoge, utna zyada kamaoge!"] },
+    ],
+  },
+  school: {
+    sprite: NPC_TEACHER_PNG,
+    name: "Teacher Neha",
+    emoji: "🏫",
+    opening: "Namaste! 👩‍🏫 Main Teacher Neha. School mein bachche bahut khush hain!",
+    replies: [
+      { label: "Bachche kaise hain?", responses: ["Bahut achhe! 📚 Naye buildings dekhkar bachchon ki aankhein chamak uthti hain!"] },
+      { label: "Kuch sikhao", responses: ["Mehnat + planning = achha shahar! ✏️ Yahi sabse badi lesson hai."] },
+    ],
+  },
+  library: {
+    sprite: NPC_SHOPKEEPER_PNG,
+    name: "Bookshop Aanya",
+    emoji: "📚",
+    opening: "Shhh... Welcome! 🤫 Main Aanya, library sambhalti hoon!",
+    replies: [
+      { label: "Kya padhna milega?", responses: ["Shahar banane ki kitaaben, farming ke nuskhe, sab hai! 📖 Knowledge hi power hai."] },
+      { label: "Shant jagah chahiye", responses: ["Library sabse shant jagah hai! 🧘 Aao, ek kone mein baith jao aur aaram karo."] },
+    ],
+  },
+  train_station: {
+    sprite: NPC_CHEF_PNG,
+    name: "Chef Ravi",
+    emoji: "🚂",
+    opening: "Chuk-chuk! 🍳 Main Chef Ravi, station ke paas apna swaad faila raha hoon!",
+    replies: [
+      { label: "Kya khana milega?", responses: ["Garam jalebi, chai-samosa! 🥟 Yatriyon ko meri khushboo hi attract karti hai!"] },
+      { label: "Swadisht lagta hai!", responses: ["Aree bas utha lijiye! 😋 Achhi khaani-piini se shahar aur khushaal banta hai!"] },
+    ],
+  },
+  park: {
+    sprite: NPC_VET_PNG,
+    name: "Vet Sonali",
+    emoji: "🌳",
+    opening: "Hi! 🐶 Main Vet Sonali. Mere saath Kutty bhi hai!",
+    replies: [
+      { label: "Kutty kaisa hai?", responses: ["Bahut healthy! 🐾 Woof woof! Park mein bhagna uski sabse pasandeeda activity hai!"] },
+      { label: "Aur janwar?", responses: ["🐄🐔 Gaiya aur murghiyan bhi park mein aati hain. Sab mil-jul kar rehte hain!"] },
+    ],
+  },
+};
+
 // Road tile PNG sources
 const ROAD_SOURCES: Record<string, any> = {
   road_straight: ROAD_STRAIGHT_PNG,
@@ -1838,6 +1954,14 @@ export default function IsometricMap() {
   const [showIndustrySelector, setShowIndustrySelector] = useState(false);
   const [showItemsMenu, setShowItemsMenu] = useState(false);
 
+  // Building chat panel state
+  const [chatPanel, setChatPanel] = useState<{
+    buildingType: string;
+    messages: BuildingChatLine[];
+    userReplied: boolean;
+  } | null>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
+
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const lastOffsetX = useSharedValue(0);
@@ -2585,6 +2709,22 @@ export default function IsometricMap() {
       setGrid((prev) => {
         const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
         if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+          // Building chat: tapping a placed community building opens a conversation
+          // with its assigned character (only when not in community placement mode).
+          // In community mode, tap keeps its existing select/remove toggle behavior.
+          const tappedBuilding = newGrid[row][col].building;
+          if (mode !== "community" && tappedBuilding !== "none" && BUILDING_CHAT_NPCS[tappedBuilding]) {
+            const npc = BUILDING_CHAT_NPCS[tappedBuilding];
+            setChatPanel({
+              buildingType: tappedBuilding,
+              messages: [{ from: "npc", text: npc.opening }],
+              userReplied: false,
+            });
+            if (Platform.OS !== "web") {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }
+            return newGrid; // no grid change
+          }
           if (mode === "tile") {
             // If we have a picked-up object, place it here
             if (moveClipboard) {
@@ -4047,6 +4187,112 @@ export default function IsometricMap() {
           </View>
         </View>
       )}
+
+      {/* Building Chat Panel (tap a community building to talk with its character) */}
+      {chatPanel && BUILDING_CHAT_NPCS[chatPanel.buildingType] && (
+        <View style={chatStyles.backdrop} pointerEvents="box-none">
+          <TouchableOpacity
+            style={chatStyles.backdropTouchable}
+            onPress={() => setChatPanel(null)}
+            activeOpacity={1}
+          />
+          <View style={chatStyles.panel} pointerEvents="box-none">
+            <View style={chatStyles.panelHeader}>
+              <View style={chatStyles.headerRow}>
+                <Image
+                  source={BUILDING_CHAT_NPCS[chatPanel.buildingType].sprite}
+                  style={chatStyles.avatar}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+                <View style={chatStyles.headerText}>
+                  <Text style={chatStyles.charName} numberOfLines={1}>
+                    {BUILDING_CHAT_NPCS[chatPanel.buildingType].emoji} {BUILDING_CHAT_NPCS[chatPanel.buildingType].name}
+                  </Text>
+                  <Text style={chatStyles.charRole} numberOfLines={1}>
+                    {COMMUNITY_EMOJIS[chatPanel.buildingType] || ""} {chatPanel.buildingType.replace(/_/g, " ")}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setChatPanel(null)}
+                activeOpacity={0.6}
+                style={chatStyles.closeBtn}
+              >
+                <Text style={chatStyles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={chatStyles.messageList}
+              contentContainerStyle={chatStyles.messageListContent}
+              showsVerticalScrollIndicator={false}
+              ref={chatScrollRef}
+              onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => chatScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+              {chatPanel.messages.map((m, i) => (
+                <View
+                  key={i}
+                  style={m.from === "npc" ? chatStyles.msgRowNpc : chatStyles.msgRowUser}
+                >
+                  {m.from === "npc" && (
+                    <Image
+                      source={BUILDING_CHAT_NPCS[chatPanel.buildingType].sprite}
+                      style={chatStyles.msgAvatar}
+                      contentFit="contain"
+                      cachePolicy="memory"
+                    />
+                  )}
+                  <View
+                    style={
+                      m.from === "npc"
+                        ? chatStyles.bubbleNpc
+                        : chatStyles.bubbleUser
+                    }
+                  >
+                    <Text style={m.from === "npc" ? chatStyles.msgTextNpc : chatStyles.msgTextUser}>
+                      {m.text}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={chatStyles.replyRow}>
+              {chatPanel.userReplied ? (
+                <View style={chatStyles.waveText}>
+                  <Text style={chatStyles.waveLabel}>👋 {BUILDING_CHAT_NPCS[chatPanel.buildingType].name} keh rahe hain: achha laga aapse baat karke!</Text>
+                </View>
+              ) : (
+                BUILDING_CHAT_NPCS[chatPanel.buildingType].replies.map((r, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={chatStyles.replyBtn}
+                    onPress={() => {
+                      const npc = BUILDING_CHAT_NPCS[chatPanel.buildingType];
+                      const response = r.responses[Math.floor(Math.random() * r.responses.length)];
+                      setChatPanel((prev) => {
+                        if (!prev) return prev;
+                        const next = [
+                          ...prev.messages,
+                          { from: "user" as const, text: r.label },
+                          { from: "npc" as const, text: response },
+                        ];
+                        return { ...prev, messages: next, userReplied: true };
+                      });
+                      if (Platform.OS !== "web") {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={chatStyles.replyBtnText}>{r.label}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -4557,5 +4803,166 @@ const styles = StyleSheet.create({
   },
   clipboardRemoveBtnText: {
     fontSize: 20,
+  },
+});
+
+// Building chat panel styles
+const chatStyles = StyleSheet.create({
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 400,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  backdropTouchable: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  panel: {
+    width: "92%",
+    maxHeight: 420,
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    marginBottom: 60,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  panelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  headerRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatar: {
+    width: 52,
+    height: 64,
+    marginRight: 8,
+  },
+  headerText: {
+    flex: 1,
+  },
+  charName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#11181c",
+    lineHeight: 22,
+  },
+  charRole: {
+    fontSize: 12,
+    color: "#687076",
+    marginTop: 2,
+    lineHeight: 16,
+    textTransform: "capitalize",
+  },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#f0f2f5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnText: {
+    fontSize: 14,
+    color: "#687076",
+    lineHeight: 18,
+  },
+  messageList: {
+    maxHeight: 220,
+  },
+  messageListContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  msgRowNpc: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginBottom: 8,
+  },
+  msgRowUser: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 8,
+  },
+  msgAvatar: {
+    width: 30,
+    height: 38,
+    marginRight: 6,
+  },
+  bubbleNpc: {
+    backgroundColor: "#f0f2f5",
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: "82%",
+  },
+  bubbleUser: {
+    backgroundColor: "#d8e8fb",
+    borderRadius: 14,
+    borderTopRightRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: "82%",
+  },
+  msgTextNpc: {
+    fontSize: 14,
+    color: "#11181c",
+    lineHeight: 20,
+  },
+  msgTextUser: {
+    fontSize: 14,
+    color: "#11181c",
+    lineHeight: 20,
+  },
+  replyRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f2f5",
+  },
+  replyBtn: {
+    backgroundColor: "#0a7ea4",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  replyBtnText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  waveText: {
+    flex: 1,
+  },
+  waveLabel: {
+    fontSize: 12,
+    color: "#687076",
+    fontStyle: "italic",
+    lineHeight: 17,
   },
 });

@@ -249,3 +249,12 @@
 - [ ] Crop 9 farm building images from the provided sprite sheet
 - [ ] Add "Farm" category button to the Items menu
 - [ ] Add 9 farm building types as placeable items on the map
+
+## Building Chat NPCs (User request: character per building + tap-to-talk)
+- [x] Crop 9 NPC character PNGs from user's 9-character sprite sheet (farmer, woman farmer, builder, policewoman, doctor, chef, grocery girl, vet, mayor) — clean transparent backgrounds
+- [x] Map each NPC to a matching community building: mayor->town_hall, doctor->hospital, policewoman->police_station, builder->fire_station, farmer->market, woman farmer->school, grocery girl->library, chef->train_station, vet->park
+- [x] Tap a placed community building (not in placement mode) to open a chat panel with that building's character PNG avatar
+- [x] Unique per-character dialog: greeting + response lines each, shown one at a time with delay
+- [x] User quick-reply buttons so the user can "talk" back; character responds
+- [x] Chat panel has close button; tap backdrop to dismiss after conversation
+- [x] Verify: TypeScript clean, 6 tests passing, app renders, chat opens for each building type, placement mode unaffected
