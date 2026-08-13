@@ -93,6 +93,7 @@ const DECORATION_FLOWER_POT_PNG = require("@/assets/images/cropped_decorations/f
 const DECORATION_SWING_PNG = require("@/assets/images/cropped_decorations/swing.png");
 const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decorations/waterfall_pond.png");
 const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
+const DECORATION_WATER_WELL_PNG = require("@/assets/images/water_well.png");
 
 // 9 Industry/Factory PNGs from user's sheet
 const INDUSTRY_STEEL_PNG = require("@/assets/images/cropped_factories/steel_factory.png");
@@ -584,9 +585,9 @@ const BUILDING_TYPES = [
   "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram",
   // 3 road tile types
   "road_straight", "road_corner", "road_intersection",
-  // 9 decoration types
+  // 10 decoration types
   "flower_arch", "fountain", "bench", "topiary", "gazebo",
-  "flower_pot", "swing", "waterfall_pond", "flower_bed",
+  "flower_pot", "swing", "waterfall_pond", "flower_bed", "water_well",
   // 9 industry/factory types
   "steel_factory", "oil_refinery", "food_factory",
   "recycling_plant", "dairy_factory", "yarn_factory",
@@ -632,7 +633,7 @@ const TEMPLE_SOURCES: Record<string, any> = {
 // Decoration types for selection (9 decorations)
 const DECORATION_TYPES = [
   "flower_arch", "fountain", "bench", "topiary", "gazebo",
-  "flower_pot", "swing", "waterfall_pond", "flower_bed",
+  "flower_pot", "swing", "waterfall_pond", "flower_bed", "water_well",
 ] as const;
 type DecorationType = (typeof DECORATION_TYPES)[number];
 
@@ -647,6 +648,7 @@ const DECORATION_SOURCES: Record<string, any> = {
   swing: DECORATION_SWING_PNG,
   waterfall_pond: DECORATION_WATERFALL_POND_PNG,
   flower_bed: DECORATION_FLOWER_BED_PNG,
+  water_well: DECORATION_WATER_WELL_PNG,
 };
 
 // Industry/Factory types for selection (9 factories)
@@ -695,6 +697,7 @@ const DECORATION_EMOJIS: Record<string, string> = {
   swing: "🛝",
   waterfall_pond: "💧",
   flower_bed: "🌷",
+  water_well: "🪣",
 };
 
 // Temple emoji labels
@@ -1948,6 +1951,19 @@ export default function IsometricMap() {
     };
   }, []);
 
+  // Check if a tile is within range of a water well (2x growth boost)
+  const isNearWell = useCallback((col: number, row: number, currentGrid: GridCell[][]): boolean => {
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        if (currentGrid[r][c].building === "water_well") {
+          const dist = Math.sqrt((r - row) ** 2 + (c - col) ** 2);
+          if (dist <= 3) return true;
+        }
+      }
+    }
+    return false;
+  }, []);
+
   // Crop growth timer: advance cropGrowthStage for all planted crops (1 tick/sec, MAX=100)
   useEffect(() => {
     const growthInterval = setInterval(() => {
@@ -1961,7 +1977,11 @@ export default function IsometricMap() {
               if (cell.cropGrowthStage < 100) {
                 // Per-crop growth: different crops grow at different rates
                 const totalDuration = getCropGrowthTime(cell.building as CropType);
-                const increment = 100000 / totalDuration; // 100 stages per duration
+                let increment = 100000 / totalDuration; // 100 stages per duration
+                // Water well boost: 2x growth if within 3 tiles of a well
+                if (isNearWell(col, row, newGrid)) {
+                  increment *= 2;
+                }
                 cell.cropGrowthStage = Math.min(100, cell.cropGrowthStage + increment);
                 changed = true;
               }
@@ -1972,7 +1992,7 @@ export default function IsometricMap() {
       });
     }, 1000); // Update every second
     return () => clearInterval(growthInterval);
-  }, []);
+  }, [isNearWell]);
 
   // Determine if it's night (0.85 to 0.15 range)
   useEffect(() => {

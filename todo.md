@@ -235,3 +235,8 @@
 ## Different Sell Prices Per Crop
 - [x] Add CROP_SELL_PRICES mapping with different values per crop type
 - [x] Use crop-specific sell price in backpack Sell All button
+
+## Water Well Growth Boost
+- [x] Add water_well decoration item to the decorations category
+- [x] Crops within 3-tile radius of a well grow 2x faster
+- [ ] Show visual indicator (blue circle) around well on the map (optional - well emoji serves as indicator)
