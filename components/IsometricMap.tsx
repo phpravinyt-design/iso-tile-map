@@ -838,13 +838,21 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
   );
 }
 
-// Emoji crop renderer (renders emoji on farmland tiles)
-function EmojiCrop({ col, row, scale, cropType, flipped = false }: {
-  col: number; row: number; scale: number; cropType: string; flipped?: boolean;
+// Emoji crop renderer (renders emoji on farmland tiles) with growth animation
+function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0 }: {
+  col: number; row: number; scale: number; cropType: string; flipped?: boolean; growthStage?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
   const emojiSize = ts * 0.8;
+  // Growth stages: 0-24 = growing, 25-49 = stage 2, 50-74 = stage 3, 75+ = fully grown (harvestable)
+  // Total growth time: ~25 seconds (at 1 tick/second)
+  const MAX_GROWTH = 100;
+  const isFullyGrown = growthStage >= MAX_GROWTH;
+  // Scale grows from 0.3 (seedling) to 1.0 (fully grown)
+  const growthScale = Math.min(1.0, 0.3 + (growthStage / MAX_GROWTH) * 0.7);
+  // Opacity grows from 0.4 to 1.0
+  const growthOpacity = Math.min(1.0, 0.4 + (growthStage / MAX_GROWTH) * 0.6);
   return (
     <View style={{
       position: "absolute",
@@ -859,13 +867,43 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false }: {
     }}>
       <Text
         style={{
-          fontSize: emojiSize * 0.7,
-          lineHeight: emojiSize * 0.9,
-          transform: [{ scaleX: flipped ? -1 : 1 }],
+          fontSize: emojiSize * 0.7 * growthScale,
+          lineHeight: emojiSize * 0.9 * growthScale,
+          opacity: growthOpacity,
+          transform: [
+            { scaleX: flipped ? -1 : 1 },
+            { scaleY: growthScale },
+          ],
+          // Add a subtle pulse animation when fully grown to indicate harvestable
+          ...(isFullyGrown ? {
+            textShadowColor: "#FFD700",
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 4,
+          } : {}),
         }}
       >
         {CROP_EMOJIS[cropType] || "🌱"}
       </Text>
+      {/* Growth progress bar indicator (only shown while growing) */}
+      {!isFullyGrown && (
+        <View style={{
+          position: "absolute",
+          bottom: 0,
+          left: "15%",
+          width: "70%",
+          height: 3,
+          backgroundColor: "rgba(0,0,0,0.3)",
+          borderRadius: 2,
+          overflow: "hidden",
+        }}>
+          <View style={{
+            width: `${Math.min(100, (growthStage / MAX_GROWTH) * 100)}%`,
+            height: "100%",
+            backgroundColor: "#4CAF50",
+            borderRadius: 2,
+          }} />
+        </View>
+      )}
     </View>
   );
 }
@@ -1442,7 +1480,7 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   }
   // All crop types render as emoji on farmland
   if (buildingType in CROP_EMOJIS) {
-    return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} />;
+    return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} growthStage={growthStage >= 0 ? growthStage : 0} />;
   }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -1843,6 +1881,29 @@ export default function IsometricMap() {
     return () => {
       if (dayNightTimerRef.current) clearInterval(dayNightTimerRef.current);
     };
+  }, []);
+
+  // Crop growth timer: advance cropGrowthStage for all planted crops (1 tick/sec, MAX=100)
+  useEffect(() => {
+    const growthInterval = setInterval(() => {
+      setGrid((prev) => {
+        let changed = false;
+        const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+        for (let row = 0; row < GRID_SIZE; row++) {
+          for (let col = 0; col < GRID_SIZE; col++) {
+            const cell = newGrid[row][col];
+            if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType]) {
+              if (cell.cropGrowthStage < 100) {
+                cell.cropGrowthStage = Math.min(100, cell.cropGrowthStage + 2); // Grow by 2 per second = 50 seconds to full
+                changed = true;
+              }
+            }
+          }
+        }
+        return changed ? newGrid : prev;
+      });
+    }, 1000); // Update every second
+    return () => clearInterval(growthInterval);
   }, []);
 
   // Determine if it's night (0.85 to 0.15 range)
@@ -3483,11 +3544,15 @@ export default function IsometricMap() {
                       if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
                         const cell = newGrid[row][col];
                         if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType]) {
-                          // Harvest: remove crop and give +25 coins
-                          cell.building = "none";
-                          setCoins((c) => c + 25);
-                          if (Platform.OS !== "web") {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                          // Only harvest when fully grown (stage >= 100)
+                          if (cell.cropGrowthStage >= 100) {
+                            // Harvest: remove crop and give +25 coins
+                            cell.building = "none";
+                            cell.cropGrowthStage = 0;
+                            setCoins((c) => c + 25);
+                            if (Platform.OS !== "web") {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            }
                           }
                         }
                       }

@@ -210,3 +210,9 @@
 
 ## Harvest Feature
 - [x] Tap a crop emoji on the map to harvest: +25 coins, remove crop from tile
+
+## Crop Growth Animation
+- [ ] Crops start as seedlings (small scale) and grow to full size over 10 seconds
+- [ ] Visual growth animation using scale/opacity transitions through stages
+- [ ] Only harvestable when fully grown (stage 4)
+- [ ] Growth progress indicator (bar or visual cue)
