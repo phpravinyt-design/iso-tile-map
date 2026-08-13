@@ -140,3 +140,10 @@
 
 ## Fix Long-Press Select
 - [x] Fixed: tiles now render with pointerEvents="none" (no long-press). Only placed items (buildings layer) have the 5s long-press hit area with progress bar. Empty tiles still get short-press for placement but no long-press timer.
+
+## Grid Snap Preview
+- [x] Added snapPreviewTile state + snapOpacity SharedValue with pulsing animation (0.6→0.2 loop)
+- [x] Highlight renders on tile layer when moveClipboard !== null and snapPreviewTile matches an empty tile
+- [x] Yellow highlight with 2px gold border, pulsing opacity via withRepeat/withSequence animation
+- [x] Only shows when cell.building === "none" && cell.roadOverlay === null (no building or road already there)
+- [x] Verified: TypeScript clean, 6 tests passing, app renders correctly. Web pointermove tracks hover position for snap preview.

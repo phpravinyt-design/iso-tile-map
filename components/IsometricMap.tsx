@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
+  withRepeat,
   withTiming,
   withDelay,
   runOnJS,
@@ -1441,6 +1442,65 @@ export default function IsometricMap() {
   const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: string; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
   const [pickupMessage, setPickupMessage] = useState<string | null>(null);
 
+  // Grid snap preview: track hovered tile when item is in clipboard
+  const [snapPreviewTile, setSnapPreviewTile] = useState<{ col: number; row: number } | null>(null);
+  const snapOpacity = useSharedValue(0);
+
+  // Pulse the snap preview highlight
+  useEffect(() => {
+    if (moveClipboard && snapPreviewTile) {
+      snapOpacity.value = 0;
+      snapOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.6, { duration: 500 }),
+          withTiming(0.2, { duration: 500 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      snapOpacity.value = 0;
+    }
+  }, [moveClipboard, snapPreviewTile]);
+
+  // Track touch position for snap preview (web only - uses pointermove)
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!moveClipboard) return;
+      const rect = (e.target as HTMLElement)?.closest("[data-map-container]")?.getBoundingClientRect();
+      if (!rect) return;
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      // Convert screen coords to grid coords
+      // Approximate: use the same gridToScreen inverse logic
+      // Simple approach: iterate and find closest tile
+      let bestDist = Infinity;
+      let bestCol = -1;
+      let bestRow = -1;
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const pos = gridToScreen(col, row, currentScale);
+          const dx = pos.x - x;
+          const dy = pos.y - y;
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestCol = col;
+            bestRow = row;
+          }
+        }
+      }
+      if (bestDist < (TILE_SIZE * currentScale * 0.5) ** 2) {
+        setSnapPreviewTile({ col: bestCol, row: bestRow });
+      } else {
+        setSnapPreviewTile(null);
+      }
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => window.removeEventListener("pointermove", handlePointerMove);
+  }, [moveClipboard, currentScale]);
+
   // Long-press progress bar state
   const pressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pressProgress, setPressProgress] = useState(0); // 0-100
@@ -2172,30 +2232,52 @@ export default function IsometricMap() {
       for (let col = 0; col < GRID_SIZE; col++) {
         const cell = grid[row][col];
         if (cell.tile === "none") continue;
+        // Check if this is the snap preview tile
+        const isSnapPreview = snapPreviewTile !== null && snapPreviewTile.col === col && snapPreviewTile.row === row;
         elements.push(
-          <View
-            key={`tile-${row}-${col}`}
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: gridToScreen(col, row, currentScale).x - (TILE_SIZE * currentScale) / 2,
-              top: gridToScreen(col, row, currentScale).y - (TILE_SIZE * currentScale) / 2,
-              width: TILE_SIZE * currentScale,
-              height: TILE_SIZE * currentScale,
-              zIndex: 1,
-            }}
-          >
-            <Image
-              source={TILE_TEXTURE_SOURCES[cell.tile] || GRASS_TILE_PNG}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="stretch"
-            />
+          <View key={`tile-${row}-${col}`}>
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: gridToScreen(col, row, currentScale).x - (TILE_SIZE * currentScale) / 2,
+                top: gridToScreen(col, row, currentScale).y - (TILE_SIZE * currentScale) / 2,
+                width: TILE_SIZE * currentScale,
+                height: TILE_SIZE * currentScale,
+                zIndex: 1,
+              }}
+            >
+              <Image
+                source={TILE_TEXTURE_SOURCES[cell.tile] || GRASS_TILE_PNG}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="stretch"
+              />
+            </View>
+            {/* Snap preview highlight */}
+            {isSnapPreview && moveClipboard && cell.building === "none" && cell.roadOverlay === null && (
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: gridToScreen(col, row, currentScale).x - (TILE_SIZE * currentScale) / 2,
+                  top: gridToScreen(col, row, currentScale).y - (TILE_SIZE * currentScale) / 2,
+                  width: TILE_SIZE * currentScale,
+                  height: TILE_SIZE * currentScale,
+                  zIndex: 15,
+                  backgroundColor: "rgba(255, 255, 100, 0.4)",
+                  borderWidth: 2,
+                  borderColor: "rgba(255, 200, 0, 0.8)",
+                  borderRadius: 4,
+                  opacity: snapOpacity,
+                }}
+              />
+            )}
           </View>
         );
       }
     }
     return elements;
-  }, [grid, currentScale]);
+  }, [grid, currentScale, snapPreviewTile, moveClipboard, snapOpacity]);
 
   // Render NPCs (walking characters on the map)
   const npcSprites = useMemo(() => {
