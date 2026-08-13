@@ -2499,7 +2499,7 @@ export default function IsometricMap() {
               }}
             >
               <Image
-                source={TILE_TEXTURE_SOURCES[cell.tile] || GRASS_TILE_PNG}
+                source={TILE_TEXTURE_SOURCES[cell.tileTexture] || GRASS_TILE_PNG}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="stretch"
               />
@@ -2644,6 +2644,30 @@ export default function IsometricMap() {
     return elements;
   }, [grid, currentScale, pressTarget, pressProgress, startPressTimer, cancelPressTimer, handleTilePress, handleRemoveBuilding]);
 
+  // Hit areas for grass/dirt tiles (these tiles have pointerEvents="none" so they need separate touch handlers)
+  const grassHitAreas = useMemo(() => {
+    const elements: React.ReactNode[] = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cell = grid[row][col];
+        // Only create hit areas for grass/dirt tiles that DON'T have a building on them
+        // (buildings have their own TouchableOpacity overlay above)
+        if (cell.tile !== "grass" && cell.tile !== "dirt") continue;
+        if (cell.building !== "none") continue;
+        const pos = gridToScreen(col, row, currentScale);
+        const ts = TILE_SIZE * currentScale;
+        elements.push(
+          <TouchableOpacity key={`grass-${row}-${col}`} activeOpacity={0.3} delayLongPress={5000}
+            style={{ position: "absolute", left: pos.x - ts / 2, top: pos.y - ts / 2, width: ts, height: ts, zIndex: 2 }}
+            onPress={() => handleTilePress(col, row)} onLongPress={() => handleRemoveBuilding(col, row)}
+            onPressIn={() => startPressTimer(col, row, true)}
+            onPressOut={() => cancelPressTimer()} />
+        );
+      }
+    }
+    return elements;
+  }, [grid, currentScale, handleTilePress, handleRemoveBuilding, startPressTimer, cancelPressTimer]);
+
   // Empty hit areas for "none" tiles
   const emptyHitAreas = useMemo(() => {
     const elements: React.ReactNode[] = [];
@@ -2711,6 +2735,7 @@ export default function IsometricMap() {
             <Animated.View style={[animatedStyle, { position: "relative" }]}>
               {/* All tiles rendered - each grass tile has its own PNG */}
               {tiles}
+              {grassHitAreas}
               {emptyHitAreas}
               {/* Grass overlays rendered between tiles and buildings */}
               {grassOverlays}

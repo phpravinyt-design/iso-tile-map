@@ -179,3 +179,10 @@
 ## Farmland Tile
 - [x] Processed: resized to 256x256 PNG (150KB), saved as tile_farmland.png
 - [x] Added to TILE_TEXTURE_TYPES as "farmland" + TILE_TEXTURE_SOURCES mapping (5 tile options now)
+
+## Bug: Items not placing on map
+- [ ] Investigate and fix the placement bug
+
+## Bug Fix: Items Not Placing
+- [x] Fix: grass tiles had pointerEvents="none" so taps were not received — added grassHitAreas (separate TouchableOpacity hit areas for grass/dirt tiles without buildings, zIndex 2, wired to handleTilePress + long-press pickup)
+- [x] Fix: tile texture rendering used cell.tile (tile type) instead of cell.tileTexture (texture name) — now correctly uses TILE_TEXTURE_SOURCES[cell.tileTexture]
