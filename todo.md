@@ -175,3 +175,7 @@
 
 ## More Vehicle Types
 - [x] Added bus to vehicle pool, increased VEHICLE_COUNT to 3 (car, truck, bus now all available)
+
+## Farmland Tile
+- [x] Processed: resized to 256x256 PNG (150KB), saved as tile_farmland.png
+- [x] Added to TILE_TEXTURE_TYPES as "farmland" + TILE_TEXTURE_SOURCES mapping (5 tile options now)
