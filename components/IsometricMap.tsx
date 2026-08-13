@@ -493,6 +493,27 @@ const TILE_TEXTURE_SOURCES: Record<string, any> = {
   farmland: FARMLAND_TILE_PNG,
 };
 
+// Crop types (vegetables that can be placed on farmland tiles)
+const CROP_TYPES = [
+  "tomato", "eggplant", "carrot",
+  "cabbage", "chili", "onion",
+  "potato", "cucumber", "okra"
+] as const;
+type CropType = (typeof CROP_TYPES)[number];
+
+// Crop PNG sources
+const CROP_SOURCES: Record<string, any> = {
+  tomato: require("@/assets/images/crop_tomato.png"),
+  eggplant: require("@/assets/images/crop_eggplant.png"),
+  carrot: require("@/assets/images/crop_carrot.png"),
+  cabbage: require("@/assets/images/crop_cabbage.png"),
+  chili: require("@/assets/images/crop_chili.png"),
+  onion: require("@/assets/images/crop_onion.png"),
+  potato: require("@/assets/images/crop_potato.png"),
+  cucumber: require("@/assets/images/crop_cucumber.png"),
+  okra: require("@/assets/images/crop_okra.png"),
+};
+
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
   "house_small", "house_big", "town_market", "none",
@@ -517,6 +538,10 @@ const BUILDING_TYPES = [
   "steel_factory", "oil_refinery", "food_factory",
   "recycling_plant", "dairy_factory", "yarn_factory",
   "chemical_plant", "wood_factory", "tech_factory",
+  // 9 crop types (placed on farmland)
+  "tomato", "eggplant", "carrot",
+  "cabbage", "chili", "onion",
+  "potato", "cucumber", "okra",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -795,7 +820,7 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
       pointerEvents: "box-none",
     }}>
       <Image
-        source={DECORATION_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
+        source={DECORATION_SOURCES[decorationType] || CROP_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
         style={{ width: size, height: size, transform: [{ scaleX: flipped ? -1 : 1 }] }}
         contentFit="contain"
         cachePolicy="memory"
@@ -1374,6 +1399,10 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false }: {
   if (buildingType in INDUSTRY_SOURCES) {
     return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
   }
+  // All crop types use the generic renderer (rendered like decorations on farmland)
+  if (buildingType in CROP_SOURCES) {
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -1566,6 +1595,7 @@ export default function IsometricMap() {
   const [showRoadSelector, setShowRoadSelector] = useState(false);
   const [selectedTileType, setSelectedTileType] = useState<TileTextureType>("lush_grass");
   const [showTileSelector, setShowTileSelector] = useState(false);
+  const [selectedCropType, setSelectedCropType] = useState<CropType>("tomato");
   const [selectedTempleType, setSelectedTempleType] = useState<TempleType>("temple_pink");
   const [showTempleSelector, setShowTempleSelector] = useState(false);
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
@@ -2322,12 +2352,25 @@ export default function IsometricMap() {
             // Tiles mode: apply the selected tile texture to this tile
             const textureToPlace = selectedTileType;
             if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
-              // Tile texture costs 100 coins only when actually changing the texture
-              if (newGrid[row][col].tileTexture !== textureToPlace) {
-                if (coins < ITEM_COST) flashLowCoins();
-                setCoins((c) => Math.max(0, c - ITEM_COST));
+              // If user selected farmland texture, place a crop on it
+              if (textureToPlace === "farmland") {
+                // Place the selected crop as a building on the farmland tile
+                newGrid[row][col].tileTexture = "farmland";
+                const cropAsBuilding = selectedCropType as BuildingType;
+                if (newGrid[row][col].building !== cropAsBuilding) {
+                  newGrid[row][col].building = cropAsBuilding;
+                  newGrid[row][col].roadOverlay = null;
+                  if (coins < ITEM_COST) flashLowCoins();
+                  setCoins((c) => Math.max(0, c - ITEM_COST));
+                }
+              } else {
+                // Regular tile texture change
+                if (newGrid[row][col].tileTexture !== textureToPlace) {
+                  if (coins < ITEM_COST) flashLowCoins();
+                  setCoins((c) => Math.max(0, c - ITEM_COST));
+                }
+                newGrid[row][col].tileTexture = textureToPlace;
               }
-              newGrid[row][col].tileTexture = textureToPlace;
             }
           } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "industry" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
@@ -2885,7 +2928,7 @@ export default function IsometricMap() {
           <View style={styles.clipboardPreview}>
             {moveClipboard.type === "building" && moveClipboard.buildingType ? (
               <Image
-                source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
+                source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || CROP_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
                 style={styles.clipboardPreviewImage}
                 contentFit="contain"
                 cachePolicy="memory"
@@ -3298,6 +3341,38 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a tile texture to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Crop Sub-Selector (shown when tiles mode + farmland texture is selected) */}
+      {mode === "tiles" && selectedTileType === "farmland" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 190 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {CROP_TYPES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.treeOption, selectedCropType === c && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedCropType(c);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={CROP_SOURCES[c] || GRASS_TILE_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>🌱 Tap a crop to select, then tap farmland to plant</Text>
           </View>
         </View>
       )}

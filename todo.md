@@ -186,3 +186,9 @@
 ## Bug Fix: Items Not Placing
 - [x] Fix: grass tiles had pointerEvents="none" so taps were not received — added grassHitAreas (separate TouchableOpacity hit areas for grass/dirt tiles without buildings, zIndex 2, wired to handleTilePress + long-press pickup)
 - [x] Fix: tile texture rendering used cell.tile (tile type) instead of cell.tileTexture (texture name) — now correctly uses TILE_TEXTURE_SOURCES[cell.tileTexture]
+
+## Crop Feature (Farmland)
+- [ ] Crop 9 vegetable PNGs from user's 3x3 sheet: tomato, eggplant, carrot, cabbage, chili, onion, potato, cucumber, okra
+- [ ] Add crop sub-selector that opens when user selects farmland tile texture
+- [ ] User can tap on farmland tiles to place selected crop type (rendered as building overlay on farmland)
+- [ ] Persist crops via building field in GridCell
