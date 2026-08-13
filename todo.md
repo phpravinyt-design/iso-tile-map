@@ -137,3 +137,6 @@
 - [x] Weather emoji indicator at top-right (right: 60) beside celestial emoji
 - [x] Humans walk at 50% speed during rain; animals stop entirely (idle 10s) during rain
 - [x] Verified: TypeScript clean, both sun ☀️ and weather icons visible top-right, NPCs walking
+
+## Fix Long-Press Select
+- [x] Fixed: tiles now render with pointerEvents="none" (no long-press). Only placed items (buildings layer) have the 5s long-press hit area with progress bar. Empty tiles still get short-press for placement but no long-press timer.

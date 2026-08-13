@@ -2165,30 +2165,37 @@ export default function IsometricMap() {
     });
   }, [playClaimPopEffect, triggerClaimPopAnimation]);
 
-  // Render ALL tiles (including grass tiles with individual PNG)
+  // Render ALL tiles (including grass tiles with individual PNG) - NO long-press on tiles, only short press
   const tiles = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const cell = grid[row][col];
         if (cell.tile === "none") continue;
-        const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
-          <SquareTile
+          <View
             key={`tile-${row}-${col}`}
-            col={col} row={row} cell={cell} scale={currentScale}
-            onPress={() => handleTilePress(col, row)}
-            onLongPress={() => handleRemoveBuilding(col, row)}
-            onDelayStart={() => startPressTimer(col, row, true)}
-            onDelayEnd={() => cancelPressTimer()}
-            isPressed={isPressed}
-            progress={isPressed ? pressProgress : 0}
-          />
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: gridToScreen(col, row, currentScale).x - (TILE_SIZE * currentScale) / 2,
+              top: gridToScreen(col, row, currentScale).y - (TILE_SIZE * currentScale) / 2,
+              width: TILE_SIZE * currentScale,
+              height: TILE_SIZE * currentScale,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              source={TILE_TEXTURE_SOURCES[cell.tile] || GRASS_TILE_PNG}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="stretch"
+            />
+          </View>
         );
       }
     }
     return elements;
-  }, [grid, currentScale, handleTilePress, handleRemoveBuilding, pressTarget, pressProgress, startPressTimer, cancelPressTimer]);
+  }, [grid, currentScale]);
 
   // Render NPCs (walking characters on the map)
   const npcSprites = useMemo(() => {
@@ -2205,19 +2212,64 @@ export default function IsometricMap() {
   }, [animals, currentScale, handleAnimalTap]);
 
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
+  // Buildings now have 5s long-press for move/remove
   const buildings = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
         const cell = grid[row][col];
         if (cell.building === "none") continue;
+        const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
-          <BuildingOnTile key={`bld-${row}-${col}`} col={col} row={row} buildingType={cell.building} scale={currentScale} />
+          <View key={`bld-wrap-${row}-${col}`}>
+            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} />
+            {/* Long-press hit area for item selection */}
+            <TouchableOpacity
+              activeOpacity={0.3}
+              delayLongPress={5000}
+              style={{
+                position: "absolute",
+                left: gridToScreen(col, row, currentScale).x - (TILE_SIZE * currentScale) / 2,
+                top: gridToScreen(col, row, currentScale).y - (TILE_SIZE * currentScale) / 2,
+                width: TILE_SIZE * currentScale,
+                height: TILE_SIZE * currentScale,
+                zIndex: 20,
+              }}
+              onPressIn={() => startPressTimer(col, row, true)}
+              onPressOut={() => cancelPressTimer()}
+              onPress={() => handleTilePress(col, row)}
+              onLongPress={() => handleRemoveBuilding(col, row)}
+            >
+              {isPressed && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: "10%",
+                    width: "80%",
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: `${pressProgress}%`,
+                      height: "100%",
+                      borderRadius: 3,
+                      backgroundColor: "#FF8C00",
+                    }}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         );
       }
     }
     return elements;
-  }, [grid, currentScale]);
+  }, [grid, currentScale, pressTarget, pressProgress, startPressTimer, cancelPressTimer, handleTilePress, handleRemoveBuilding]);
 
   // Empty hit areas for "none" tiles
   const emptyHitAreas = useMemo(() => {
