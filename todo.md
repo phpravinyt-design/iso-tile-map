@@ -244,3 +244,8 @@
 ## Harvest All Button
 - [x] Add a button on screen to harvest all fully grown crops at once
 - [x] Adds +25 coins per crop and increments backpack counts
+
+## Farm Category (9 Animal Buildings)
+- [ ] Crop 9 farm building images from the provided sprite sheet
+- [ ] Add "Farm" category button to the Items menu
+- [ ] Add 9 farm building types as placeable items on the map

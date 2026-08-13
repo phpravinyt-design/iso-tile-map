@@ -95,6 +95,17 @@ const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decoratio
 const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
 const DECORATION_WATER_WELL_PNG = require("@/assets/images/water_well.png");
 
+// Farm building PNG sources
+const FARM_SHEEP_BARN_PNG = require("@/assets/images/farm_sheep_barn.png");
+const FARM_CHICKEN_COOP_PNG = require("@/assets/images/farm_chicken_coop.png");
+const FARM_GOAT_FARM_PNG = require("@/assets/images/farm_goat_farm.png");
+const FARM_BUFFALO_PEN_PNG = require("@/assets/images/farm_buffalo_pen.png");
+const FARM_DAIRY_FARM_PNG = require("@/assets/images/farm_dairy_farm.png");
+const FARM_FISH_POND_PNG = require("@/assets/images/farm_fish_pond.png");
+const FARM_LLAMA_FARM_PNG = require("@/assets/images/farm_llama_farm.png");
+const FARM_DUCK_POND_PNG = require("@/assets/images/farm_duck_pond.png");
+const FARM_BEEHIVE_PNG = require("@/assets/images/farm_beehive.png");
+
 // 9 Industry/Factory PNGs from user's sheet
 const INDUSTRY_STEEL_PNG = require("@/assets/images/cropped_factories/steel_factory.png");
 const INDUSTRY_OIL_PNG = require("@/assets/images/cropped_factories/oil_refinery.png");
@@ -598,6 +609,10 @@ const BUILDING_TYPES = [
   "crop_carrot", "crop_corn", "crop_watermelon",
   "crop_chili", "crop_broccoli", "crop_peanut",
   "crop_garlic", "crop_mushroom",
+  // 9 farm building types
+  "farm_sheep_barn", "farm_chicken_coop", "farm_goat_farm",
+  "farm_buffalo_pen", "farm_dairy_farm", "farm_fish_pond",
+  "farm_llama_farm", "farm_duck_pond", "farm_beehive",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -659,6 +674,28 @@ const INDUSTRY_TYPES = [
 ] as const;
 type IndustryType = (typeof INDUSTRY_TYPES)[number];
 const INDUSTRY_TYPE_VALUES: string[] = [...INDUSTRY_TYPES];
+
+// Farm building types for selection (9 farm buildings)
+const FARM_TYPES = [
+  "farm_sheep_barn", "farm_chicken_coop", "farm_goat_farm",
+  "farm_buffalo_pen", "farm_dairy_farm", "farm_fish_pond",
+  "farm_llama_farm", "farm_duck_pond", "farm_beehive",
+] as const;
+type FarmType = (typeof FARM_TYPES)[number];
+const FARM_TYPE_VALUES: string[] = [...FARM_TYPES];
+
+// Farm PNG sources
+const FARM_SOURCES: Record<string, any> = {
+  farm_sheep_barn: FARM_SHEEP_BARN_PNG,
+  farm_chicken_coop: FARM_CHICKEN_COOP_PNG,
+  farm_goat_farm: FARM_GOAT_FARM_PNG,
+  farm_buffalo_pen: FARM_BUFFALO_PEN_PNG,
+  farm_dairy_farm: FARM_DAIRY_FARM_PNG,
+  farm_fish_pond: FARM_FISH_POND_PNG,
+  farm_llama_farm: FARM_LLAMA_FARM_PNG,
+  farm_duck_pond: FARM_DUCK_POND_PNG,
+  farm_beehive: FARM_BEEHIVE_PNG,
+};
 
 // Industry PNG sources
 const INDUSTRY_SOURCES: Record<string, any> = {
@@ -832,6 +869,34 @@ function PngCommunityGeneric({ col, row, scale, communityType, flipped = false }
   );
 }
 
+// Generic PNG Farm Building renderer
+function PngFarmGeneric({ col, row, scale, farmType, flipped = false }: {
+  col: number; row: number; scale: number; farmType: string; flipped?: boolean;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const bldSize = ts * 1.8;
+
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - bldSize / 2,
+      top: pos.y - bldSize / 2,
+      width: bldSize,
+      height: bldSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={FARM_SOURCES[farmType] || TOWN_HALL_PNG}
+        style={{ width: bldSize, height: bldSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
+
 // Generic PNG House renderer
 function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
   col: number; row: number; scale: number; houseType: string; flipped?: boolean;
@@ -957,7 +1022,7 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
   );
 }
 // Placement modes
-const MODES = ["tile", "tiles", "community", "temple", "decoration", "industry", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "temple", "decoration", "industry", "farm", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -998,6 +1063,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tiles: "🧱",
   temple: "🛕",
   decoration: "🌸",
+  farm: "🐑",
   industry: "🏭",
   community: "🏛️",
   road: "🛣️",
@@ -1527,6 +1593,10 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   if (buildingType in INDUSTRY_SOURCES) {
     return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
   }
+  // All farm building types use the generic renderer
+  if (buildingType in FARM_SOURCES) {
+    return <PngFarmGeneric col={col} row={row} scale={scale} farmType={buildingType} flipped={flipped} />;
+  }
   // All crop types render as emoji on farmland
   if (buildingType in CROP_EMOJIS) {
     return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} growthStage={growthStage >= 0 ? growthStage : 0} />;
@@ -1764,6 +1834,7 @@ export default function IsometricMap() {
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
   const [showDecorationSelector, setShowDecorationSelector] = useState(false);
   const [selectedIndustryType, setSelectedIndustryType] = useState<IndustryType>("steel_factory");
+  const [selectedFarmType, setSelectedFarmType] = useState<FarmType>("farm_sheep_barn");
   const [showIndustrySelector, setShowIndustrySelector] = useState(false);
   const [showItemsMenu, setShowItemsMenu] = useState(false);
 
@@ -2609,7 +2680,7 @@ export default function IsometricMap() {
                 newGrid[row][col].tileTexture = textureToPlace;
               }
             }
-          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "industry" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "industry" || mode === "farm" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -2671,6 +2742,15 @@ export default function IsometricMap() {
               } else if (mode === "industry") {
                 // Industry mode: place the user's selected factory type
                 const buildingToPlace = selectedIndustryType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
+                }
+              } else if (mode === "farm") {
+                // Farm mode: place the user's selected farm building type
+                const buildingToPlace = selectedFarmType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
                 } else {
@@ -3897,6 +3977,41 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a factory to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Farm Sub-Selector (shown when farm mode is active) */}
+      {mode === "farm" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 170 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {FARM_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedFarmType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedFarmType(t);
+                  if (Platform.OS !== "web") {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={FARM_SOURCES[t]}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a farm building to select it</Text>
           </View>
         </View>
       )}
