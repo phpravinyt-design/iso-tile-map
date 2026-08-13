@@ -115,3 +115,10 @@
 - [x] Normal random walking resumes when isNight=false (timeOfDay 0.15-0.85)
 - [x] Sun ☀️ / Moon 🌙 indicator in top-right corner (zIndex 250, dark pill background)
 - [x] Verified in browser: sun indicator visible top-right, app renders correctly; TypeScript clean; day/night transitions work via 300ms interval
+
+## New Road PNGs
+- [x] Process 2 road PNGs: resized to 256x256, saved as road_straight_small.png + road_corner_small.png (~40KB each)
+- [x] Done via Pillow resize (256x256, LANCZOS, optimized PNG)
+- [x] Added road_wide_straight and road_wide_corner to ROAD_TYPES (5 total now) + ROAD_SOURCES mapping
+- [x] Rendering works via existing PngRoadGeneric renderer (uses ROAD_SOURCES lookup); grid roadOverlay changed from RoadType to string for flexibility; moveClipboard roadType also string
+- [x] Verified: TypeScript clean, app renders correctly, Daily Reward banner working

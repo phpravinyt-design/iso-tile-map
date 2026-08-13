@@ -65,6 +65,10 @@ const ROAD_STRAIGHT_PNG = require("@/assets/images/cropped_roads/road_straight.p
 const ROAD_CORNER_PNG = require("@/assets/images/cropped_roads/road_corner.png");
 const ROAD_INTERSECTION_PNG = require("@/assets/images/cropped_roads/road_intersection.png");
 
+// New road PNGs from user upload (with sidewalks + corner turn)
+const ROAD_WIDE_STRAIGHT_PNG = require("@/assets/images/road_straight_small.png");
+const ROAD_WIDE_CORNER_PNG = require("@/assets/images/road_corner_small.png");
+
 // 9 Temple PNGs from user's sheet
 const TEMPLE_PINK_PNG = require("@/assets/images/cropped_temples/temple_pink.png");
 const TEMPLE_GOLD_TOWER_PNG = require("@/assets/images/cropped_temples/temple_gold_tower.png");
@@ -487,8 +491,8 @@ const COMMUNITY_TYPES = [
 ] as const;
 type CommunityType = (typeof COMMUNITY_TYPES)[number];
 
-// Road tile types (3 road tiles from user's sheet)
-const ROAD_TYPES = ["road_straight", "road_corner", "road_intersection"] as const;
+// Road tile types (5 road tiles - 3 original + 2 new wide roads)
+const ROAD_TYPES = ["road_straight", "road_corner", "road_intersection", "road_wide_straight", "road_wide_corner"] as const;
 type RoadType = (typeof ROAD_TYPES)[number];
 
 // Full value lists (including house types) used for profile item stats classification
@@ -540,6 +544,8 @@ const ROAD_SOURCES: Record<string, any> = {
   road_straight: ROAD_STRAIGHT_PNG,
   road_corner: ROAD_CORNER_PNG,
   road_intersection: ROAD_INTERSECTION_PNG,
+  road_wide_straight: ROAD_WIDE_STRAIGHT_PNG,
+  road_wide_corner: ROAD_WIDE_CORNER_PNG,
 };
 
 // Generic Road tile renderer (covers the whole tile)
@@ -702,7 +708,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: RoadType | null; roadRotation: number; tileTexture: TileTextureType };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: TileTextureType };
 
 // Simple grid positioning (flat top-down, square tiles)
 function gridToScreen(col: number, row: number, scale: number) {
@@ -1430,7 +1436,7 @@ export default function IsometricMap() {
   const MAX_SCALE = MAX_ZOOM;
 
   // Move clipboard: holds object picked up via long press (cut mode)
-  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: RoadType; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
+  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: string; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
   const [pickupMessage, setPickupMessage] = useState<string | null>(null);
 
   // Long-press progress bar state
