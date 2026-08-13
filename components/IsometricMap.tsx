@@ -1669,7 +1669,9 @@ export default function IsometricMap() {
   const [showTaskReward, setShowTaskReward] = useState(false);
   const [showBackpack, setShowBackpack] = useState(false);
   const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
+  const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const harvestAllMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Persist backpack
   const BACKPACK_KEY = "backpack_v1";
   const [, forceBackpackRender] = useState(0);
@@ -3542,6 +3544,44 @@ export default function IsometricMap() {
           <Text style={[styles.profileButtonIcon, showBackpack && styles.profileButtonIconActive]}>🎒</Text>
           <Text style={styles.profileCoinText}>{Object.values(harvestedItems).reduce((a, b) => a + b, 0)}</Text>
         </TouchableOpacity>
+        {/* Harvest All button - collects all fully grown crops at once */}
+        <TouchableOpacity
+          style={styles.harvestAllButton}
+          onPress={() => {
+            setGrid((prev) => {
+              let totalHarvested = 0;
+              const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+              const newBackpack = { ...harvestedItems };
+              for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                  const cell = newGrid[row][col];
+                  if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType] && cell.cropGrowthStage >= 100) {
+                    const cropType = cell.building as CropType;
+                    cell.building = "none";
+                    cell.cropGrowthStage = 0;
+                    totalHarvested++;
+                    newBackpack[cropType] = (newBackpack[cropType] || 0) + 1;
+                  }
+                }
+              }
+              if (totalHarvested > 0) {
+                setCoins((c) => c + totalHarvested * 25);
+                saveBackpack(newBackpack);
+                if (Platform.OS !== "web") {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                // Show brief harvest all message
+                setShowHarvestAllMsg(true);
+                if (harvestAllMsgTimer.current) clearTimeout(harvestAllMsgTimer.current);
+                harvestAllMsgTimer.current = setTimeout(() => setShowHarvestAllMsg(false), 2000);
+              }
+              return newGrid;
+            });
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.harvestAllButtonText}>🌾 All</Text>
+        </TouchableOpacity>
         {MODES.includes(mode) && (
           <View style={[styles.modeButton, styles.modeButtonActive, { width: 70, justifyContent: "center" }]}>
             <Text style={[styles.modeIcon, styles.modeIconActive, { fontSize: 16 }]}>
@@ -3712,6 +3752,12 @@ export default function IsometricMap() {
             {tappedFarmlandPos ? (
               <View style={styles.cropSelectorActions}>
                 <Text style={styles.treeSelectedText}>🌾 Select a crop to plant here</Text>
+                {/* Harvest All toast message */}
+                {showHarvestAllMsg && (
+                  <View style={{ position: "absolute", top: -50, left: "50%", marginLeft: -80, backgroundColor: "rgba(34,197,94,0.9)", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, zIndex: 100 }}>
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>Harvested all crops!</Text>
+                  </View>
+                )}
                 {/* Harvest button - removes crop and gives +25 coins */}
                 <TouchableOpacity
                   style={styles.harvestButton}
@@ -3993,6 +4039,19 @@ const styles = StyleSheet.create({
   harvestButtonText: {
     color: "#fff",
     fontSize: 12,
+    fontWeight: "bold",
+  },
+  harvestAllButton: {
+    backgroundColor: "#FF9800",
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginLeft: 8,
+    alignSelf: "center",
+  },
+  harvestAllButtonText: {
+    color: "#fff",
+    fontSize: 11,
     fontWeight: "bold",
   },
   itemsPanel: {
