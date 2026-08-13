@@ -1618,7 +1618,26 @@ export default function IsometricMap() {
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(generateTasksForDate(new Date().toISOString().slice(0, 10)));
   const [showTasks, setShowTasks] = useState(false);
   const [showTaskReward, setShowTaskReward] = useState(false);
+  const [showBackpack, setShowBackpack] = useState(false);
+  const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Persist backpack
+  const BACKPACK_KEY = "backpack_v1";
+  const [, forceBackpackRender] = useState(0);
+  // Load backpack on mount
+  useEffect(() => {
+    AsyncStorage.getItem(BACKPACK_KEY).then((saved) => {
+      if (saved) {
+        try { setHarvestedItems(JSON.parse(saved)); } catch {}
+      }
+    });
+  }, []);
+  // Save backpack when it changes
+  const saveBackpack = useCallback((items: Record<string, number>) => {
+    setHarvestedItems(items);
+    forceBackpackRender((n) => n + 1);
+    AsyncStorage.setItem(BACKPACK_KEY, JSON.stringify(items)).catch(() => {});
+  }, []);
 
   // Flash a low-coins warning when the user places an item with little balance
   const flashLowCoins = useCallback(() => {
@@ -3143,6 +3162,47 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Backpack panel (shown when 🎒 button is tapped) */}
+      {showBackpack && (
+        <View style={styles.itemsPanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>🎒 Harvested Vegetables</Text>
+            <TouchableOpacity onPress={() => setShowBackpack(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingVertical: 8, gap: 8, paddingHorizontal: 4 }}
+          >
+            {CROP_TYPES.map((crop) => {
+              const count = harvestedItems[crop] || 0;
+              return (
+                <View
+                  key={crop}
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                    padding: 10,
+                    minWidth: 70,
+                  }}
+                >
+                  <Text style={{ fontSize: 32 }}>{CROP_EMOJIS[crop] || "🌱"}</Text>
+                  <Text style={{ color: count > 0 ? "#4CAF50" : "#666", fontSize: 16, fontWeight: "bold", marginTop: 4 }}>
+                    {count}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+          <Text style={{ color: "#888", fontSize: 12, textAlign: "center", marginTop: 4 }}>
+            Total: {Object.values(harvestedItems).reduce((a, b) => a + b, 0)} vegetables
+          </Text>
+        </View>
+      )}
+
       {/* Daily Tasks panel (shown when Tasks button is tapped) */}
       {showTasks && (
         <View style={styles.profilePanel}>
@@ -3357,11 +3417,20 @@ export default function IsometricMap() {
         {/* Daily Tasks button */}
         <TouchableOpacity
           style={[styles.profileButton, showTasks && styles.profileButtonActive]}
-          onPress={() => { setShowTasks(!showTasks); setShowProfile(false); }}
+          onPress={() => { setShowTasks(!showTasks); setShowProfile(false); setShowBackpack(false); }}
           activeOpacity={0.7}
         >
           <Text style={[styles.profileButtonIcon, showTasks && styles.profileButtonIconActive]}>📋</Text>
           <Text style={styles.profileCoinText}>Tasks</Text>
+        </TouchableOpacity>
+        {/* Backpack button */}
+        <TouchableOpacity
+          style={[styles.profileButton, showBackpack && styles.profileButtonActive]}
+          onPress={() => { setShowBackpack(!showBackpack); setShowProfile(false); setShowTasks(false); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, showBackpack && styles.profileButtonIconActive]}>🎒</Text>
+          <Text style={styles.profileCoinText}>{Object.values(harvestedItems).reduce((a, b) => a + b, 0)}</Text>
         </TouchableOpacity>
         {MODES.includes(mode) && (
           <View style={[styles.modeButton, styles.modeButtonActive, { width: 70, justifyContent: "center" }]}>
@@ -3547,12 +3616,17 @@ export default function IsometricMap() {
                           // Only harvest when fully grown (stage >= 100)
                           if (cell.cropGrowthStage >= 100) {
                             // Harvest: remove crop and give +25 coins
+                            const cropType = cell.building as CropType;
                             cell.building = "none";
                             cell.cropGrowthStage = 0;
                             setCoins((c) => c + 25);
                             if (Platform.OS !== "web") {
                               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             }
+                            // Add to backpack
+                            const updated = { ...harvestedItems };
+                            updated[cropType] = (updated[cropType] || 0) + 1;
+                            saveBackpack(updated);
                           }
                         }
                       }

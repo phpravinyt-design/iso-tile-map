@@ -216,3 +216,9 @@
 - [ ] Visual growth animation using scale/opacity transitions through stages
 - [ ] Only harvestable when fully grown (stage 4)
 - [ ] Growth progress indicator (bar or visual cue)
+
+## Backpack (🎒) Inventory Button
+- [ ] Add 🎒 backpack button in the bottom toolbar
+- [ ] Track harvested vegetable counts per crop type
+- [ ] Show backpack popup with emoji crop icons and their harvested counts
+- [ ] Persist backpack counts across sessions
