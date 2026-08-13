@@ -153,3 +153,8 @@
 - [x] Triple-tap on any item flips it: tripleTapRef tracks taps within 400ms, 3 taps = flip via scaleX(-1)
 - [x] Flip persists: GridCell.flipped is part of grid state, saved with MAP_SAVE_KEY v2
 - [x] Verified: TypeScript clean, app renders correctly with NPCs and buildings visible
+
+## Industry Feature
+- [x] Cropped 9 factory PNGs from 3x3 sheet (368x368 each, ~90-100KB) into assets/images/cropped_factories/
+- [x] Added Industry mode (🏭) in Items popup + INDUSTRY_TYPES/SOURCES/EMOJIS + sub-selector + placement logic + BuildingOnTile dispatch via PngCommunityGeneric
+- [x] Verified: TypeScript clean, app renders with NPCs/animals walking, industry PNGs exist as assets

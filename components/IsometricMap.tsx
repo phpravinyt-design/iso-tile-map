@@ -93,6 +93,17 @@ const DECORATION_SWING_PNG = require("@/assets/images/cropped_decorations/swing.
 const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decorations/waterfall_pond.png");
 const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
 
+// 9 Industry/Factory PNGs from user's sheet
+const INDUSTRY_STEEL_PNG = require("@/assets/images/cropped_factories/steel_factory.png");
+const INDUSTRY_OIL_PNG = require("@/assets/images/cropped_factories/oil_refinery.png");
+const INDUSTRY_FOOD_PNG = require("@/assets/images/cropped_factories/food_factory.png");
+const INDUSTRY_RECYCLING_PNG = require("@/assets/images/cropped_factories/recycling_plant.png");
+const INDUSTRY_DAIRY_PNG = require("@/assets/images/cropped_factories/dairy_factory.png");
+const INDUSTRY_YARN_PNG = require("@/assets/images/cropped_factories/yarn_factory.png");
+const INDUSTRY_CHEMICAL_PNG = require("@/assets/images/cropped_factories/chemical_plant.png");
+const INDUSTRY_WOOD_PNG = require("@/assets/images/cropped_factories/wood_factory.png");
+const INDUSTRY_TECH_PNG = require("@/assets/images/cropped_factories/tech_factory.png");
+
 // 9 Community Building PNGs from user's sheet
 const TOWN_HALL_PNG = require("@/assets/images/cropped_community/town_hall.png");
 const HOSPITAL_PNG = require("@/assets/images/cropped_community/hospital.png");
@@ -409,6 +420,10 @@ const BUILDING_TYPES = [
   // 9 decoration types
   "flower_arch", "fountain", "bench", "topiary", "gazebo",
   "flower_pot", "swing", "waterfall_pond", "flower_bed",
+  // 9 industry/factory types
+  "steel_factory", "oil_refinery", "food_factory",
+  "recycling_plant", "dairy_factory", "yarn_factory",
+  "chemical_plant", "wood_factory", "tech_factory",
 ] as const;
 type BuildingType = (typeof BUILDING_TYPES)[number];
 
@@ -459,6 +474,41 @@ const DECORATION_SOURCES: Record<string, any> = {
   swing: DECORATION_SWING_PNG,
   waterfall_pond: DECORATION_WATERFALL_POND_PNG,
   flower_bed: DECORATION_FLOWER_BED_PNG,
+};
+
+// Industry/Factory types for selection (9 factories)
+const INDUSTRY_TYPES = [
+  "steel_factory", "oil_refinery", "food_factory",
+  "recycling_plant", "dairy_factory", "yarn_factory",
+  "chemical_plant", "wood_factory", "tech_factory",
+] as const;
+type IndustryType = (typeof INDUSTRY_TYPES)[number];
+const INDUSTRY_TYPE_VALUES: string[] = [...INDUSTRY_TYPES];
+
+// Industry PNG sources
+const INDUSTRY_SOURCES: Record<string, any> = {
+  steel_factory: INDUSTRY_STEEL_PNG,
+  oil_refinery: INDUSTRY_OIL_PNG,
+  food_factory: INDUSTRY_FOOD_PNG,
+  recycling_plant: INDUSTRY_RECYCLING_PNG,
+  dairy_factory: INDUSTRY_DAIRY_PNG,
+  yarn_factory: INDUSTRY_YARN_PNG,
+  chemical_plant: INDUSTRY_CHEMICAL_PNG,
+  wood_factory: INDUSTRY_WOOD_PNG,
+  tech_factory: INDUSTRY_TECH_PNG,
+};
+
+// Industry emoji labels
+const INDUSTRY_EMOJIS: Record<string, string> = {
+  steel_factory: "⚙️",
+  oil_refinery: "🛢️",
+  food_factory: "🍞",
+  recycling_plant: "♻️",
+  dairy_factory: "🥛",
+  yarn_factory: "🧶",
+  chemical_plant: "🧪",
+  wood_factory: "🪵",
+  tech_factory: "🖥️",
 };
 
 // Decoration emoji labels
@@ -661,7 +711,7 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
   );
 }
 // Placement modes
-const MODES = ["tile", "tiles", "community", "temple", "decoration", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "temple", "decoration", "industry", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -702,6 +752,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tiles: "🧱",
   temple: "🛕",
   decoration: "🌸",
+  industry: "🏭",
   community: "🏛️",
   road: "🛣️",
   house_small: "🏠",
@@ -1226,6 +1277,10 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false }: {
   if (buildingType in DECORATION_SOURCES) {
     return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
   }
+  // All industry/factory types use the generic renderer
+  if (buildingType in INDUSTRY_SOURCES) {
+    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
+  }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
     case "house_big": return <BigHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -1422,6 +1477,8 @@ export default function IsometricMap() {
   const [showTempleSelector, setShowTempleSelector] = useState(false);
   const [selectedDecorationType, setSelectedDecorationType] = useState<DecorationType>("flower_arch");
   const [showDecorationSelector, setShowDecorationSelector] = useState(false);
+  const [selectedIndustryType, setSelectedIndustryType] = useState<IndustryType>("steel_factory");
+  const [showIndustrySelector, setShowIndustrySelector] = useState(false);
   const [showItemsMenu, setShowItemsMenu] = useState(false);
 
   const offsetX = useSharedValue(0);
@@ -2090,7 +2147,7 @@ export default function IsometricMap() {
               }
               newGrid[row][col].tileTexture = textureToPlace;
             }
-          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "industry" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -2148,6 +2205,15 @@ export default function IsometricMap() {
                   newGrid[row][col].building = buildingToPlace;
                   placedNewBuilding = true;
                 }
+              } else if (mode === "industry") {
+                // Industry mode: place the user's selected factory type
+                const buildingToPlace = selectedIndustryType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                  placedNewBuilding = true;
+                }
               } else if (mode === "tree") {
                 // Tree mode: place the user's selected tree type
                 if (currentBuilding === selectedTreeType) {
@@ -2179,7 +2245,7 @@ export default function IsometricMap() {
       // Daily tasks: refresh progress against the new grid (after placement)
       advanceDailyTasks();
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, moveClipboard]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, moveClipboard]
   );
 
   // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
@@ -2837,6 +2903,11 @@ export default function IsometricMap() {
                   } else {
                     setShowDecorationSelector(false);
                   }
+                  if (m === "industry") {
+                    setShowIndustrySelector(!showIndustrySelector);
+                  } else {
+                    setShowIndustrySelector(false);
+                  }
                   setMode(m);
                   setShowItemsMenu(false);
                 }}
@@ -3075,6 +3146,41 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap an item to select it</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Industry Sub-Selector (shown when industry mode is active) */}
+      {mode === "industry" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 170 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {INDUSTRY_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedIndustryType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedIndustryType(t);
+                  if (Platform.OS !== "web") {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={INDUSTRY_SOURCES[t] || INDUSTRY_STEEL_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a factory to select it</Text>
           </View>
         </View>
       )}
