@@ -1465,6 +1465,74 @@ export default function IsometricMap() {
   const [isNight, setIsNight] = useState(false);
   const dayNightTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // --- Weather System ---
+  type WeatherType = "sunny" | "cloudy" | "rainy";
+  const [weather, setWeather] = useState<WeatherType>("sunny");
+  const [rainDrops, setRainDrops] = useState<{ id: number; x: number; y: number; speed: number; opacity: number }[]>([]);
+  const weatherTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rainIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dropIdRef = useRef(0);
+
+  // Weather timer: change weather every ~60 seconds (random between sunny/cloudy/rainy)
+  useEffect(() => {
+    weatherTimerRef.current = setInterval(() => {
+      const rand = Math.random();
+      if (rand < 0.4) setWeather("sunny");
+      else if (rand < 0.7) setWeather("cloudy");
+      else setWeather("rainy");
+    }, 60000); // Change every 60 seconds
+    return () => {
+      if (weatherTimerRef.current) clearInterval(weatherTimerRef.current);
+    };
+  }, []);
+
+  // Rain drops animation
+  useEffect(() => {
+    if (weather === "rainy") {
+      // Generate rain drops
+      const createDrops = () => {
+        const newDrops = [];
+        for (let i = 0; i < 8; i++) {
+          newDrops.push({
+            id: dropIdRef.current++,
+            x: Math.random() * 100,
+            y: -10,
+            speed: 2 + Math.random() * 3,
+            opacity: 0.4 + Math.random() * 0.3,
+          });
+        }
+        return newDrops;
+      };
+
+      rainIntervalRef.current = setInterval(() => {
+        setRainDrops((prev) => {
+          const updated = prev.map((d) => ({ ...d, y: d.y + d.speed }));
+          const fallen = updated.filter((d) => d.y < 110);
+          const newDrops = createDrops();
+          return [...fallen, ...newDrops];
+        });
+      }, 50);
+    } else {
+      if (rainIntervalRef.current) {
+        clearInterval(rainIntervalRef.current);
+        rainIntervalRef.current = null;
+      }
+      setRainDrops([]);
+    }
+    return () => {
+      if (rainIntervalRef.current) clearInterval(rainIntervalRef.current);
+    };
+  }, [weather]);
+
+  // Weather effect values
+  const weatherOverlayOpacity = useMemo(() => {
+    if (weather === "sunny") return 0;
+    if (weather === "cloudy") return 0.15;
+    return 0.25;
+  }, [weather]);
+
+  const weatherEmoji = weather === "sunny" ? "☀️" : weather === "cloudy" ? "☁️" : "🌧️";
+
   // Day/night timer: slowly advance time of day (full cycle every 5 minutes for demo)
   useEffect(() => {
     dayNightTimerRef.current = setInterval(() => {
@@ -1588,6 +1656,7 @@ export default function IsometricMap() {
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
+      const isRainyNow = weather === "rainy";
 
       // Update human NPCs
       setNpcs((prevNpcs) => {
@@ -1628,7 +1697,9 @@ export default function IsometricMap() {
             }
             return { ...npc, idleUntil: now + 2000 };
           }
-          const speed = NPC_WALK_SPEED * 0.1;
+          // Weather: humans walk slower in rain
+          const speedMult = isRainyNow ? 0.5 : 1.0;
+          const speed = NPC_WALK_SPEED * 0.1 * speedMult;
           const moveX = (dx / dist) * speed;
           const moveY = (dy / dist) * speed;
           return {
@@ -1664,6 +1735,10 @@ export default function IsometricMap() {
             }
             return { ...animal, idleUntil: now + 2000 };
           }
+          // Weather: animals stop moving during rain (hide under trees/buildings)
+          if (isRainyNow) {
+            return { ...animal, idleUntil: now + 10000 };
+          }
           const speed = ANIMAL_WALK_SPEED * 0.1;
           const moveX = (dx / dist) * speed;
           const moveY = (dy / dist) * speed;
@@ -1677,7 +1752,7 @@ export default function IsometricMap() {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [grid, timeOfDay, isNight, nearestBuilding]);
+  }, [grid, timeOfDay, isNight, nearestBuilding, weather]);
 
   // Pan gesture
   const panGesture = useMemo(
@@ -2236,6 +2311,38 @@ export default function IsometricMap() {
                   }}
                 />
               )}
+              {/* Weather overlay (cloudy/rainy tint) */}
+              {weatherOverlayOpacity > 0 && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: weather === "rainy" ? "rgba(100, 120, 150, 0.25)" : "rgba(150, 160, 170, 0.15)",
+                    zIndex: 99,
+                  }}
+                />
+              )}
+              {/* Rain drops */}
+              {weather === "rainy" && rainDrops.map((drop) => (
+                <View
+                  key={drop.id}
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: `${drop.x}%`,
+                    top: `${drop.y}%`,
+                    width: 2,
+                    height: 12,
+                    backgroundColor: `rgba(170, 200, 255, ${drop.opacity})`,
+                    borderRadius: 1,
+                    zIndex: 150,
+                  }}
+                />
+              ))}
               {/* Speech bubble for tapped NPC/animal */}
               {activeBubble && (
                 <View
@@ -2304,6 +2411,20 @@ export default function IsometricMap() {
         paddingVertical: 6,
       }}>
         <Text style={{ fontSize: 22 }}>{celestialEmoji}</Text>
+      </View>
+
+      {/* Weather indicator */}
+      <View style={{
+        position: "absolute",
+        top: 8,
+        right: 60,
+        zIndex: 250,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+      }}>
+        <Text style={{ fontSize: 22 }}>{weatherEmoji}</Text>
       </View>
 
       {/* Clipboard Indicator Bar (shown when an item is picked up via long press) */}

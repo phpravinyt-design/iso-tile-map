@@ -128,3 +128,12 @@
 - [x] Added to TILE_TEXTURE_TYPES as "sand_grass" + TILE_TEXTURE_SOURCES mapping (4 tile options now)
 - [x] Rendering works via existing tile texture renderer (TILE_TEXTURE_SOURCES lookup); grid tileTexture changed from TileTextureType to string
 - [x] Verified: TypeScript clean, app renders correctly, NPCs walking
+
+## Weather System
+- [x] Added weather state (sunny/cloudy/rainy) that cycles every 60 seconds randomly
+- [x] Rain drops: 8 drops generated every 50ms, falling animation via position update, cleared when not rainy
+- [x] Weather overlay: cloudy = rgba(150,160,170,0.15), rainy = rgba(100,120,150,0.25), sunny = 0
+- [x] Sunny = no overlay (clear bright map)
+- [x] Weather emoji indicator at top-right (right: 60) beside celestial emoji
+- [x] Humans walk at 50% speed during rain; animals stop entirely (idle 10s) during rain
+- [x] Verified: TypeScript clean, both sun ☀️ and weather icons visible top-right, NPCs walking
