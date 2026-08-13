@@ -132,6 +132,11 @@ const NPC_COW_PNG = require("@/assets/images/npc_cow_small.png");
 const NPC_CHICKEN_PNG = require("@/assets/images/npc_chicken_small.png");
 const NPC_DOG_PNG = require("@/assets/images/npc_dog_small.png");
 
+// --- Vehicle Sprites (road-only NPCs) ---
+const VEHICLE_CAR_PNG = require("@/assets/images/vehicle_car_small.png");
+const VEHICLE_TRUCK_PNG = require("@/assets/images/vehicle_truck_small.png");
+const VEHICLE_BUS_PNG = require("@/assets/images/vehicle_bus_small.png");
+
 // Animal sprite sources
 const ANIMAL_SOURCES: Record<string, any> = {
   cow: NPC_COW_PNG,
@@ -195,6 +200,63 @@ interface AnimalNpcState {
   direction: 1 | -1;
 }
 
+// Vehicle NPC state - only moves on placed roads
+interface VehicleState {
+  id: number;
+  type: "car" | "truck" | "bus";
+  x: number; // grid column (float)
+  y: number; // grid row (float)
+  targetX: number;
+  targetY: number;
+  rotation: number; // 0=up, 90=right, 180=down, 270=left
+}
+
+// Vehicle sprite sources
+const VEHICLE_SOURCES: Record<string, any> = {
+  car: VEHICLE_CAR_PNG,
+  truck: VEHICLE_TRUCK_PNG,
+  bus: VEHICLE_BUS_PNG,
+};
+
+// Vehicle config
+const VEHICLE_COUNT = 2;
+const VEHICLE_WALK_SPEED = 2.0; // faster than NPCs
+const VEHICLE_IDLE_TIME = 500; // shorter idle on roads
+
+// Get all road tiles on the map
+function getRoadTiles(grid: GridCell[][]): { x: number; y: number }[] {
+  const roads: { x: number; y: number }[] = [];
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      if (grid[row][col].roadOverlay !== null) {
+        roads.push({ x: col, y: row });
+      }
+    }
+  }
+  return roads;
+}
+
+// Get connected road neighbors (adjacent N/S/E/W tiles that are also roads)
+function getConnectedRoads(grid: GridCell[][], row: number, col: number): { x: number; y: number; direction: number }[] {
+  const connected: { x: number; y: number; direction: number }[] = [];
+  const dirs = [
+    { dx: 0, dy: -1, dir: 0 },    // up = 0
+    { dx: 1, dy: 0, dir: 90 },    // right = 90
+    { dx: 0, dy: 1, dir: 180 },   // down = 180
+    { dx: -1, dy: 0, dir: 270 },  // left = 270
+  ];
+  for (const { dx, dy, dir } of dirs) {
+    const nx = col + dx;
+    const ny = row + dy;
+    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+      if (grid[ny][nx].roadOverlay !== null) {
+        connected.push({ x: nx, y: ny, direction: dir });
+      }
+    }
+  }
+  return connected;
+}
+
 // Check if a tile is walkable (grass or dirt, no building)
 function isTileWalkable(grid: GridCell[][], row: number, col: number): boolean {
   if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return false;
@@ -252,6 +314,35 @@ function NpcSprite({ npc, scale, onTap }: { npc: NpcState; scale: number; onTap:
         cachePolicy="memory"
       />
     </TouchableOpacity>
+  );
+}
+
+// --- Vehicle Sprite Renderer (road-only NPCs) ---
+function VehicleSprite({ vehicle, scale }: { vehicle: VehicleState; scale: number }) {
+  const pos = gridToScreen(vehicle.x, vehicle.y, scale);
+  const ts = TILE_SIZE * scale;
+  const vehicleSize = ts * 0.65; // vehicles are slightly smaller than NPCs
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - vehicleSize / 2,
+        top: pos.y - vehicleSize / 2,
+        width: vehicleSize,
+        height: vehicleSize,
+        zIndex: 16, // Above NPCs and animals
+        transform: [{ rotate: `${vehicle.rotation}deg` }],
+      }}
+    >
+      <Image
+        source={VEHICLE_SOURCES[vehicle.type] || VEHICLE_CAR_PNG}
+        style={{ width: vehicleSize, height: vehicleSize }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
   );
 }
 
@@ -1772,6 +1863,95 @@ export default function IsometricMap() {
     return initial;
   });
 
+  // --- Vehicle NPCs (road-only) ---
+  const vehicleTypes: VehicleState["type"][] = ["car", "truck"];
+  const [vehicles, setVehicles] = useState<VehicleState[]>([]);
+
+  // Spawn vehicles when roads exist on the map
+  useEffect(() => {
+    const roadTiles = getRoadTiles(grid);
+    if (roadTiles.length === 0) {
+      setVehicles([]); // No roads = no vehicles
+      return;
+    }
+    setVehicles((prev) => {
+      // Already spawned enough vehicles
+      if (prev.length >= VEHICLE_COUNT) return prev;
+      const initial: VehicleState[] = [...prev];
+      for (let i = prev.length; i < VEHICLE_COUNT; i++) {
+        // Pick a random road tile to spawn on
+        const roadTile = roadTiles[Math.floor(Math.random() * roadTiles.length)];
+        const connected = getConnectedRoads(grid, roadTile.y, roadTile.x);
+        let targetX = roadTile.x;
+        let targetY = roadTile.y;
+        let rotation = 0;
+        if (connected.length > 0) {
+          const next = connected[Math.floor(Math.random() * connected.length)];
+          targetX = next.x;
+          targetY = next.y;
+          rotation = next.direction;
+        }
+        initial.push({
+          id: 200 + i,
+          type: vehicleTypes[i % vehicleTypes.length],
+          x: roadTile.x + 0.5,
+          y: roadTile.y + 0.5,
+          targetX,
+          targetY,
+          rotation,
+        });
+      }
+      return initial;
+    });
+  }, [grid]);
+
+  // Vehicle movement tick (only on roads)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setVehicles((prevVehicles) => {
+        return prevVehicles.map((v) => {
+          if (v.x === v.targetX && v.y === v.targetY) return v;
+          const dx = v.targetX - v.x;
+          const dy = v.targetY - v.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 0.15) {
+            // Arrived at target, pick next connected road tile
+            const row = Math.round(v.y);
+            const col = Math.round(v.x);
+            const connected = getConnectedRoads(grid, row, col);
+            if (connected.length === 0) return v; // No connected roads, stay put
+            // Avoid going back to where we came from
+            const forward = connected.filter((c) => {
+              const prevRow = Math.round(v.y - dy * 3);
+              const prevCol = Math.round(v.x - dx * 3);
+              return !(c.x === prevCol && c.y === prevRow);
+            });
+            const candidates = forward.length > 0 ? forward : connected;
+            const next = candidates[Math.floor(Math.random() * candidates.length)];
+            return {
+              ...v,
+              targetX: next.x,
+              targetY: next.y,
+              rotation: next.direction,
+              idleUntil: now + VEHICLE_IDLE_TIME,
+            };
+          }
+          // Move toward target
+          const speed = VEHICLE_WALK_SPEED * 0.1;
+          const moveX = (dx / dist) * speed;
+          const moveY = (dy / dist) * speed;
+          return {
+            ...v,
+            x: v.x + moveX,
+            y: v.y + moveY,
+          };
+        });
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [grid]);
+
   // NPC movement tick (runs every ~100ms for smooth walking)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2362,6 +2542,13 @@ export default function IsometricMap() {
     ));
   }, [animals, currentScale, handleAnimalTap]);
 
+  // Render Vehicle NPCs (road-following cars/trucks)
+  const vehicleSprites = useMemo(() => {
+    return vehicles.map((vehicle) => (
+      <VehicleSprite key={`vehicle-${vehicle.id}`} vehicle={vehicle} scale={currentScale} />
+    ));
+  }, [vehicles, currentScale]);
+
   // Render buildings (top layer, sorted by row then col for proper z-ordering)
   // Buildings now have 5s long-press for move/remove
   const buildings = useMemo(() => {
@@ -2532,6 +2719,8 @@ export default function IsometricMap() {
               {npcSprites}
               {/* Animal NPCs: walking animals */}
               {animalSprites}
+              {/* Vehicle NPCs: cars/trucks driving on roads */}
+              {vehicleSprites}
               {/* Night overlay: dark blue tint during nighttime */}
               {nightOpacity > 0 && (
                 <View

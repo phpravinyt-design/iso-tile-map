@@ -158,3 +158,17 @@
 - [x] Cropped 9 factory PNGs from 3x3 sheet (368x368 each, ~90-100KB) into assets/images/cropped_factories/
 - [x] Added Industry mode (🏭) in Items popup + INDUSTRY_TYPES/SOURCES/EMOJIS + sub-selector + placement logic + BuildingOnTile dispatch via PngCommunityGeneric
 - [x] Verified: TypeScript clean, app renders with NPCs/animals walking, industry PNGs exist as assets
+
+## Vehicle NPCs (Road Followers)
+- [ ] Generate vehicle sprite assets: Township-style cars/trucks (top-down) as transparent PNGs
+- [ ] Implement vehicle system: 2-3 vehicles spawn on placed roads and drive along them
+- [ ] Vehicles follow road connections (straight, corner, intersection) and loop
+- [ ] Vehicles only appear on tiles with roadOverlay !== null
+- [ ] Vehicles rotate based on direction of travel
+- [ ] Verify in browser + checkpoint + deliver
+
+## Vehicle NPCs
+- [x] Generate vehicle sprite assets: red car, blue truck, yellow bus (top-down view, 128x128 transparent PNGs)
+- [x] Implement road-following system: VehicleState interface, getRoadTiles/getConnectedRoads helpers, VEHICLE_COUNT=2, VEHICLE_WALK_SPEED=2.0, spawn only when roads exist, movement only on connected road tiles, rotation follows direction, avoids backtracking
+- [x] Vehicles render at zIndex 16 (above NPCs/animals), sprite rotates to match travel direction
+- [x] Verified: TypeScript clean, app renders correctly with NPCs/animals walking; vehicles spawn when roads are placed
