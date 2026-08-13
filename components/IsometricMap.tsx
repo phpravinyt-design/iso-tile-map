@@ -521,6 +521,29 @@ const CROP_EMOJIS: Record<string, string> = {
   crop_mushroom: "🍄‍",
 };
 
+// Growth times per crop type (in milliseconds)
+const CROP_GROWTH_TIMES: Record<CropType, number> = {
+  crop_carrot: 30000,      // 30 seconds
+  crop_potato: 35000,      // 35 seconds
+  crop_garlic: 40000,      // 40 seconds
+  crop_wheat: 45000,       // 45 seconds
+  crop_corn: 45000,        // 45 seconds
+  crop_peanut: 45000,      // 45 seconds
+  crop_tomato: 50000,      // 50 seconds
+  crop_eggplant: 50000,    // 50 seconds
+  crop_cucumber: 50000,    // 50 seconds
+  crop_strawberry: 55000,  // 55 seconds
+  crop_chili: 55000,       // 55 seconds
+  crop_mushroom: 60000,    // 60 seconds
+  crop_broccoli: 70000,    // 70 seconds
+  crop_watermelon: 90000,  // 90 seconds
+};
+
+// Get growth time for a crop type (default 50s)
+function getCropGrowthTime(cropType: CropType): number {
+  return CROP_GROWTH_TIMES[cropType] || 50000;
+}
+
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
   "house_small", "house_big", "town_market", "none",
@@ -1913,7 +1936,10 @@ export default function IsometricMap() {
             const cell = newGrid[row][col];
             if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType]) {
               if (cell.cropGrowthStage < 100) {
-                cell.cropGrowthStage = Math.min(100, cell.cropGrowthStage + 2); // Grow by 2 per second = 50 seconds to full
+                // Per-crop growth: different crops grow at different rates
+                const totalDuration = getCropGrowthTime(cell.building as CropType);
+                const increment = 100000 / totalDuration; // 100 stages per duration
+                cell.cropGrowthStage = Math.min(100, cell.cropGrowthStage + increment);
                 changed = true;
               }
             }

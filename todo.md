@@ -227,3 +227,7 @@
 - [x] Add sell button per crop type in backpack panel
 - [x] Each crop sells for coins (10 coins each)
 - [x] Subtract from backpack count and add coins when sold
+
+## Different Growth Times Per Crop
+- [x] Add CROP_GROWTH_TIMES mapping with different durations per crop type
+- [x] Use crop-specific growth time in the growth timer and progress bar
