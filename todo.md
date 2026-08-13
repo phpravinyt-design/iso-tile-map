@@ -222,3 +222,8 @@
 - [ ] Track harvested vegetable counts per crop type
 - [ ] Show backpack popup with emoji crop icons and their harvested counts
 - [ ] Persist backpack counts across sessions
+
+## Sell Harvested Vegetables
+- [x] Add sell button per crop type in backpack panel
+- [x] Each crop sells for coins (10 coins each)
+- [x] Subtract from backpack count and add coins when sold

@@ -3193,6 +3193,33 @@ export default function IsometricMap() {
                   <Text style={{ color: count > 0 ? "#4CAF50" : "#666", fontSize: 16, fontWeight: "bold", marginTop: 4 }}>
                     {count}
                   </Text>
+                  {count > 0 && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: "#FF9800",
+                        borderRadius: 8,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        marginTop: 4,
+                      }}
+                      onPress={() => {
+                        // Sell all of this crop type for 10 coins each
+                        const sellCoins = count * 10;
+                        setCoins((c) => c + sellCoins);
+                        const updated = { ...harvestedItems };
+                        delete updated[crop];
+                        saveBackpack(updated);
+                        if (Platform.OS !== "web") {
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>
+                        Sell All ({count * 10})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
