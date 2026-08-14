@@ -484,3 +484,8 @@
 - [x] Detect when the Next Up badge unlocks (previous nextUp id just got earned) and fire a confetti burst + celebratory chime (E4-G4-B4-E5-E6 major arpeggio, gated by sound toggle, native Success haptic)
 - [x] Confetti: 26 lightweight falling confetti pieces via Reanimated (fade in, fall + rotate over ~2.8s, fade out, auto-clear after 3s), mounted inside the profile panel, pointerEvents none
 - [x] Verify: tsc clean, 53 tests passing, render check
+
+## Badge Unlock Toast
+- [x] Show a toast with the unlocked badge's emoji + name during the confetti animation (gold chip, slide-down + scale-in, auto-dismiss after ~3s matching confetti)
+- [x] Wire it into the Next Up celebration effect (badge def carried in confetti state + badgeUnlockToast state)
+- [x] Verify: tsc clean, 53 tests passing, render check

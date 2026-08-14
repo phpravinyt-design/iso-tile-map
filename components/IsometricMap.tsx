@@ -2540,6 +2540,61 @@ function ConfettiPiece({ piece }: { piece: { id: number; left: number; delay: nu
   return <Animated.View pointerEvents="none" style={style} />;
 }
 
+// --- Badge Unlock Toast: shows the unlocked badge's name riding the confetti celebration ---
+function BadgeUnlockToast({ message }: { message: string }) {
+  const translateY = useSharedValue(-20);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.9);
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 200 });
+    translateY.value = withTiming(0, { duration: 300 });
+    scale.value = withTiming(1, { duration: 300 });
+    const hideT = setTimeout(() => {
+      opacity.value = withTiming(0, { duration: 350 });
+      translateY.value = withTiming(-12, { duration: 350 });
+    }, 2550);
+    return () => clearTimeout(hideT);
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+  }));
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 26,
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        zIndex: 210,
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            backgroundColor: "rgba(255, 215, 0, 0.96)",
+            borderWidth: 1.5,
+            borderColor: "#B8860B",
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 4,
+          },
+          style,
+        ]}
+      >
+        <Text style={{ color: "#6B4A00", fontSize: 14, fontWeight: "700", lineHeight: 19 }}>{message}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 // --- Farmer Harvest Hint: bubble shown above a ready crop while the 3D farmer stands nearby ---
 function FarmerHintBubble({
   col,
@@ -3127,9 +3182,11 @@ export default function IsometricMap() {
   const [lockedBadgeHint, setLockedBadgeHint] = useState<string | null>(null);
   const lockedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // --- Next Up unlock celebration: confetti burst + chime when the pinned badge unlocks ---
-  const [badgeConfetti, setBadgeConfetti] = useState<{ pieces: { id: number; left: number; delay: number; hue: number; size: number }[] } | null>(null);
+  const [badgeConfetti, setBadgeConfetti] = useState<{ pieces: { id: number; left: number; delay: number; hue: number; size: number }[]; badge: { emoji: string; name: string } } | null>(null);
   const badgeConfettiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNextUpRef = useRef<string | null>(null);
+  const [badgeUnlockToast, setBadgeUnlockToast] = useState<string | null>(null);
+  const badgeToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Refs for Next Up celebration effect (declared before the state vars it reads — populated in its own effect)
   const earnedRef = useRef<AchievementRecord[]>([]);
   const statsRef = useRef<{ coinsEarned: number; cropsHarvested: number; ordersDelivered: number }>({ coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 });
@@ -3253,6 +3310,7 @@ export default function IsometricMap() {
     const prev = prevNextUpIdRef.current;
     prevNextUpIdRef.current = nextUp ? nextUp.id : null;
     if (prev && nextUp && prev !== nextUp.id && earnedRef.current.some((a) => a.id === prev)) {
+      const def = ACHIEVEMENT_DEFS.find((d) => d.id === prev);
       const burst = {
         pieces: Array.from({ length: 26 }, (_, i) => ({
           id: i,
@@ -3261,10 +3319,14 @@ export default function IsometricMap() {
           hue: Math.floor(Math.random() * 60) + (Math.random() > 0.5 ? 35 : 0),
           size: 6 + Math.random() * 7,
         })),
+        badge: { emoji: def?.emoji || "🏅", name: def?.name || "Badge" },
       };
       setBadgeConfetti(burst);
       if (badgeConfettiTimer.current) clearTimeout(badgeConfettiTimer.current);
       badgeConfettiTimer.current = setTimeout(() => setBadgeConfetti(null), 3000);
+      setBadgeUnlockToast(`${def?.emoji || "🏅"} ${def?.name || "Badge"} Unlocked!`);
+      if (badgeToastTimer.current) clearTimeout(badgeToastTimer.current);
+      badgeToastTimer.current = setTimeout(() => setBadgeUnlockToast(null), 3000);
       playBadgeChime();
       if (Platform.OS !== "web" && settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } else if (!nextUp) {
@@ -6980,6 +7042,8 @@ export default function IsometricMap() {
 
           {/* Next Up unlock confetti: subtle falling confetti when the pinned badge unlocks */}
           {badgeConfetti && <BadgeConfetti burst={badgeConfetti} />}
+          {/* Badge unlock toast: shows the unlocked badge name during the celebration */}
+          {badgeUnlockToast && <BadgeUnlockToast message={badgeUnlockToast} />}
         </View>
       )}
 
