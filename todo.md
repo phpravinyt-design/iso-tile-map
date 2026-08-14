@@ -399,3 +399,10 @@
 - [x] Added 3D farmer to the animal walking system as type "farmer_3d" (4th entity): walks on grass/dirt with same wander/idle/chase mechanics, direction flip, follows pan/zoom
 - [x] 3D farmer renders human-sized (1.05× tile) with own sprite, no sleeping pose; tappable with its own speech bubble pool (5 messages: 🚜 What a lovely farm! 🌾 etc.)
 - [x] Verified: tsc clean, 18 tests passing, render check — 3D farmer visible on map next to house
+
+## Farmer Task Helper (Harvest Hint)
+- [x] Farmer scans grid every 1s for ready crops (cropGrowthStage >= 100) via findReadyCrop() (closest to farmer, skipped after harvest)
+- [x] When a ready crop exists, farmer overrides his wander and walks to it (200ms tick), idles beside it while the hint is active
+- [x] FarmerHintBubble overlay rendered above the ready crop: white card, orange border, 🧑‍🌾 emoji + harvest hint text (5 rotating messages), arrow tail, fades in/out via Reanimated shared value; pointerEvents="none" so taps still work
+- [x] Farmer re-picks a new crop after harvest/cooldown (8s hint window); idle wander resumes when none ready; sleeping at night still works
+- [x] Verified: tsc clean, 18 tests passing, render check (map OK, bird/bee overlays fine)

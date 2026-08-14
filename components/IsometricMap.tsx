@@ -203,6 +203,20 @@ const ANIMAL_COUNT = 3;
 const ANIMAL_WALK_SPEED = 0.8; // animals walk slower
 const ANIMAL_IDLE_TIME = 2500; // animals idle longer
 
+// Farmer task-helper: hint messages shown above a ready crop
+const FARMER_HINT_MESSAGES: string[] = [
+  "Harvest karo! 🌾",
+  "Ready hai! Pick it! 🍅",
+  "Let's collect these! 🥕",
+  "Fully grown! 🌽",
+  "Harvest time! 🍓",
+];
+// How often (ms) the farmer re-scans for ready crops while wandering
+const FARMER_HINT_SCAN_MS = 3000;
+// Time (ms) the farmer stays at a ready crop showing the hint before re-scanning
+const FARMER_HINT_STAY_MS = 8000;
+const FARMER_ID = 100; // the farmer_3d entity is always the first spawned animal (id 100)
+
 // NPC state interface
 interface NpcState {
   id: number;
@@ -2170,6 +2184,80 @@ function DustCloud({
   );
 }
 
+// --- Farmer Harvest Hint: bubble shown above a ready crop while the 3D farmer stands nearby ---
+function FarmerHintBubble({
+  col,
+  row,
+  scale,
+  message,
+  opacityValue,
+}: {
+  col: number;
+  row: number;
+  scale: number;
+  message: string;
+  opacityValue: SharedValue<{ col: number; row: number; opacity: number } | null>;
+}) {
+  const pos = gridToScreen(col + 0.5, row + 0.5, scale);
+  const ts = TILE_SIZE * scale;
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacityValue.value?.opacity ?? 0,
+  }));
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - 90,
+        top: pos.y - ts * 0.55 - 62,
+        width: 180,
+        alignItems: "center",
+        zIndex: 60,
+        ...animStyle,
+      }}
+    >
+      {/* Bubble card */}
+      <View
+        style={{
+          backgroundColor: "white",
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: "#FF9F43",
+          paddingHorizontal: 10,
+          paddingVertical: 7,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          elevation: 5,
+          alignItems: "center",
+        }}
+      >
+        {/* Small farmer emoji to attribute the hint */}
+        <Text style={{ fontSize: 15, lineHeight: 20, marginBottom: 1 }}>🧑‍🌾</Text>
+        <Text style={{ fontSize: 13, fontWeight: "700", color: "#333", textAlign: "center" }}>{message}</Text>
+      </View>
+      {/* Bubble tail */}
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: 6,
+          borderRightWidth: 6,
+          borderTopWidth: 8,
+          borderLeftColor: "transparent",
+          borderRightColor: "transparent",
+          borderTopColor: "#FF9F43",
+          alignSelf: "center",
+          marginTop: 2,
+        }}
+      />
+    </View>
+  );
+}
+
 // --- Claim Pop: same bounce + sparkle celebration, centered on screen (for task reward claims) ---
 function ClaimPop({
   dims,
@@ -3456,6 +3544,11 @@ export default function IsometricMap() {
     return false;
   }, []);
 
+  // Farmer task-helper refs/state (declared here, before first use in scan tick effect)
+  const farmerHintRef = useRef<{ col: number; row: number; until: number; message: string } | null>(null);
+  const farmerHintBubble = useSharedValue<{ col: number; row: number; opacity: number } | null>(null);
+  const [, setFarmerHintTick] = useState(0);
+
   // Crop growth timer: advance cropGrowthStage for all planted crops (1 tick/sec, MAX=100)
   useEffect(() => {
     const growthInterval = setInterval(() => {
@@ -3485,6 +3578,109 @@ export default function IsometricMap() {
     }, 1000); // Update every second
     return () => clearInterval(growthInterval);
   }, [isNearWell]);
+
+  // Find a ready (fully grown) crop closest to the given position, ignoring an already-hinted one
+  const findReadyCrop = useCallback(
+    (g: GridCell[][], nearX: number, nearY: number, ignoreCol: number, ignoreRow: number): { col: number; row: number } | null => {
+      let best: { col: number; row: number } | null = null;
+      let bestDist = Infinity;
+      for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const cell = g[row][col];
+          if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType] && cell.cropGrowthStage >= 100) {
+            if (col === ignoreCol && row === ignoreRow) continue;
+            const d = (col - nearX) ** 2 + (row - nearY) ** 2;
+            if (d < bestDist) {
+              bestDist = d;
+              best = { col, row };
+            }
+          }
+        }
+      }
+      return best;
+    },
+    []
+  );
+
+  // Farmer task-helper tick: scan for ready crops and guide the farmer to them with a hint bubble.
+  // Runs every second; the farmer overrides its wander to walk to the ready crop, shows a
+  // "Harvest karo!" bubble above it, then returns to wandering after the hint window.
+  useEffect(() => {
+    const scanInterval = setInterval(() => {
+      const now = Date.now();
+      const hint = farmerHintRef.current;
+
+      // Drop the hint if the crop at the hinted tile is no longer ready/harvested
+      if (hint) {
+        setGrid((prev) => {
+          const cell = prev[hint.row]?.[hint.col];
+          const stillReady = cell?.cropGrowthStage >= 100;
+          if (!stillReady) farmerHintRef.current = null;
+          return prev;
+        });
+      }
+
+      // Pick a new target crop if nothing is currently being hinted
+      if (!farmerHintRef.current) {
+        setAnimals((prev) => {
+          const farmer = prev.find((a) => a.id === FARMER_ID);
+          if (!farmer) return prev;
+          setGrid((g) => {
+            const target = findReadyCrop(g, farmer.x, farmer.y, -1, -1);
+            if (target) {
+              const msg = FARMER_HINT_MESSAGES[Math.floor(Math.random() * FARMER_HINT_MESSAGES.length)];
+              farmerHintRef.current = { col: target.col, row: target.row, until: now + FARMER_HINT_STAY_MS, message: msg };
+              farmerHintBubble.value = { col: target.col, row: target.row, opacity: 0 };
+            }
+            return g;
+          });
+          return prev;
+        });
+        setFarmerHintTick((n) => n + 1);
+      }
+
+      // Fade the hint bubble in while active
+      if (farmerHintRef.current) {
+        const active = now < farmerHintRef.current.until;
+        const cur = farmerHintBubble.value;
+        if (cur) {
+          farmerHintBubble.value = { col: cur.col, row: cur.row, opacity: active ? 1 : 0 };
+        }
+        if (!active) {
+          farmerHintRef.current = null;
+          setFarmerHintTick((n) => n + 1);
+        }
+      } else {
+        farmerHintBubble.value = null;
+      }
+    }, 1000);
+    return () => clearInterval(scanInterval);
+  }, [findReadyCrop, farmerHintBubble]);
+
+  // Farmer task-helper: override wander target to walk to the hinted ready crop
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const hint = farmerHintRef.current;
+      if (!hint) return;
+      setAnimals((prev) => {
+        const farmer = prev.find((a) => a.id === FARMER_ID);
+        if (!farmer || farmer.sleeping) return prev;
+        const dx = hint.col + 0.5 - farmer.x;
+        const dy = hint.row + 0.5 - farmer.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= 1.1) {
+          // Standing next to the ready crop: idle and keep showing the hint
+          return prev.map((a) => (a.id === FARMER_ID ? { ...a, targetX: a.x, targetY: a.y, idleUntil: Date.now() + 500 } : a));
+        }
+        return prev.map((a) =>
+          a.id === FARMER_ID
+            ? { ...a, targetX: hint.col + 0.5, targetY: hint.row + 0.5, idleUntil: Date.now() + 300, direction: dx > 0 ? 1 : dx < 0 ? -1 : a.direction }
+            : a
+        );
+      });
+    }, 200);
+    return () => clearInterval(interval);
+  }, []);
 
   // Determine if it's night (0.85 to 0.15 range) and play an occasional owl hoot while dark
   const owlTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4904,6 +5100,17 @@ export default function IsometricMap() {
                   scale={currentScale}
                   scaleValue={popScale}
                   opacityValue={popOpacity}
+                />
+              )}
+              {/* Farmer task-helper: harvest hint bubble above a ready crop */}
+              {farmerHintBubble.value && (
+                <FarmerHintBubble
+                  key={`hint-${farmerHintBubble.value.col}-${farmerHintBubble.value.row}`}
+                  col={farmerHintBubble.value.col}
+                  row={farmerHintBubble.value.row}
+                  scale={currentScale}
+                  message={farmerHintRef.current?.message || "Harvest karo! 🌾"}
+                  opacityValue={farmerHintBubble}
                 />
               )}
             </Animated.View>
