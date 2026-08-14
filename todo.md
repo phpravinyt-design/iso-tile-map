@@ -475,3 +475,7 @@
 - [x] Locked badge tooltips: tap/press a locked badge to show an unlock hint (exact unlock path + live progress, auto-hides after 4.5s with gold border highlight + light haptic)
 - [x] Badge registry entries include unlockHint per badge; progress derived from lifetimeStats (coins/harvests/orders), playerLevel, streakLevel, weeklyProgress length, mega count
 - [x] Verify: tsc clean, 53 tests passing, render check
+
+## Next Up Badge Highlight
+- [x] Compute next-achievable locked badge by progress ratio (weekly quest days/7, mega count, level, coins, harvests, orders, streak) and pin it at top of Badge Wall as a gold "Next Up ⭐" card with hint + live progress bar + %
+- [x] Verify: tsc clean, 53 tests passing, render check

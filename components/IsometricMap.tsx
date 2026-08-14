@@ -6708,6 +6708,41 @@ export default function IsometricMap() {
           {/* Achievement Badge Wall: permanent record of earned mega-quests & milestones */}
           <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: "#3a3a3a", paddingTop: 8 }}>
             <Text style={{ color: "#FFD700", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>🏅 Badge Wall ({earnedAchievements.length}/{ACHIEVEMENT_DEFS.length})</Text>
+
+            {/* Next Up: pinned highlight of the locked badge closest to unlocking */}
+            {(() => {
+              const megaCount = earnedAchievements.filter((a) => /^mega_\d+$/.test(a.id)).length;
+              const ratioOf = (def: AchievementDef): number => {
+                if (def.id === "coins_5000") return Math.min(lifetimeStats.coinsEarned / 5000, 1);
+                if (def.id === "harvest_100") return Math.min(lifetimeStats.cropsHarvested / 100, 1);
+                if (def.id === "order_25") return Math.min(lifetimeStats.ordersDelivered / 25, 1);
+                if (def.id === "level_5") return Math.min(playerLevel / 5, 1);
+                if (def.id === "level_10") return Math.min(playerLevel / 10, 1);
+                if (def.id === "streak_3") return Math.min(streakLevel / 3, 1);
+                if (def.id === "mega_5") return Math.min(megaCount / 5, 1);
+                if (def.id === "mega_10") return Math.min(megaCount / 10, 1);
+                if (def.id === "first_mega") return Math.min((weeklyProgress.length || 0) / 7, 1);
+                return 0; // golden_harvest: no tracked progress, starts at 0
+              };
+              const nextUp = ACHIEVEMENT_DEFS.filter((d) => !earnedAchievements.some((a) => a.id === d.id))
+                .map((d) => ({ def: d, ratio: ratioOf(d) }))
+                .sort((a, b) => b.ratio - a.ratio)[0];
+              if (!nextUp) return null;
+              return (
+                <View style={{ marginTop: 6, borderRadius: 10, borderWidth: 1, borderColor: "#FFD700", backgroundColor: "rgba(255, 215, 0, 0.12)", padding: 8, flexDirection: "row", alignItems: "center" }}>
+                  <Text style={{ fontSize: 22, lineHeight: 26 }}>{nextUp.def.emoji}</Text>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={{ color: "#FFD700", fontSize: 10.5, fontWeight: "bold", lineHeight: 13 }}>Next Up ⭐ — {nextUp.def.name}</Text>
+                    <Text style={{ color: "#ddd", fontSize: 9, lineHeight: 12 }}>{nextUp.def.unlockHint}</Text>
+                    <View style={{ marginTop: 4, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.12)", overflow: "hidden" }}>
+                      <View style={{ height: 4, width: `${Math.max(nextUp.ratio * 100, 3)}%`, borderRadius: 2, backgroundColor: "#FFD700" }} />
+                    </View>
+                  </View>
+                  <Text style={{ color: "#FFD700", fontSize: 10, fontWeight: "bold", lineHeight: 13 }}>{Math.round(nextUp.ratio * 100)}%</Text>
+                </View>
+              );
+            })()}
+
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
               {ACHIEVEMENT_DEFS.map((def) => {
                 const earned = earnedAchievements.find((a) => a.id === def.id);
