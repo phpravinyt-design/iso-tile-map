@@ -1272,6 +1272,38 @@ const INDUSTRY_SOURCES: Record<string, any> = {
   tech_factory: INDUSTRY_TECH_PNG,
 };
 
+// Industry production data (Goathed-style popup, shared with farm production system)
+// Each factory produces one or more goods over time; left/right arrows cycle products.
+const INDUSTRY_PRODUCTIONS: Record<string, FarmProduction> = {
+  steel_factory: { title: "STEEL FACTORY", products: [
+    { label: "Steel", emoji: "\u2699\uFE0F", goods: "\u2699\uFE0F \u2699\uFE0F \u2699\uFE0F \u2699\uFE0F \u2699\uFE0F", readyTimeMs: 45000, rewardCoins: 30, collectLabel: "Steel" },
+  ] },
+  oil_refinery: { title: "OIL REFINERY", products: [
+    { label: "Oil", emoji: "\uD83D\uDEE2\uFE0F", goods: "\uD83D\uDEE2\uFE0F \uD83D\uDEE2\uFE0F \uD83D\uDEE2\uFE0F \uD83D\uDEE2\uFE0F \uD83D\uDEE2\uFE0F", readyTimeMs: 50000, rewardCoins: 35, collectLabel: "Oil" },
+  ] },
+  food_factory: { title: "FOOD FACTORY", products: [
+    { label: "Bread", emoji: "\uD83C\uDF5E", goods: "\uD83C\uDF5E \uD83C\uDF5E \uD83C\uDF5E \uD83C\uDF5E \uD83C\uDF5E", readyTimeMs: 30000, rewardCoins: 22, collectLabel: "Bread" },
+  ] },
+  recycling_plant: { title: "RECYCLING PLANT", products: [
+    { label: "Recycled Goods", emoji: "\u267B\uFE0F", goods: "\u267B\uFE0F \u267B\uFE0F \u267B\uFE0F \u267B\uFE0F \u267B\uFE0F", readyTimeMs: 40000, rewardCoins: 25, collectLabel: "Recycled Goods" },
+  ] },
+  dairy_factory: { title: "DAIRY FACTORY", products: [
+    { label: "Butter", emoji: "\uD83E\uDDC8", goods: "\uD83E\uDDC8 \uD83E\uDDC8 \uD83E\uDDC8 \uD83E\uDDC8 \uD83E\uDDC8", readyTimeMs: 35000, rewardCoins: 25, collectLabel: "Butter" },
+  ] },
+  yarn_factory: { title: "YARN FACTORY", products: [
+    { label: "Yarn", emoji: "\uD83E\uDDF6", goods: "\uD83E\uDDF6 \uD83E\uDDF6 \uD83E\uDDF6 \uD83E\uDDF6 \uD83E\uDDF6", readyTimeMs: 35000, rewardCoins: 25, collectLabel: "Yarn" },
+  ] },
+  chemical_plant: { title: "CHEMICAL PLANT", products: [
+    { label: "Chemicals", emoji: "\uD83E\uDDEA", goods: "\uD83E\uDDEA \uD83E\uDDEA \uD83E\uDDEA \uD83E\uDDEA \uD83E\uDDEA", readyTimeMs: 45000, rewardCoins: 30, collectLabel: "Chemicals" },
+  ] },
+  wood_factory: { title: "WOOD FACTORY", products: [
+    { label: "Wood", emoji: "\uD83E\uDEB5", goods: "\uD83E\uDEB5 \uD83E\uDEB5 \uD83E\uDEB5 \uD83E\uDEB5 \uD83E\uDEB5", readyTimeMs: 30000, rewardCoins: 22, collectLabel: "Wood" },
+  ] },
+  tech_factory: { title: "TECH FACTORY", products: [
+    { label: "Gadgets", emoji: "\uD83D\uDDA5\uFE0F", goods: "\uD83D\uDDA5\uFE0F \uD83D\uDDA5\uFE0F \uD83D\uDDA5\uFE0F \uD83D\uDDA5\uFE0F \uD83D\uDDA5\uFE0F", readyTimeMs: 50000, rewardCoins: 35, collectLabel: "Gadgets" },
+  ] },
+};
+
 // Industry emoji labels
 const INDUSTRY_EMOJIS: Record<string, string> = {
   steel_factory: "⚙️",
@@ -2891,8 +2923,12 @@ export default function IsometricMap() {
     });
   }, []);
 
+  // Resolve production data for both farm buildings and factories
+  const getProduction = (buildingType: string): FarmProduction | undefined =>
+    FARM_PRODUCTIONS[buildingType] || INDUSTRY_PRODUCTIONS[buildingType];
+
   const openFarmPopup = useCallback((buildingType: string, col: number, row: number) => {
-    const prod = FARM_PRODUCTIONS[buildingType];
+    const prod = getProduction(buildingType);
     if (!prod || !prod.products.length) return;
     loadFarmProd().then((saved: Record<string, any>) => {
       const key = `${row},${col}`;
@@ -2905,7 +2941,7 @@ export default function IsometricMap() {
       farmPopupIntervalRef.current = setInterval(() => {
         setFarmPopup((prev) => {
           if (!prev || !prev.ticking) return prev;
-          const cur = FARM_PRODUCTIONS[prev.buildingType]?.products?.[prev.productIndex];
+          const cur = getProduction(prev.buildingType)?.products?.[prev.productIndex];
           if (!cur) return prev;
           const elapsedNow = Date.now() - prev.startedAt;
           return { ...prev, ready: Math.floor(elapsedNow / cur.readyTimeMs) };
@@ -2926,7 +2962,8 @@ export default function IsometricMap() {
   const collectFarmGoods = useCallback(() => {
     setFarmPopup((prev) => {
       if (!prev || prev.ready <= 0) return prev;
-      const prod = FARM_PRODUCTIONS[prev.buildingType];
+      const prod = getProduction(prev.buildingType);
+      if (!prod) return prev;
       const p = prod.products[prev.productIndex];
       const earned = p.rewardCoins * prev.ready;
       // Add coins
@@ -4113,10 +4150,9 @@ export default function IsometricMap() {
             if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
             return newGrid; // no grid change
           }
-          // Farm production popup: tapping a placed farm building opens the Goathed-style
-          // production popup to cycle products and collect goods (only outside farm placement mode).
-          // In farm mode, tap keeps its existing select/remove toggle behavior.
-          if (mode !== "farm" && tappedBuilding !== "none" && FARM_PRODUCTIONS[tappedBuilding]) {
+          // Farm/industry production popup: tapping a placed farm or factory building opens the
+          // Goathed-style production popup to cycle products and collect goods (outside placement modes).
+          if (mode !== "farm" && mode !== "industry" && tappedBuilding !== "none" && (FARM_PRODUCTIONS[tappedBuilding] || INDUSTRY_PRODUCTIONS[tappedBuilding])) {
             openFarmPopup(tappedBuilding, col, row);
             return newGrid; // no grid change
           }
@@ -6061,10 +6097,13 @@ export default function IsometricMap() {
 
       {/* Farm Production Popup (Goathed-style: tap a placed farm building) */}
       {farmPopup && (() => {
-        const prod = FARM_PRODUCTIONS[farmPopup.buildingType];
+        const prod = getProduction(farmPopup.buildingType);
         if (!prod) return null;
         const p = prod.products[farmPopup.productIndex];
-        const imgSrc = (FARM_SOURCES as any)[farmPopup.buildingType] ?? null;
+        const imgSrc =
+          ((FARM_SOURCES as any)[farmPopup.buildingType] as any) ??
+          ((INDUSTRY_SOURCES as any)[farmPopup.buildingType] as any) ??
+          null;
         return (
           <>
             <TouchableOpacity
@@ -6074,7 +6113,7 @@ export default function IsometricMap() {
             />
             <View style={chatStyles.panel}>
               <View style={chatStyles.panelHeader}>
-                <Text style={chatStyles.panelTitle}>🏠 {prod.title}</Text>
+                <Text style={chatStyles.panelTitle}>{INDUSTRY_PRODUCTIONS[farmPopup.buildingType] ? "🏭" : "🏠"} {prod.title}</Text>
                 <TouchableOpacity
                   style={chatStyles.closeBtn}
                   onPress={() => closeFarmPopup()}

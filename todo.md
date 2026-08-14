@@ -384,3 +384,12 @@
 ## Fix Industry (Factory) Button
 - [x] Diagnose: root cause was missing dedicated render branch — industry types fell back to TOWN_HALL_PNG via PngCommunityGeneric's source chain
 - [x] Fix: added PngIndustryGeneric renderer using INDUSTRY_SOURCES + dedicated BuildingOnTile dispatch (placed before FARM_SOURCES check), plus INDUSTRY_SOURCES/FARM_SOURCES fallback in move-clipboard preview chain; verified end-to-end in browser (industry selector opens, factory selection, tile placement, coin deduction, correct PNG rendering), tsc clean, 14 tests passing
+
+## Factory Production Mode
+- [x] Define INDUSTRY_PRODUCTIONS data (9 factories, each with goods label/emoji, readyTimeMs, rewardCoins, collectLabel)
+- [x] Reuse the existing farm production progress system for factories via getProduction() resolver + shared FARM_PROD_KEY "row,col" persistence
+- [x] Tapping a placed factory outside factory placement mode opens the Goathed-style production popup (mode!=="industry" guard added)
+- [x] Factory popup shows: title bar with 🏭 icon, ✕ close, ◀/▶ product arrows, goods emoji strip, factory PNG image, batch time/coin info, Collect button with ready-count badge
+- [x] Collect adds coins + backpack goods, resets per-cell production timer, persisted via AsyncStorage
+- [x] Live ready counter ticks every second for factories too
+- [x] 4 new vitest tests (data completeness for all 9 factories, timer/reward sanity, ready math, multi-batch collect math); tsc clean, 18 tests passing, render verified
