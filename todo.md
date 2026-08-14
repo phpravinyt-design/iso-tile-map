@@ -489,3 +489,7 @@
 - [x] Show a toast with the unlocked badge's emoji + name during the confetti animation (gold chip, slide-down + scale-in, auto-dismiss after ~3s matching confetti)
 - [x] Wire it into the Next Up celebration effect (badge def carried in confetti state + badgeUnlockToast state)
 - [x] Verify: tsc clean, 53 tests passing, render check
+
+## Toast with Badge Description
+- [x] Toast shows badge name on the first line and the badge's short description underneath (badgeUnlockDesc state, smaller muted-gold subtitle, center-aligned)
+- [x] Verify: tsc clean, 53 tests passing, render check
