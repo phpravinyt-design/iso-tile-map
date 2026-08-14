@@ -293,3 +293,9 @@
 - [x] Play a subtle synthesized placement "pop" sound (Web Audio API, no external file) on web; light haptic on native
 - [x] Animation/sound only on NEW placements (buildings, roads, crops, farmland); free remove/toggle/corner rotation not triggered
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Removal Dust Cloud + Sound
+- [x] When an item is removed from the map (5s pickup removal, free toggle-off in all modes, road/grass-overlay removal), show a brief 💨 dust cloud puff at the tile (expand + fade ~500ms)
+- [x] Play a distinct whoosh-style removal sound (sawtooth 220→90Hz, different from the placement pop) via Web Audio API; Medium haptic on native
+- [x] Dust/sound only on actual removals; placement keeps the sparkle pop
+- [x] Verify TypeScript clean, 6 tests passing, app renders

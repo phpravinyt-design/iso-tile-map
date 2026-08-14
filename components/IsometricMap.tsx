@@ -1493,6 +1493,47 @@ function PlacePop({
   );
 }
 
+// --- Dust Cloud: puff-of-dust animation at a removed tile ---
+function DustCloud({
+  col,
+  row,
+  scale,
+  scaleValue,
+  opacityValue,
+}: {
+  col: number;
+  row: number;
+  scale: number;
+  scaleValue: SharedValue<number>;
+  opacityValue: SharedValue<number>;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scaleValue.value }],
+    opacity: opacityValue.value,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - ts / 2,
+        top: pos.y - ts / 2,
+        width: ts,
+        height: ts,
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 120,
+        ...animStyle,
+      }}
+    >
+      <Text style={{ fontSize: ts * 0.75, lineHeight: ts }}>💨</Text>
+    </Animated.View>
+  );
+}
+
 // --- Claim Pop: same bounce + sparkle celebration, centered on screen (for task reward claims) ---
 function ClaimPop({
   dims,
@@ -2225,6 +2266,55 @@ export default function IsometricMap() {
       // audio/haptics unavailable, ignore
     }
   }, []);
+  // --- Removal dust cloud + distinct sound ---
+  const dustScale = useSharedValue(0);
+  const dustOpacity = useSharedValue(0);
+  const [dustPos, setDustPos] = useState<{ col: number; row: number } | null>(null);
+  const playRemovalSound = useCallback(() => {
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        // Deeper whoosh-style sound distinct from the placement pop
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.32);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, []);
+  const triggerRemovalDustAnimation = useCallback((col: number, row: number) => {
+    playRemovalSound();
+    setDustPos({ col, row });
+    dustOpacity.value = 1;
+    dustScale.value = withSequence(
+      withTiming(0.5, { duration: 60, easing: Easing.in(Easing.cubic) }),
+      withTiming(1.25, { duration: 260, easing: Easing.out(Easing.back(1.2)) })
+    );
+    dustOpacity.value = withDelay(240, withTiming(0, { duration: 200 }));
+    setTimeout(() => {
+      setDustPos(null);
+    }, 520);
+  }, [dustOpacity, dustScale, playRemovalSound]);
+
   const triggerPlacePopAnimation = useCallback((col: number, row: number) => {
     playPlaceSound();
     setPlacePopPos({ col, row });
@@ -2237,7 +2327,7 @@ export default function IsometricMap() {
     setTimeout(() => {
       setPlacePopPos(null);
     }, 550);
-  }, [placePopOpacity, placePopScale, playPlaceSound]);
+  }, [placePopOpacity, placePopScale, playPlaceSound, audioCtxRef]);
   const screenDims = useMemo(() => Dimensions.get("window"), []);
   const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
   const [isItemPress, setIsItemPress] = useState(false);
@@ -2749,6 +2839,7 @@ export default function IsometricMap() {
 
   // Handle long press to pick up (cut) building/object for moving
   const handleRemoveBuilding = useCallback((col: number, row: number) => {
+    let removedFlag = false;
     setGrid((prev) => {
       const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
       if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
@@ -2758,15 +2849,18 @@ export default function IsometricMap() {
           setMoveClipboard({ type: "building", buildingType: cell.building, origCol: col, origRow: row });
           setPickupMessage("Item picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].building = "none";
+          removedFlag = true;
         } else if (cell.roadOverlay) {
           setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation, origCol: col, origRow: row });
           setPickupMessage("Road picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].roadOverlay = null;
           newGrid[row][col].roadRotation = 0;
+          removedFlag = true;
         } else if (cell.grassOverlay) {
           setMoveClipboard({ type: "grass", origCol: col, origRow: row });
           setPickupMessage("Decoration picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].grassOverlay = false;
+          removedFlag = true;
         } else {
           // Tapping elsewhere while holding cancels the picked item
           setMoveClipboard(null);
@@ -2781,7 +2875,9 @@ export default function IsometricMap() {
       }
       return newGrid;
     });
-  }, []);
+    // Dust cloud + distinct whoosh sound whenever an item actually leaves the map
+    if (removedFlag) triggerRemovalDustAnimation(col, row);
+  }, [triggerRemovalDustAnimation]);
 
   // Cancel the long-press progress timer (on release / pan start)
   const cancelPressTimer = useCallback(() => {
@@ -2980,6 +3076,9 @@ export default function IsometricMap() {
             if (newGrid[row][col].grassOverlay) {
               if (coins < ITEM_COST) flashLowCoins();
               setCoins((c) => Math.max(0, c - ITEM_COST));
+            } else {
+              // Grass overlay removed — dust cloud + whoosh
+              triggerRemovalDustAnimation(col, row);
             }
           } else if (mode === "road") {
             // Road mode: road PNG overlays ON grass tile (grass stays underneath)
@@ -2988,6 +3087,8 @@ export default function IsometricMap() {
             if (newGrid[row][col].roadOverlay === roadToPlace && roadToPlace !== "road_corner") {
               newGrid[row][col].roadOverlay = null;
               newGrid[row][col].roadRotation = 0;
+              // Dust cloud + whoosh on road removal (toggle off)
+              triggerRemovalDustAnimation(col, row);
             } else if (newGrid[row][col].roadOverlay === roadToPlace && roadToPlace === "road_corner") {
               // Rotate corner by 90 degrees
               newGrid[row][col].roadRotation = (newGrid[row][col].roadRotation + 90) % 360;
@@ -3052,11 +3153,13 @@ export default function IsometricMap() {
               // Clear road overlay if placing a building on top
               newGrid[row][col].roadOverlay = null;
               let placedNewBuilding = false;
+              let removedItem = false;
               if (mode === "community") {
                 // Community building mode: use selectedCommunityType (the user's chosen community building)
                 const buildingToPlace = selectedCommunityType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3065,6 +3168,7 @@ export default function IsometricMap() {
               } else if (mode === "town_market") {
                 if (currentBuilding === "town_market") {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = "town_market";
                   newGrid[row][col].flipped = mirrorMode;
@@ -3075,6 +3179,7 @@ export default function IsometricMap() {
                 const buildingToPlace = selectedTempleType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3085,6 +3190,7 @@ export default function IsometricMap() {
                 const buildingToPlace = selectedDecorationType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3095,6 +3201,7 @@ export default function IsometricMap() {
                 const buildingToPlace = selectedIndustryType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3105,6 +3212,7 @@ export default function IsometricMap() {
                 const buildingToPlace = selectedFarmType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3114,6 +3222,7 @@ export default function IsometricMap() {
                 // Tree mode: place the user's selected tree type
                 if (currentBuilding === selectedTreeType) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = selectedTreeType;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3124,6 +3233,7 @@ export default function IsometricMap() {
                 const buildingToPlace = selectedHouseType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
+                  removedItem = true;
                 } else {
                   newGrid[row][col].building = buildingToPlace;
                   newGrid[row][col].flipped = mirrorMode;
@@ -3136,6 +3246,9 @@ export default function IsometricMap() {
                 setCoins((c) => Math.max(0, c - ITEM_COST));
                 // Celebration pop + subtle sound on successful new placement
                 triggerPlacePopAnimation(col, row);
+              } else if (removedItem) {
+                // Dust cloud + distinct whoosh sound on free removal (toggle off)
+                triggerRemovalDustAnimation(col, row);
               }
             }
           }
@@ -3145,7 +3258,7 @@ export default function IsometricMap() {
       // Daily tasks: refresh progress against the new grid (after placement)
       advanceDailyTasks();
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode, triggerPlacePopAnimation]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode, triggerPlacePopAnimation, triggerRemovalDustAnimation]
   );
 
   // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
@@ -3862,6 +3975,17 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Removal: 💨 dust cloud at the tile where an item was removed */}
+      {dustPos ? (
+        <DustCloud
+          key={`dust-${dustPos.col}-${dustPos.row}`}
+          col={dustPos.col}
+          row={dustPos.row}
+          scale={currentScale}
+          scaleValue={dustScale}
+          opacityValue={dustOpacity}
+        />
+      ) : null}
       {/* Claim celebration: same ✨ pop used for pickup, centered on screen for task claims */}
       {placePopPos ? (
         <PlacePop
