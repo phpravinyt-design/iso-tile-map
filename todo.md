@@ -355,3 +355,8 @@
 - [x] Birds hide during rain (fade out over 0.8s, stop rendering) and return when weather clears; cloudy = calmer, lower-amplitude flight
 - [x] Butterflies/bees are at full cast (5) in sunny weather, reduced (3) in cloudy, and 0 in rain; wildlife opacity fades smoothly (0.8s) on weather change
 - [x] Wired into the existing weather system state (sunny/cloudy/rainy), not random; TypeScript clean, 14 tests passing
+
+## Animal Playful Chase
+- [x] Occasional playful chase: one animal (chaser, e.g. 🐕 dog) runs straight at another (chasee, e.g. 🐔) at 3x speed while the chasee darts away at 2x; chase lasts ~3.5s
+- [x] Triggers every ~20-40s randomly; skipped during rain and item placement (cooldown ticks slower, resumes after); ends gracefully — both animals return to normal wandering with an idle beat
+- [x] Chase roles stored on AnimalNpcState (chaseRole/chaseTargetId/chaseEndsAt) and reused by the existing movement tick; TypeScript clean, 14 tests passing, render verified

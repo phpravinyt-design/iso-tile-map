@@ -212,6 +212,10 @@ interface AnimalNpcState {
   targetY: number;
   idleUntil: number;
   direction: 1 | -1;
+  // Playful chase state: "chaser" runs toward chaseTarget, "chasee" darts away
+  chaseRole?: "chaser" | "chasee";
+  chaseTargetId?: number; // id of the other animal involved
+  chaseEndsAt?: number;
 }
 
 // Vehicle NPC state - only moves on placed roads
@@ -3266,6 +3270,8 @@ export default function IsometricMap() {
 
   // --- Animal NPCs ---
   const animalTypes: AnimalNpcState["type"][] = ["cow", "chicken", "dog"];
+  // Playful chase: triggered occasionally; one animal chases another for a few seconds
+  const chaseCooldownRef = useRef(20000 + Math.random() * 15000);
   const [animals, setAnimals] = useState<AnimalNpcState[]>(() => {
     const initial: AnimalNpcState[] = [];
     for (let i = 0; i < ANIMAL_COUNT; i++) {
@@ -3433,9 +3439,40 @@ export default function IsometricMap() {
         });
       });
 
+      // Playful chase trigger: only during day, clear of rain/placement, with 2+ animals
+      const placementActive = tappedFarmlandPos !== null;
+      if (!placementActive && !isNight && !isRainyNow) {
+        chaseCooldownRef.current -= 100;
+        if (chaseCooldownRef.current <= 0) {
+          chaseCooldownRef.current = 20000 + Math.random() * 20000;
+          setAnimals((prevAnimals) => {
+            const dayAnimals = prevAnimals.filter((a) => !a.chaseRole);
+            if (dayAnimals.length < 2) return prevAnimals;
+            const chaserIdx = Math.floor(Math.random() * dayAnimals.length);
+            const chaseeIdx = (chaserIdx + 1 + Math.floor(Math.random() * (dayAnimals.length - 1))) % dayAnimals.length;
+            const chaser = dayAnimals[chaserIdx];
+            const chasee = dayAnimals[chaseeIdx];
+            const endsAt = Date.now() + 3500;
+            return prevAnimals.map((a) => {
+              if (a.id === chaser.id) return { ...a, chaseRole: "chaser", chaseTargetId: chasee.id, chaseEndsAt: endsAt };
+              if (a.id === chasee.id) return { ...a, chaseRole: "chasee", chaseTargetId: chaser.id, chaseEndsAt: endsAt };
+              return a;
+            });
+          });
+        }
+      } else {
+        // Placement/rain simply delay the chase cooldown
+        chaseCooldownRef.current -= 50;
+        if (chaseCooldownRef.current < 0) chaseCooldownRef.current = 0;
+      }
+
       // Update animal NPCs
       setAnimals((prevAnimals) => {
         return prevAnimals.map((animal) => {
+          // End chase when time's up
+          if (animal.chaseRole && animal.chaseEndsAt && now >= animal.chaseEndsAt) {
+            return { ...animal, chaseRole: undefined, chaseTargetId: undefined, chaseEndsAt: undefined, idleUntil: now + ANIMAL_IDLE_TIME };
+          }
           if (now < animal.idleUntil) return animal;
           const dx = animal.targetX - animal.x;
           const dy = animal.targetY - animal.y;
@@ -3444,6 +3481,10 @@ export default function IsometricMap() {
             // Animals stay put at night, only wander during day
             if (isNight) {
               return { ...animal, idleUntil: now + 5000 };
+            }
+            if (animal.chaseRole === "chaser") {
+              // Chaser that has caught up keeps its target in range by idling briefly (chasee will dart away)
+              return { ...animal, idleUntil: now + 400 };
             }
             const target = pickRandomWalkableTile(grid, animal.x, animal.y);
             if (target) {
@@ -3461,9 +3502,28 @@ export default function IsometricMap() {
           if (isRainyNow) {
             return { ...animal, idleUntil: now + 10000 };
           }
-          const speed = ANIMAL_WALK_SPEED * 0.1;
-          const moveX = (dx / dist) * speed;
-          const moveY = (dy / dist) * speed;
+          let speed = ANIMAL_WALK_SPEED * 0.1;
+          let chaseeDartX = dx;
+          let chaseeDartY = dy;
+          if (animal.chaseRole) {
+            const other = prevAnimals.find((a) => a.id === animal.chaseTargetId);
+            if (!other) {
+              return { ...animal, chaseRole: undefined, chaseTargetId: undefined, chaseEndsAt: undefined };
+            }
+            if (animal.chaseRole === "chaser") {
+              // Chase: run straight at the chasee at 3x speed
+              speed = ANIMAL_WALK_SPEED * 0.3;
+              chaseeDartX = other.x - animal.x;
+              chaseeDartY = other.y - animal.y;
+            } else {
+              // Chasee: dart away from the chaser at 2x speed
+              speed = ANIMAL_WALK_SPEED * 0.2;
+              chaseeDartX = animal.x - other.x;
+              chaseeDartY = animal.y - other.y;
+            }
+          }
+          const moveX = (chaseeDartX / dist) * speed;
+          const moveY = (chaseeDartY / dist) * speed;
           return {
             ...animal,
             x: animal.x + moveX,
@@ -3474,7 +3534,7 @@ export default function IsometricMap() {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [grid, timeOfDay, isNight, nearestBuilding, weather]);
+  }, [grid, timeOfDay, isNight, nearestBuilding, weather, tappedFarmlandPos]);
 
   // Mirrored cursor preview (web): track pointer position for the preview overlay
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
