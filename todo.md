@@ -315,3 +315,11 @@
 - [x] Collect button gathers produced goods (adds to inventory/coins) and updates the counter; production timers persist per cell via AsyncStorage (FARM_PROD_KEY)
 - [x] Popup closes via × button or backdrop tap (reuses the chat panel slide styles)
 - [x] Popup only opens outside farm placement mode; in farm mode tap keeps select/remove behavior; TypeScript clean, tests passing, app renders verified
+
+## Orders Board (NPC Customer Orders)
+- [x] Order data model: NPC customers (existing chat characters) request goods from backpack labels (crops/farm goods) with quantity 1-3 and coin rewards (premium over sell value)
+- [x] Orders generated daily (deterministic per-day, 3 orders via loop-free hash shuffle), persisted via AsyncStorage (orders_v1 + orders_date) with claim state
+- [x] Orders board UI: 📌 Orders button in toolbar opens a panel listing NPC orders with avatar, name/title, requested goods, progress (have/want), reward, and Deliver & Collect button when fulfilled
+- [x] Fulfill logic: tapping Deliver & Collect deducts goods from backpack (crops + farm goods), grants coin reward + success banner
+- [x] Shows pending "Need more goods…" state (disabled greyed button); delivered orders show ✅ Delivered!
+- [x] 8 new vitest cases covering generation, determinism, distinct goods/NPCs, fulfillment math, insufficient-stock blocking; TypeScript clean, 14 tests passing, app renders verified

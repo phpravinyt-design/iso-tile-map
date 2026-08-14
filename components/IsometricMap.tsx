@@ -581,6 +581,99 @@ function getCropSellPrice(cropType: CropType): number {
   return CROP_SELL_PRICES[cropType] || 10;
 }
 
+// ---------- Orders Board (NPC customer orders) ----------
+type OrderGoods = { label: string; emoji: string; baseValue: number };
+// Pool of goods NPCs can request: crops (harvested vegetables) + farm products.
+// baseValue is the coins a single unit is worth when sold by NPC (premium over sell price).
+const ORDER_GOODS: OrderGoods[] = [
+  { label: "🍅 Tomato", emoji: "🍅", baseValue: 12 },
+  { label: "🥕 Carrot", emoji: "🥕", baseValue: 8 },
+  { label: "🥔 Potato", emoji: "🥔", baseValue: 9 },
+  { label: "🌾 Wheat", emoji: "🌾", baseValue: 10 },
+  { label: "🌽 Corn", emoji: "🌽", baseValue: 11 },
+  { label: "🍓 Strawberry", emoji: "🍓", baseValue: 15 },
+  { label: "🥒 Cucumber", emoji: "🥒", baseValue: 12 },
+  { label: "🌶️ Chili", emoji: "🌶️", baseValue: 15 },
+  { label: "🥦 Broccoli", emoji: "🥦", baseValue: 20 },
+  { label: "🍉 Watermelon", emoji: "🍉", baseValue: 30 },
+  { label: "🧄 Garlic", emoji: "🧄", baseValue: 10 },
+  { label: "🍄 Mushroom", emoji: "🍄‍🟫", baseValue: 17 },
+  { label: "🥚 Eggs", emoji: "🥚", baseValue: 14 },
+  { label: "🐑 Wool", emoji: "🐑", baseValue: 18 },
+  { label: "🥛 Milk", emoji: "🥛", baseValue: 24 },
+  { label: "🧀 Cheese", emoji: "🧀", baseValue: 30 },
+  { label: "🐟 Fish", emoji: "🐟", baseValue: 18 },
+  { label: "🍯 Honey", emoji: "🍯", baseValue: 22 },
+];
+// Map order label keys to backpack keys
+function orderLabelToBackpackKey(label: string): string {
+  // Order labels are "🍅 Tomato" → backpack key "Tomato"; crops are stored as crop type
+  // strings like "crop_tomato" while farm goods use their collectLabel (e.g. "Wool").
+  const words = label.trim().split(" ");
+  return words.slice(1).join(" ");
+}
+type OrderNpc = { npcType: string; sprite: any; name: string; title: string };
+function getOrderNpcs(): OrderNpc[] {
+  // Lazy accessor so NPC sprite constants (defined later in the file) are initialized.
+  return [
+    { npcType: "market", sprite: NPC_FARMER_BIG_PNG, name: "Farmer Balram", title: "Market Vendor" },
+    { npcType: "hospital", sprite: NPC_DOCTOR_PNG, name: "Dr. Sharma", title: "Doctor" },
+    { npcType: "train_station", sprite: NPC_CHEF_PNG, name: "Chef Ravi", title: "Chef" },
+    { npcType: "school", sprite: NPC_TEACHER_PNG, name: "Teacher Neha", title: "Teacher" },
+    { npcType: "library", sprite: NPC_SHOPKEEPER_PNG, name: "Bookshop Aanya", title: "Shopkeeper" },
+    { npcType: "park", sprite: NPC_VET_PNG, name: "Vet Sonali", title: "Vet" },
+    { npcType: "town_hall", sprite: NPC_MAYOR_PNG, name: "Mayor", title: "Mayor" },
+    { npcType: "police_station", sprite: NPC_POLICEWOMAN_PNG, name: "Officer Priya", title: "Officer" },
+    { npcType: "fire_station", sprite: NPC_BUILDER_PNG, name: "Engineer Rohit", title: "Engineer" },
+  ];
+}
+interface OrderBoardItem {
+  id: number;
+  npcIndex: number;
+  goodsLabel: string; // key in ORDER_GOODS
+  quantity: number;
+  rewardCoins: number;
+  claimed: boolean;
+}
+// Deterministic daily shuffle (no loops over retries)
+function orderShuffle<T>(arr: T[], salt: string): T[] {
+  const indices = Array.from({ length: arr.length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = simpleHash(salt + ":" + i) % (i + 1);
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  return indices.map((idx) => arr[idx]);
+}
+const ORDERS_KEY = "orders_v1";
+const ORDERS_DATE_KEY = "orders_date";
+function getTodayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function generateDailyOrders(claimState: Record<string, boolean> = {}): OrderBoardItem[] {
+  // Claim states persist across days for previously generated orders; new day regenerates.
+  const today = getTodayStr();
+  const orders: OrderBoardItem[] = [];
+  const shuffledNpcs = orderShuffle(getOrderNpcs(), today + ":npc");
+  const shuffledGoods = orderShuffle(ORDER_GOODS, today + ":goods");
+  const count = Math.min(3, ORDER_GOODS.length);
+  for (let i = 0; i < count; i += 1) {
+    const goods = shuffledGoods[i];
+    const qty = 1 + (simpleHash(today + ":qty" + i) % 3); // 1-3 units
+    orders.push({
+      id: i,
+      npcIndex: getOrderNpcs().indexOf(shuffledNpcs[i] as OrderNpc),
+      goodsLabel: goods.label,
+      quantity: qty,
+      rewardCoins: qty * goods.baseValue + 25, // premium reward above sell value
+      claimed: claimState[`${i}`] === true,
+    });
+  }
+  return orders;
+}
+
 // Building types (placed ON tiles)
 const BUILDING_TYPES = [
   "house_small", "house_big", "town_market", "none",
@@ -2029,6 +2122,73 @@ export default function IsometricMap() {
   const [showBackpack, setShowBackpack] = useState(false);
   const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
+
+  // --- Orders Board: NPC customers request goods for premium coin rewards ---
+  const [showOrders, setShowOrders] = useState(false);
+  const [orders, setOrders] = useState<OrderBoardItem[]>(() => generateDailyOrders());
+  const [orderRewardBanner, setOrderRewardBanner] = useState<string | null>(null);
+  const orderRewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Load persisted orders; regenerate on a new day
+  useEffect(() => {
+    AsyncStorage.multiGet([ORDERS_KEY, ORDERS_DATE_KEY]).then(([ordersEntry, dateEntry]) => {
+      const savedDate = dateEntry?.[1];
+      const today = getTodayStr();
+      if (savedDate === today && ordersEntry?.[1]) {
+        try {
+          const parsed = JSON.parse(ordersEntry[1]) as OrderBoardItem[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders(parsed);
+            return;
+          }
+        } catch {}
+      }
+      // New day (or nothing saved) — generate fresh orders
+      const fresh = generateDailyOrders();
+      setOrders(fresh);
+      AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(fresh)).catch(() => {});
+      AsyncStorage.setItem(ORDERS_DATE_KEY, today).catch(() => {});
+    });
+  }, []);
+  const saveOrders = useCallback((next: OrderBoardItem[]) => {
+    setOrders(next);
+    AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+  const fulfillOrder = useCallback((orderId: number) => {
+    setOrders((prev) => {
+      const order = prev.find((o) => o.id === orderId);
+      if (!order || order.claimed) return prev;
+      const goods = ORDER_GOODS.find((g) => g.label === order.goodsLabel);
+      if (!goods) return prev;
+      // Backpack stores farm goods by collectLabel ("Wool", "Eggs") and crops by crop type
+      // ("crop_tomato"). Resolve which key to consume.
+      const requestedName = orderLabelToBackpackKey(order.goodsLabel);
+      const cropKey = (CROP_TYPES as readonly string[]).find((ct) => CROP_EMOJIS[ct] === goods.emoji);
+      const haveFromFarm = harvestedItems[requestedName] || 0;
+      const haveFromCrop = cropKey ? harvestedItems[cropKey] || 0 : 0;
+      const haveTotal = haveFromFarm + haveFromCrop;
+      if (haveTotal < order.quantity) return prev; // not enough goods yet
+      const updated = { ...harvestedItems };
+      let remaining = order.quantity;
+      if (cropKey && updated[cropKey]) {
+        const take = Math.min(remaining, updated[cropKey]);
+        updated[cropKey] -= take;
+        if (updated[cropKey] <= 0) delete updated[cropKey];
+        remaining -= take;
+      }
+      if (remaining > 0 && updated[requestedName]) {
+        updated[requestedName] -= remaining;
+        if (updated[requestedName] <= 0) delete updated[requestedName];
+      }
+      saveBackpack(updated);
+      setCoins((c) => c + order.rewardCoins);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const npc = getOrderNpcs()[order.npcIndex];
+      setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
+      if (orderRewardTimer.current) clearTimeout(orderRewardTimer.current);
+      orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
+      return prev.map((o) => (o.id === orderId ? { ...o, claimed: true } : o));
+    });
+  }, [harvestedItems]);
   const lowCoinsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const harvestAllMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Persist backpack
@@ -4140,6 +4300,84 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Orders Board panel (shown when 📌 Orders button is tapped) */}
+      {showOrders && (
+        <View style={styles.profilePanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>📌 Orders Board</Text>
+            <TouchableOpacity onPress={() => setShowOrders(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.ordersSubTitle}>NPC customers want your goods — deliver for premium coins!</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingVertical: 8, gap: 10, paddingHorizontal: 4 }}
+          >
+            {orders.map((o) => {
+              const npc = getOrderNpcs()[o.npcIndex];
+              const goods = ORDER_GOODS.find((g) => g.label === o.goodsLabel);
+              const requestedName = orderLabelToBackpackKey(o.goodsLabel);
+              const cropKey = (CROP_TYPES as readonly string[]).find((ct) => CROP_EMOJIS[ct] === goods?.emoji);
+              const have = (harvestedItems[cropKey || ""] || 0) + (harvestedItems[requestedName] || 0);
+              const fulfilled = have >= o.quantity;
+              return (
+                <View
+                  key={o.id}
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.12)",
+                    borderRadius: 16,
+                    padding: 12,
+                    minWidth: 220,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: o.claimed ? "rgba(255,255,255,0.15)" : fulfilled ? "#4CAF50" : "rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <Image source={npc.sprite} style={{ width: 48, height: 48, resizeMode: "contain", marginBottom: 4 }} />
+                  <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700", lineHeight: 18 }}>{npc.name}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, lineHeight: 15, marginTop: 1 }}>{npc.title}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, backgroundColor: "rgba(0,0,0,0.25)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 22, lineHeight: 28 }}>{goods?.emoji}</Text>
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginLeft: 6, lineHeight: 19 }}>
+                      {have}/{o.quantity} {goods ? goods.label.split(" ").slice(1).join(" ") : ""}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+                    <Text style={{ fontSize: 16, lineHeight: 22 }}>🪙</Text>
+                    <Text style={{ color: "#FFD166", fontSize: 15, fontWeight: "700", marginLeft: 4, lineHeight: 20 }}>+{o.rewardCoins}</Text>
+                  </View>
+                  {o.claimed ? (
+                    <View style={{ backgroundColor: "rgba(76,175,80,0.25)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8 }}>
+                      <Text style={{ color: "#8FD98F", fontSize: 12, fontWeight: "700", lineHeight: 16 }}>✅ Delivered!</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => fulfillOrder(o.id)}
+                      disabled={!fulfilled}
+                      style={{
+                        backgroundColor: fulfilled ? "#FF9800" : "rgba(255,255,255,0.15)",
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 6,
+                        marginTop: 8,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ color: fulfilled ? "#fff" : "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: "700", lineHeight: 17 }}>
+                        {fulfilled ? "Deliver & Collect 🚚" : "Need more goods…"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.ordersHint}>💡 Tip: Harvest crops and collect farm goods, then deliver to earn premium coins. Orders refresh daily!</Text>
+        </View>
+      )}
+
       {/* Removal: 💨 dust cloud at the tile where an item was removed */}
       {dustPos ? (
         <DustCloud
@@ -4170,6 +4408,13 @@ export default function IsometricMap() {
       {showTaskReward && (
         <View style={styles.taskRewardMsg}>
           <Text style={styles.taskRewardMsgText}>🏆 {taskRewardMessage}</Text>
+        </View>
+      )}
+
+      {/* Orders Board reward banner: brief flash when an order is delivered */}
+      {orderRewardBanner && (
+        <View style={styles.taskRewardMsg}>
+          <Text style={styles.taskRewardMsgText}>{orderRewardBanner}</Text>
         </View>
       )}
 
@@ -4352,6 +4597,15 @@ export default function IsometricMap() {
         >
           <Text style={[styles.profileButtonIcon, showBackpack && styles.profileButtonIconActive]}>🎒</Text>
           <Text style={styles.profileCoinText}>{Object.values(harvestedItems).reduce((a, b) => a + b, 0)}</Text>
+        </TouchableOpacity>
+        {/* Orders Board button - NPC customers request goods for coins */}
+        <TouchableOpacity
+          style={[styles.profileButton, showOrders && styles.profileButtonActive]}
+          onPress={() => { setShowOrders(!showOrders); setShowProfile(false); setShowTasks(false); setShowBackpack(false); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, showOrders && styles.profileButtonIconActive]}>📌</Text>
+          <Text style={styles.profileCoinText}>Orders</Text>
         </TouchableOpacity>
         {/* Harvest All button - collects all fully grown crops at once */}
         <TouchableOpacity
@@ -5608,6 +5862,22 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   tasksHint: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 6,
+  },
+  ordersSubTitle: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 2,
+    marginBottom: 4,
+    paddingHorizontal: 8,
+  },
+  ordersHint: {
     color: "rgba(255,255,255,0.55)",
     fontSize: 11,
     lineHeight: 15,
