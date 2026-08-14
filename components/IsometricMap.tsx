@@ -419,6 +419,36 @@ function DeliveryNpcSprite({ delivery, scale }: { delivery: DeliveryState; scale
           <Text style={{ fontSize: 18, lineHeight: 24 }}>📦</Text>
         </View>
       )}
+      {/* Coin float: "+{coins} 🪙" rises above the NPC during pickup and fades out */}
+      {showEmoji && (
+        <View
+          style={{
+            position: "absolute",
+            top: -20 - thanksProgress * 22, // rises 22px over pickup
+            left: npcSize / 2 - 28,
+            width: 56,
+            alignItems: "center",
+            opacity: Math.max(0, 1 - thanksProgress * 1.25), // fades out as pickup ends
+            transform: [{ scaleX: 1 }, { scale: 0.9 + thanksProgress * 0.15 }],
+          }}
+        >
+          <Text
+            style={{
+              color: "#FFC107",
+              fontSize: 13,
+              fontWeight: "800",
+              lineHeight: 18,
+              textAlign: "center",
+              textShadowColor: "rgba(0,0,0,0.25)",
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 2,
+            }}
+          >
+            +{delivery.rewardCoins} 🪙
+          </Text>
+        </View>
+      )}
+
       {/* Thank-you dialogue bubble above the NPC during pickup */}
       {thanks && (
         <View
@@ -784,6 +814,8 @@ interface DeliveryState {
   spot: { x: number; y: number };
   step: DeliveryStep;
   startedAt: number;
+  rewardCoins: number; // coins granted by this delivery (for the float animation)
+  goodsLabel: string; // requested goods label (e.g. "Eggs")
 }
 // Deterministic daily shuffle (no loops over retries)
 function orderShuffle<T>(arr: T[], salt: string): T[] {
@@ -2344,9 +2376,9 @@ export default function IsometricMap() {
   }, [grid]);
   const deliveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Run the delivery walk: origin -> delivery spot (pickup pop) -> origin
-  const startNpcDelivery = useCallback((npc: OrderNpc) => {
+  const startNpcDelivery = useCallback((npc: OrderNpc, rewardCoins: number, goodsLabel: string) => {
     const { origin, spot } = findDeliverySpots(npc.npcType);
-    setDelivery({ sprite: npc.sprite, emoji: "📦", origin, spot, step: "toSpot", startedAt: Date.now() });
+    setDelivery({ sprite: npc.sprite, emoji: "📦", origin, spot, step: "toSpot", startedAt: Date.now(), rewardCoins, goodsLabel });
     const toSpotMs = 1200;
     const pickupMs = 700;
     const returnMs = 1200;
@@ -2410,7 +2442,7 @@ export default function IsometricMap() {
       orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
       // Start delivery walk animation: NPC walks from a building spot to a
       // delivery point near their community building, picks up the goods, and returns
-      startNpcDelivery(npc);
+      startNpcDelivery(npc, order.rewardCoins, order.goodsLabel);
       return prev.map((o) => (o.id === orderId ? { ...o, claimed: true } : o));
     });
   }, [harvestedItems]);

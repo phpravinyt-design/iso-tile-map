@@ -340,3 +340,8 @@
 - [x] Play a subtle synthesized chime (sine-wave triplet C5-E5-G5, staggered 110ms apart, soft 0.12 gain) when the NPC receives the goods at the start of the pickup phase
 - [x] Chime respects the sound toggle (skipped when off); native fallback uses a Success haptic notification like other SFX; shares the same AudioContext helper as placement/removal sounds
 - [x] TypeScript clean, 14 tests passing
+
+## Delivery Coin Float Animation
+- [x] During delivery pickup, a "+{rewardCoins} 🪙" gold text floats above the NPC, rising 22px and fading out over the pickup phase
+- [x] Float is tied to pickup progress with slight scale-up and dark text shadow; unflipped, appears with the 📦 badge and clears before return walk
+- [x] DeliveryState carries rewardCoins/goodsLabel from fulfillOrder; TypeScript clean, 14 tests passing
