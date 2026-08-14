@@ -3059,19 +3059,21 @@ export default function IsometricMap() {
   const [goldenCropTags, setGoldenCropTags] = useState<Record<string, boolean>>({});
   // ---------- Achievement Badge Wall ----------
   const ACHIEVEMENTS_KEY = "achievement_badges";
-  type AchievementDef = { id: string; emoji: string; name: string; desc: string };
+  type AchievementDef = { id: string; emoji: string; name: string; desc: string; unlockHint: string };
   const ACHIEVEMENT_DEFS: AchievementDef[] = [
-    { id: "first_mega", emoji: "🌟", name: "First Mega-Quest", desc: "Complete your first weekly mega-quest" },
-    { id: "mega_5", emoji: "🏆", name: "Mega Veteran", desc: "Complete 5 weekly mega-quests" },
-    { id: "mega_10", emoji: "👑", name: "Mega Legend", desc: "Complete 10 weekly mega-quests" },
-    { id: "level_5", emoji: "⭐", name: "Rising Star", desc: "Reach level 5" },
-    { id: "level_10", emoji: "🚀", name: "Farm Master", desc: "Reach level 10" },
-    { id: "coins_5000", emoji: "💰", name: "Rich Farmer", desc: "Earn 5,000 total coins" },
-    { id: "harvest_100", emoji: "🌾", name: "Harvest King", desc: "Harvest 100 crops total" },
-    { id: "streak_3", emoji: "🔥", name: "Dedicated Farmer", desc: "Keep a 3-day login streak" },
-    { id: "golden_harvest", emoji: "✨", name: "Golden Touch", desc: "Harvest your first golden wheat" },
-    { id: "order_25", emoji: "📦", name: "Trusted Supplier", desc: "Deliver 25 orders" },
+    { id: "first_mega", emoji: "🌟", name: "First Mega-Quest", desc: "Complete your first weekly mega-quest", unlockHint: "Complete all 3 daily quests every day for 7 days (one full week)" },
+    { id: "mega_5", emoji: "🏆", name: "Mega Veteran", desc: "Complete 5 weekly mega-quests", unlockHint: "Finish 5 weekly mega-quests (keep completing all daily quests each week)" },
+    { id: "mega_10", emoji: "👑", name: "Mega Legend", desc: "Complete 10 weekly mega-quests", unlockHint: "Finish 10 weekly mega-quests — a long-term dedication goal" },
+    { id: "level_5", emoji: "⭐", name: "Rising Star", desc: "Reach level 5", unlockHint: "Earn XP by harvesting, selling, and completing quests to reach Level 5" },
+    { id: "level_10", emoji: "🚀", name: "Farm Master", desc: "Reach level 10", unlockHint: "Keep earning XP to reach Level 10" },
+    { id: "coins_5000", emoji: "💰", name: "Rich Farmer", desc: "Earn 5,000 total coins", unlockHint: "Earn 5,000 coins in total (selling crops pays 25+ 🪙 each, golden wheat pays 100 🪙)" },
+    { id: "harvest_100", emoji: "🌾", name: "Harvest King", desc: "Harvest 100 crops total", unlockHint: "Harvest 100 crops in total (use Harvest All to collect many at once)" },
+    { id: "streak_3", emoji: "🔥", name: "Dedicated Farmer", desc: "Keep a 3-day login streak", unlockHint: "Come back on 3 consecutive days to claim the daily reward and keep the streak alive" },
+    { id: "golden_harvest", emoji: "✨", name: "Golden Touch", desc: "Harvest your first golden wheat", unlockHint: "Win 🌟 Golden Seeds from a weekly mega-quest, plant them, then harvest the golden wheat" },
+    { id: "order_25", emoji: "📦", name: "Trusted Supplier", desc: "Deliver 25 orders", unlockHint: "Deliver 25 NPC orders from the Orders board (each delivery earns coins + XP)" },
   ];
+  const [lockedBadgeHint, setLockedBadgeHint] = useState<string | null>(null);
+  const lockedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   type AchievementRecord = { id: string; earnedAt: string; week?: string };
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementRecord[]>([]);
   const [newBadgeBanner, setNewBadgeBanner] = useState<string | null>(null);
@@ -6709,46 +6711,81 @@ export default function IsometricMap() {
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
               {ACHIEVEMENT_DEFS.map((def) => {
                 const earned = earnedAchievements.find((a) => a.id === def.id);
+                const hintActive = !earned && lockedBadgeHint === def.id;
                 return (
-                  <View
-                    key={def.id}
-                    style={{
-                      width: 84,
-                      minHeight: 84,
-                      borderRadius: 10,
-                      padding: 4,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: earned ? "rgba(255, 215, 0, 0.18)" : "rgba(60, 60, 70, 0.5)",
-                      borderWidth: 1,
-                      borderColor: earned ? "#FFD700" : "#3a3a3a",
-                    }}
-                  >
-                    <Text style={{ fontSize: earned ? 26 : 18, opacity: earned ? 1 : 0.35, lineHeight: 24 }}>{def.emoji}</Text>
-                    <Text
-                      style={{
-                        fontSize: 8.5,
-                        fontWeight: "bold",
-                        color: earned ? "#FFD700" : "#777",
-                        textAlign: "center",
-                        lineHeight: 11,
+                  <View key={def.id} style={{ alignItems: "center" }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (earned) return;
+                        setLockedBadgeHint(def.id);
+                        if (lockedHintTimer.current) clearTimeout(lockedHintTimer.current);
+                        lockedHintTimer.current = setTimeout(() => setLockedBadgeHint(null), 4500);
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }}
+                      activeOpacity={0.7}
+                      style={{ width: 84, minHeight: 84 }}
                     >
-                      {def.name}
-                    </Text>
-                    {earned ? (
-                      <Text style={{ fontSize: 7.5, color: "#bbb", textAlign: "center", lineHeight: 10 }}>
-                        {earned.week || ""} {earned.earnedAt.slice(0, 10)}
-                      </Text>
-                    ) : (
-                      <Text style={{ fontSize: 7.5, color: "#555", textAlign: "center", lineHeight: 10 }}>🔒 Locked</Text>
+                      <View
+                        style={{
+                          width: 84,
+                          minHeight: 84,
+                          borderRadius: 10,
+                          padding: 4,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: earned ? "rgba(255, 215, 0, 0.18)" : "rgba(60, 60, 70, 0.5)",
+                          borderWidth: 1,
+                          borderColor: hintActive ? "#FFD700" : earned ? "#FFD700" : "#3a3a3a",
+                        }}
+                      >
+                        <Text style={{ fontSize: earned ? 26 : 18, opacity: earned ? 1 : hintActive ? 0.9 : 0.35, lineHeight: 24 }}>{def.emoji}</Text>
+                        <Text
+                          style={{
+                            fontSize: 8.5,
+                            fontWeight: "bold",
+                            color: earned ? "#FFD700" : hintActive ? "#eee" : "#777",
+                            textAlign: "center",
+                            lineHeight: 11,
+                          }}
+                        >
+                          {def.name}
+                        </Text>
+                        {earned ? (
+                          <Text style={{ fontSize: 7.5, color: "#bbb", textAlign: "center", lineHeight: 10 }}>
+                            {earned.week || ""} {earned.earnedAt.slice(0, 10)}
+                          </Text>
+                        ) : (
+                          <Text style={{ fontSize: 7.5, color: hintActive ? "#FFD700" : "#555", textAlign: "center", lineHeight: 10 }}>🔒 Locked</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                    {/* Unlock hint tooltip for locked badges */}
+                    {hintActive && (
+                      <View
+                        style={{
+                          marginTop: 4,
+                          width: 150,
+                          borderRadius: 8,
+                          padding: 6,
+                          backgroundColor: "rgba(30, 24, 8, 0.97)",
+                          borderWidth: 1,
+                          borderColor: "#FFD700",
+                        }}
+                        pointerEvents="none"
+                      >
+                        <Text style={{ color: "#FFD700", fontSize: 9, fontWeight: "bold", lineHeight: 12 }}>How to unlock:</Text>
+                        <Text style={{ color: "#ddd", fontSize: 8.5, lineHeight: 11.5, marginTop: 2 }}>{def.unlockHint}</Text>
+                        <Text style={{ color: "#aaa", fontSize: 8, lineHeight: 11, marginTop: 3 }}>
+                          Progress: {def.id === "coins_5000" ? `${Math.min(lifetimeStats.coinsEarned, 5000)}/5,000 🪙` : def.id === "harvest_100" ? `${Math.min(lifetimeStats.cropsHarvested, 100)}/100 crops` : def.id === "order_25" ? `${Math.min(lifetimeStats.ordersDelivered, 25)}/25 orders` : def.id === "level_5" ? `Lv ${playerLevel}/5` : def.id === "level_10" ? `Lv ${playerLevel}/10` : def.id === "streak_3" ? `Streak ${Math.min(streakLevel, 3)}/3 days` : def.id === "mega_5" || def.id === "mega_10" ? `${Math.min(earnedAchievements.filter((a) => /^mega_\d+$/.test(a.id)).length, def.id === "mega_10" ? 10 : 5)} mega-quests` : def.id === "first_mega" ? `${weeklyProgress.length}/7 days this week` : "—"}
+                        </Text>
+                      </View>
                     )}
                   </View>
                 );
               })}
             </View>
             <Text style={{ color: "#888", fontSize: 10, marginTop: 6, lineHeight: 13 }}>
-              🌟 Mega-quests are recorded forever on your Badge Wall — complete all 7 daily-quest days each week to earn more!
+              💡 Tap a locked badge to see how to unlock it 🌟 Mega-quests are recorded forever — complete all 7 daily-quest days each week to earn more!
             </Text>
           </View>
         </View>

@@ -470,3 +470,8 @@
 - [x] Display badge wall in Profile panel: 🏅 grid of earned (gold, big emoji, date) / locked (dim, 🔒) badges with earned count, plus lifetime stat tracking behind all earnings (coins, harvests, orders)
 - [x] Unlock celebration: gold "🏅 New Badge" banner + claim-pop animation when a new badge is earned
 - [x] Verify: tsc clean, 53 tests passing (9 new badge tests), render check
+
+## Locked Badge Tooltips
+- [x] Locked badge tooltips: tap/press a locked badge to show an unlock hint (exact unlock path + live progress, auto-hides after 4.5s with gold border highlight + light haptic)
+- [x] Badge registry entries include unlockHint per badge; progress derived from lifetimeStats (coins/harvests/orders), playerLevel, streakLevel, weeklyProgress length, mega count
+- [x] Verify: tsc clean, 53 tests passing, render check
