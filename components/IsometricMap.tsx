@@ -1589,6 +1589,32 @@ function PngCommunityGeneric({ col, row, scale, communityType, flipped = false }
   );
 }
 
+// Generic PNG Factory/Industry Building renderer
+function PngIndustryGeneric({ col, row, scale, industryType, flipped = false }: {
+  col: number; row: number; scale: number; industryType: string; flipped?: boolean;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const bldSize = ts * 1.8;
+  return (
+    <View style={{
+      position: "absolute",
+      left: pos.x - bldSize / 2,
+      top: pos.y - bldSize / 2,
+      width: bldSize,
+      height: bldSize,
+      zIndex: 10,
+      pointerEvents: "box-none",
+    }}>
+      <Image
+        source={INDUSTRY_SOURCES[industryType] || INDUSTRY_STEEL_PNG}
+        style={{ width: bldSize, height: bldSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        contentFit="contain"
+        cachePolicy="memory"
+      />
+    </View>
+  );
+}
 // Generic PNG Farm Building renderer
 function PngFarmGeneric({ col, row, scale, farmType, flipped = false }: {
   col: number; row: number; scale: number; farmType: string; flipped?: boolean;
@@ -2391,9 +2417,9 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   if (buildingType in DECORATION_SOURCES) {
     return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
   }
-  // All industry/factory types use the generic renderer
+  // All industry/factory types use the dedicated generic renderer
   if (buildingType in INDUSTRY_SOURCES) {
-    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
+    return <PngIndustryGeneric col={col} row={row} scale={scale} industryType={buildingType} flipped={flipped} />;
   }
   // All farm building types use the generic renderer
   if (buildingType in FARM_SOURCES) {
@@ -4870,7 +4896,7 @@ export default function IsometricMap() {
                 <Text style={{ fontSize: 28 }}>{CROP_EMOJIS[moveClipboard.buildingType]}</Text>
               ) : (
                 <Image
-                  source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
+                  source={COMMUNITY_SOURCES[moveClipboard.buildingType] || TEMPLE_SOURCES[moveClipboard.buildingType] || DECORATION_SOURCES[moveClipboard.buildingType] || INDUSTRY_SOURCES[moveClipboard.buildingType] || FARM_SOURCES[moveClipboard.buildingType] || HOUSE_SOURCES[moveClipboard.buildingType] || TREE_SOURCES[moveClipboard.buildingType] || TOWN_HALL_PNG}
                   style={styles.clipboardPreviewImage}
                   contentFit="contain"
                   cachePolicy="memory"

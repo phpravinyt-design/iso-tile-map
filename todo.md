@@ -380,3 +380,7 @@
 - [x] Synthesized warm farm bell: metallic triangle strike at 830Hz with shimmering overtones (1660/2490Hz sine) and a long decay tail, plus a brighter second toll at 980Hz — rings once at dawn
 - [x] Rings exactly once per sunrise, tied to the animal wake-up moment in the sleep tick; gated by the sound toggle (native fallback: Success haptic)
 - [x] TypeScript clean, 14 tests passing, render verified
+
+## Fix Industry (Factory) Button
+- [x] Diagnose: root cause was missing dedicated render branch — industry types fell back to TOWN_HALL_PNG via PngCommunityGeneric's source chain
+- [x] Fix: added PngIndustryGeneric renderer using INDUSTRY_SOURCES + dedicated BuildingOnTile dispatch (placed before FARM_SOURCES check), plus INDUSTRY_SOURCES/FARM_SOURCES fallback in move-clipboard preview chain; verified end-to-end in browser (industry selector opens, factory selection, tile placement, coin deduction, correct PNG rendering), tsc clean, 14 tests passing
