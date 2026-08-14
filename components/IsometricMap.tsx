@@ -3167,6 +3167,8 @@ export default function IsometricMap() {
   const [plantedSeedCropSuffix, setPlantedSeedCropSuffix] = useState<string | null>(null); // "golden" for mega-quest golden seeds
   // Golden crop tag per seed-slot: tracks whether the next planted crop is a premium golden crop
   const [goldenCropTags, setGoldenCropTags] = useState<Record<string, boolean>>({});
+  // ---------- "How to Unlock" badge guide helpers (declared after weeklyProgress so refs are stable) ----------
+
   // ---------- Achievement Badge Wall ----------
   const ACHIEVEMENTS_KEY = "achievement_badges";
   type AchievementDef = { id: string; emoji: string; name: string; desc: string; unlockHint: string };
@@ -3200,6 +3202,8 @@ export default function IsometricMap() {
   const prevNextUpIdRef = useRef<string | null>(null);
   type AchievementRecord = { id: string; earnedAt: string; week?: string };
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementRecord[]>([]);
+  // ---------- "How to Unlock" badge guide screen ----------
+  const [showBadgeGuide, setShowBadgeGuide] = useState(false);
   const [newBadgeBanner, setNewBadgeBanner] = useState<string | null>(null);
   // Lifetime stats for milestone badges: { coinsEarned, cropsHarvested, ordersDelivered }
   const [lifetimeStats, setLifetimeStats] = useState<{ coinsEarned: number; cropsHarvested: number; ordersDelivered: number }>({ coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 });
@@ -5599,6 +5603,35 @@ export default function IsometricMap() {
 
   const [weeklyProgress, setWeeklyProgress] = useState<string[]>([]);
 
+  // "How to Unlock" guide helpers: live progress text + ratio per badge (declared after all state they read)
+  const badgeGuideProgress = useCallback((def: AchievementDef): string => {
+    if (def.id === "coins_5000") return `${Math.min(lifetimeStats.coinsEarned, 5000).toLocaleString()} / 5,000 🪙`;
+    if (def.id === "harvest_100") return `${Math.min(lifetimeStats.cropsHarvested, 100)} / 100 crops harvested`;
+    if (def.id === "order_25") return `${Math.min(lifetimeStats.ordersDelivered, 25)} / 25 orders delivered`;
+    if (def.id === "level_5") return `Lv ${Math.min(playerLevel, 5)} / 5`;
+    if (def.id === "level_10") return `Lv ${Math.min(playerLevel, 10)} / 10`;
+    if (def.id === "streak_3") return `Streak ${Math.min(streakLevel, 3)} / 3 days`;
+    const megaCount = earnedAchievements.filter((a) => /^mega_\d+$/.test(a.id)).length;
+    if (def.id === "mega_5") return `${Math.min(megaCount, 5)} / 5 mega-quests`;
+    if (def.id === "mega_10") return `${Math.min(megaCount, 10)} / 10 mega-quests`;
+    if (def.id === "first_mega") return `${Math.min(weeklyProgress.length, 7)} / 7 days completed this week`;
+    return "No progress yet — start the requirement above!";
+  }, [lifetimeStats, playerLevel, streakLevel, earnedAchievements, weeklyProgress.length]);
+
+  const badgeGuideRatio = useCallback((def: AchievementDef): number => {
+    if (def.id === "coins_5000") return Math.min(lifetimeStats.coinsEarned / 5000, 1);
+    if (def.id === "harvest_100") return Math.min(lifetimeStats.cropsHarvested / 100, 1);
+    if (def.id === "order_25") return Math.min(lifetimeStats.ordersDelivered / 25, 1);
+    if (def.id === "level_5") return Math.min(playerLevel / 5, 1);
+    if (def.id === "level_10") return Math.min(playerLevel / 10, 1);
+    if (def.id === "streak_3") return Math.min(streakLevel / 3, 1);
+    const megaCount = earnedAchievements.filter((a) => /^mega_\d+$/.test(a.id)).length;
+    if (def.id === "mega_5") return Math.min(megaCount / 5, 1);
+    if (def.id === "mega_10") return Math.min(megaCount / 10, 1);
+    if (def.id === "first_mega") return Math.min((weeklyProgress.length || 0) / 7, 1);
+    return 0;
+  }, [lifetimeStats, playerLevel, streakLevel, earnedAchievements, weeklyProgress.length]);
+
   // Load weekly mega-quest progress (dates this ISO week on which all 3 daily quests were claimed)
   useEffect(() => {
     AsyncStorage.getItem(WEEKLY_MEGA_KEY)
@@ -6931,7 +6964,23 @@ export default function IsometricMap() {
 
           {/* Achievement Badge Wall: permanent record of earned mega-quests & milestones */}
           <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: "#3a3a3a", paddingTop: 8 }}>
-            <Text style={{ color: "#FFD700", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>🏅 Badge Wall ({earnedAchievements.length}/{ACHIEVEMENT_DEFS.length})</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ color: "#FFD700", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>🏅 Badge Wall ({earnedAchievements.length}/{ACHIEVEMENT_DEFS.length})</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBadgeGuide(true);
+                  setShowTasks(false);
+                  setShowQuests(false);
+                  setShowBackpack(false);
+                  setShowItemsMenu(false);
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                activeOpacity={0.7}
+                style={{ backgroundColor: "#FFD700", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}
+              >
+                <Text style={{ color: "#4a3500", fontSize: 10.5, fontWeight: "bold", lineHeight: 13 }}>📖 Guide</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Next Up: pinned highlight of the locked badge closest to unlocking */}
             {(() => {
@@ -7047,6 +7096,90 @@ export default function IsometricMap() {
               💡 Tap a locked badge to see how to unlock it 🌟 Mega-quests are recorded forever — complete all 7 daily-quest days each week to earn more!
             </Text>
           </View>
+
+          {/* "How to Unlock" badge guide screen: full scrollable list of every badge with requirements + live progress */}
+          {showBadgeGuide && (
+            <View style={styles.profilePanel}>
+              <View style={[styles.itemsPanelHeader, { backgroundColor: "#4A148C", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+                <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>📖 Badge Guide — How to Unlock</Text>
+                <TouchableOpacity onPress={() => setShowBadgeGuide(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+                  <Text style={styles.itemsPanelCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ color: "#ddd", fontSize: 11, lineHeight: 15, paddingHorizontal: 10, paddingTop: 4 }}>Every badge ever added — tap a badge to see exactly how to earn it. Your live progress is shown below each one! ✨</Text>
+              <ScrollView style={{ flexGrow: 1, paddingHorizontal: 8, paddingVertical: 6 }} showsVerticalScrollIndicator>
+                {ACHIEVEMENT_DEFS.map((def) => {
+                  const earned = earnedAchievements.find((a) => a.id === def.id);
+                  const ratio = badgeGuideRatio(def);
+                  const progress = badgeGuideProgress(def);
+                  return (
+                    <TouchableOpacity
+                      key={def.id}
+                      activeOpacity={0.75}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <View
+                        style={{
+                          marginBottom: 8,
+                          borderRadius: 12,
+                          padding: 10,
+                          backgroundColor: earned ? "rgba(255, 215, 0, 0.14)" : "rgba(50, 50, 60, 0.75)",
+                          borderWidth: 1.5,
+                          borderColor: earned ? "#FFD700" : "#555",
+                        }}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <View
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 10,
+                              backgroundColor: earned ? "rgba(255, 215, 0, 0.25)" : "rgba(30, 30, 40, 0.8)",
+                              borderWidth: 1,
+                              borderColor: earned ? "#FFD700" : "#444",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Text style={{ fontSize: 22, opacity: earned ? 1 : 0.4, lineHeight: 26 }}>{def.emoji}</Text>
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                              <Text style={{ color: earned ? "#FFD700" : "#eee", fontSize: 13, fontWeight: "bold", lineHeight: 17 }}>{def.name}</Text>
+                              <Text style={{ color: earned ? "#FFD700" : "#999", fontSize: 9.5, fontWeight: "bold", marginLeft: 6, lineHeight: 13 }}>
+                                {earned ? "✅ Earned" : "🔒 Locked"}
+                              </Text>
+                            </View>
+                            <Text style={{ color: "#ccc", fontSize: 10.5, lineHeight: 14, marginTop: 2 }}>{def.desc}</Text>
+                            <Text style={{ color: earned ? "#FFD700" : "#7ec8e3", fontSize: 10.5, lineHeight: 14, marginTop: 4, fontWeight: "bold" }}>🗺️ How to unlock: {def.unlockHint}</Text>
+                          </View>
+                        </View>
+                        {/* Live progress */}
+                        <View style={{ marginTop: 8 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                            <Text style={{ color: "#bbb", fontSize: 10, lineHeight: 13 }}>📈 Progress</Text>
+                            <Text style={{ color: earned ? "#FFD700" : "#eee", fontSize: 10, fontWeight: "bold", lineHeight: 13 }}>{Math.round(ratio * 100)}%</Text>
+                          </View>
+                          <View style={{ marginTop: 3, height: 7, borderRadius: 3.5, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+                            <View style={{ height: 7, width: `${Math.max(ratio * 100, earned ? 100 : 2)}%`, borderRadius: 3.5, backgroundColor: earned ? "#FFD700" : "#7ec8e3" }} />
+                          </View>
+                          <Text style={{ color: "#aaa", fontSize: 9.5, lineHeight: 13, marginTop: 3 }}>{progress}</Text>
+                          {earned ? (
+                            <Text style={{ color: "#b8a34a", fontSize: 9, lineHeight: 12, marginTop: 2 }}>🎉 Earned on {earned.earnedAt.slice(0, 16)}{earned.week ? ` (${earned.week})` : ""}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <View style={{ borderTopWidth: 1, borderTopColor: "#3a3a3a", paddingTop: 6, paddingHorizontal: 10 }}>
+                <Text style={{ color: "#888", fontSize: 10, lineHeight: 13 }}>💡 Tip: complete daily quests every day to level up fast — that unlocks most badges! 🌟</Text>
+              </View>
+            </View>
+          )}
 
           {/* Next Up unlock confetti: subtle falling confetti when the pinned badge unlocks */}
           {badgeConfetti && <BadgeConfetti burst={badgeConfetti} />}

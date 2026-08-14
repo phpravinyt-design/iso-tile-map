@@ -508,8 +508,12 @@
 - [x] Browser render verified: map, crops, inventory, quests, profile panels all healthy — no blocking bugs; economics (place -100 / harvest +25 / sell = profit) is intentional design
 
 ## Kid-Friendly UI Redesign
-- [ ] Big colorful toolbar buttons: sticker-style cartoon buttons (thick 3px dark outline, bright saturated colors per button, soft 3D bottom shadow, bigger emoji + bold text, bounce on press)
-- [ ] Coins (🪙) and Level (⭐) displays as bigger gold/star pills
-- [ ] Colorful themed header bars on all panels (items, tasks, quests, inventory, orders, profile, settings) with big emoji titles
-- [ ] Bigger emoji + brighter cards in crop picker, seed cards, badge wall
-- [ ] Verify render + tsc clean + tests passing, checkpoint
+- [x] Big colorful toolbar buttons: sticker-style cartoon buttons (thick 3px dark outline, bright saturated colors per button, soft 3D bottom shadow, bigger emoji + bold text, bounce on press)
+- [x] Coins (🪙) and Level (⭐) displays as bigger gold/star pills
+- [x] Colorful themed header bars on all panels (items, tasks, quests, inventory, orders, profile, settings) with big emoji titles
+- [x] Bigger emoji + brighter cards in crop picker, seed cards, badge wall
+- [x] Verify render + tsc clean + tests passing, checkpoint
+- [x] Add "How to Unlock" badge guide screen: scrollable colorful view of all badges with unlock requirements and progress hints
+- [x] Add guide entry button in the Badge Wall panel
+- [x] Kid-friendly styling matching badge wall (colored header, big emojis, earned/locked states)
+- [x] 5 new vitest tests for guide progress/ratio logic (58 passing, tsc clean)

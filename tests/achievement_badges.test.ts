@@ -157,3 +157,96 @@ describe("Achievement Badge Wall", () => {
     expect(locked).toHaveLength(8);
   });
 });
+
+// ---------- "How to Unlock" badge guide logic mirrors (IsometricMap.tsx) ----------
+type GuideDef = { id: string; emoji: string; name: string; desc: string; unlockHint: string };
+const GUIDE_DEFS: GuideDef[] = [
+  { id: "first_mega", emoji: "🌟", name: "First Mega-Quest", desc: "", unlockHint: "Complete all 3 daily quests every day for 7 days" },
+  { id: "mega_5", emoji: "🏆", name: "Mega Veteran", desc: "", unlockHint: "Finish 5 weekly mega-quests" },
+  { id: "mega_10", emoji: "👑", name: "Mega Legend", desc: "", unlockHint: "Finish 10 weekly mega-quests" },
+  { id: "level_5", emoji: "⭐", name: "Rising Star", desc: "", unlockHint: "Earn XP to reach Level 5" },
+  { id: "level_10", emoji: "🚀", name: "Farm Master", desc: "", unlockHint: "Earn XP to reach Level 10" },
+  { id: "coins_5000", emoji: "💰", name: "Rich Farmer", desc: "", unlockHint: "Earn 5,000 coins in total" },
+  { id: "harvest_100", emoji: "🌾", name: "Harvest King", desc: "", unlockHint: "Harvest 100 crops in total" },
+  { id: "streak_3", emoji: "🔥", name: "Dedicated Farmer", desc: "", unlockHint: "Come back on 3 consecutive days" },
+  { id: "golden_harvest", emoji: "✨", name: "Golden Touch", desc: "", unlockHint: "Win Golden Seeds from a mega-quest, plant and harvest" },
+  { id: "order_25", emoji: "📦", name: "Trusted Supplier", desc: "", unlockHint: "Deliver 25 NPC orders" },
+];
+
+const badgeGuideProgress = (def: GuideDef, s: { coinsEarned: number; cropsHarvested: number; ordersDelivered: number }, level: number, streak: number, earned: AchievementRecord[], weekDays: number): string => {
+  if (def.id === "coins_5000") return `${Math.min(s.coinsEarned, 5000).toLocaleString()} / 5,000 🪙`;
+  if (def.id === "harvest_100") return `${Math.min(s.cropsHarvested, 100)} / 100 crops harvested`;
+  if (def.id === "order_25") return `${Math.min(s.ordersDelivered, 25)} / 25 orders delivered`;
+  if (def.id === "level_5") return `Lv ${Math.min(level, 5)} / 5`;
+  if (def.id === "level_10") return `Lv ${Math.min(level, 10)} / 10`;
+  if (def.id === "streak_3") return `Streak ${Math.min(streak, 3)} / 3 days`;
+  const megaCount = earned.filter((a) => /^mega_\d+$/.test(a.id)).length;
+  if (def.id === "mega_5") return `${Math.min(megaCount, 5)} / 5 mega-quests`;
+  if (def.id === "mega_10") return `${Math.min(megaCount, 10)} / 10 mega-quests`;
+  if (def.id === "first_mega") return `${Math.min(weekDays, 7)} / 7 days completed this week`;
+  return "No progress yet — start the requirement above!";
+};
+
+const badgeGuideRatio = (def: GuideDef, s: { coinsEarned: number; cropsHarvested: number; ordersDelivered: number }, level: number, streak: number, earned: AchievementRecord[], weekDays: number): number => {
+  if (def.id === "coins_5000") return Math.min(s.coinsEarned / 5000, 1);
+  if (def.id === "harvest_100") return Math.min(s.cropsHarvested / 100, 1);
+  if (def.id === "order_25") return Math.min(s.ordersDelivered / 25, 1);
+  if (def.id === "level_5") return Math.min(level / 5, 1);
+  if (def.id === "level_10") return Math.min(level / 10, 1);
+  if (def.id === "streak_3") return Math.min(streak / 3, 1);
+  const megaCount = earned.filter((a) => /^mega_\d+$/.test(a.id)).length;
+  if (def.id === "mega_5") return Math.min(megaCount / 5, 1);
+  if (def.id === "mega_10") return Math.min(megaCount / 10, 1);
+  if (def.id === "first_mega") return Math.min((weekDays || 0) / 7, 1);
+  return 0;
+};
+
+describe("\"How to Unlock\" badge guide screen", () => {
+  const emptyStats = { coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 };
+  const earned: AchievementRecord[] = [];
+
+  it("has exactly one guide entry for every badge definition", () => {
+    expect(GUIDE_DEFS).toHaveLength(ACHIEVEMENT_DEFS.length);
+    const ids = new Set(GUIDE_DEFS.map((d) => d.id));
+    expect(ids.size).toBe(GUIDE_DEFS.length);
+  });
+
+  it("computes progress text per badge at a fresh start", () => {
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "coins_5000")!, emptyStats, 1, 0, earned, 0)).toBe("0 / 5,000 🪙");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "harvest_100")!, emptyStats, 1, 0, earned, 0)).toBe("0 / 100 crops harvested");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "order_25")!, emptyStats, 1, 0, earned, 0)).toBe("0 / 25 orders delivered");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "level_5")!, emptyStats, 1, 0, earned, 0)).toBe("Lv 1 / 5");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "streak_3")!, emptyStats, 1, 0, earned, 0)).toBe("Streak 0 / 3 days");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "golden_harvest")!, emptyStats, 1, 0, earned, 0)).toContain("No progress yet");
+  });
+
+  it("caps ratios at 1 and computes partial progress", () => {
+    const s = { coinsEarned: 2500, cropsHarvested: 150, ordersDelivered: 12 };
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "coins_5000")!, s, 1, 0, earned, 0)).toBeCloseTo(0.5);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "harvest_100")!, s, 1, 0, earned, 0)).toBe(1); // over-earned stays at 1
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "order_25")!, s, 1, 0, earned, 0)).toBeCloseTo(0.48);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "level_5")!, s, 3, 0, earned, 0)).toBeCloseTo(0.6);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "first_mega")!, s, 3, 0, earned, 4)).toBeCloseTo(4 / 7);
+  });
+
+  it("progress text caps at the target and uses earned mega-quest records", () => {
+    const earnedRecs: AchievementRecord[] = [
+      { id: "mega_1", earnedAt: "2026-07-01 00:00 UTC", week: "2026-W27" },
+      { id: "mega_2", earnedAt: "2026-07-08 00:00 UTC", week: "2026-W28" },
+      { id: "mega_3", earnedAt: "2026-07-15 00:00 UTC", week: "2026-W29" },
+    ];
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "mega_5")!, emptyStats, 1, 0, earnedRecs, 0)).toBe("3 / 5 mega-quests");
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "mega_10")!, emptyStats, 1, 0, earnedRecs, 0)).toBe("3 / 10 mega-quests");
+    // first_mega already earned; progress still reports weekly day count
+    expect(badgeGuideProgress(GUIDE_DEFS.find((d) => d.id === "first_mega")!, emptyStats, 1, 0, earnedRecs, 7)).toBe("7 / 7 days completed this week");
+  });
+
+  it("guide ratio implies earned status consistently with threshold checks", () => {
+    // At exactly-threshold values, ratio is 1 — matching the award conditions
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "coins_5000")!, { coinsEarned: 5000, cropsHarvested: 0, ordersDelivered: 0 }, 1, 0, earned, 0)).toBe(1);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "harvest_100")!, { coinsEarned: 0, cropsHarvested: 100, ordersDelivered: 0 }, 1, 0, earned, 0)).toBe(1);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "order_25")!, { coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 25 }, 1, 0, earned, 0)).toBe(1);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "level_5")!, { coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 }, 5, 0, earned, 0)).toBe(1);
+    expect(badgeGuideRatio(GUIDE_DEFS.find((d) => d.id === "streak_3")!, { coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 }, 1, 3, earned, 0)).toBe(1);
+  });
+});
