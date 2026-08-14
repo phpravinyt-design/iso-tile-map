@@ -536,3 +536,9 @@
 - [x] Add 9 flowers as orderable goods (FLOWER_GOODS pool mixed into daily orders, baseValue 14-20 coins)
 - [x] Fulfillment: NPC requests for flowers are delivered by removing placed flowers from the map (setGrid, no sell refund) — same reward flow: coins, XP, quest/deliver stats, NPC delivery walk animation + chime
 - [x] 6 new vitest tests for flower order pool + fulfillment (64 passing, tsc clean), checkpoint
+
+## APK Build Fix (second failure: EAS Gradle failed)
+- [x] Diagnose: reviewed app.config.ts plugins, SDK versions (all SDK-54-compatible); sandbox RAM too low to repro Gradle link locally (OOM), but prebuild succeeds
+- [x] Apply fixes: removed unused expo-video plugin (native Video SDK was likely breaking Gradle), dropped legacy armeabi-v7a arch (arm64-v8a only)
+- [x] Validate: tsc clean, 64 tests pass, local Android prebuild succeeds, Android JS bundle succeeds, no expo-video references remain
+- [x] Checkpoint + instruct user to rebuild (Build APK); if still failing → https://help.manus.im for server-side gradle logs
