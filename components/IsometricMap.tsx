@@ -2941,6 +2941,8 @@ export default function IsometricMap() {
             setCoins(val);
             setStreakLevel(streak);
             setDailyRewardAmount(reward);
+            recordLifetimeStat("coins", reward);
+            if (streak >= 3) awardAchievement("streak_3");
             setShowDailyReward(true);
             setTimeout(() => setShowDailyReward(false), 3500);
           }, 600);
@@ -3055,6 +3057,108 @@ export default function IsometricMap() {
   const [plantedSeedCropSuffix, setPlantedSeedCropSuffix] = useState<string | null>(null); // "golden" for mega-quest golden seeds
   // Golden crop tag per seed-slot: tracks whether the next planted crop is a premium golden crop
   const [goldenCropTags, setGoldenCropTags] = useState<Record<string, boolean>>({});
+  // ---------- Achievement Badge Wall ----------
+  const ACHIEVEMENTS_KEY = "achievement_badges";
+  type AchievementDef = { id: string; emoji: string; name: string; desc: string };
+  const ACHIEVEMENT_DEFS: AchievementDef[] = [
+    { id: "first_mega", emoji: "🌟", name: "First Mega-Quest", desc: "Complete your first weekly mega-quest" },
+    { id: "mega_5", emoji: "🏆", name: "Mega Veteran", desc: "Complete 5 weekly mega-quests" },
+    { id: "mega_10", emoji: "👑", name: "Mega Legend", desc: "Complete 10 weekly mega-quests" },
+    { id: "level_5", emoji: "⭐", name: "Rising Star", desc: "Reach level 5" },
+    { id: "level_10", emoji: "🚀", name: "Farm Master", desc: "Reach level 10" },
+    { id: "coins_5000", emoji: "💰", name: "Rich Farmer", desc: "Earn 5,000 total coins" },
+    { id: "harvest_100", emoji: "🌾", name: "Harvest King", desc: "Harvest 100 crops total" },
+    { id: "streak_3", emoji: "🔥", name: "Dedicated Farmer", desc: "Keep a 3-day login streak" },
+    { id: "golden_harvest", emoji: "✨", name: "Golden Touch", desc: "Harvest your first golden wheat" },
+    { id: "order_25", emoji: "📦", name: "Trusted Supplier", desc: "Deliver 25 orders" },
+  ];
+  type AchievementRecord = { id: string; earnedAt: string; week?: string };
+  const [earnedAchievements, setEarnedAchievements] = useState<AchievementRecord[]>([]);
+  const [newBadgeBanner, setNewBadgeBanner] = useState<string | null>(null);
+  // Lifetime stats for milestone badges: { coinsEarned, cropsHarvested, ordersDelivered }
+  const [lifetimeStats, setLifetimeStats] = useState<{ coinsEarned: number; cropsHarvested: number; ordersDelivered: number }>({ coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 });
+  const lifetimeAccRef = useRef(lifetimeStats);
+  const newBadgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const popEffectsRef = useRef<{ play?: () => void; trigger?: () => void }>({});
+
+  // Load earned achievements permanently (plus legacy lifetime stats key)
+  useEffect(() => {
+    AsyncStorage.getItem(ACHIEVEMENTS_KEY)
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setEarnedAchievements(parsed);
+        }
+      })
+      .catch(() => {});
+    AsyncStorage.getItem("lifetime_stats")
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            const ls = { coinsEarned: Number(parsed.coinsEarned || 0), cropsHarvested: Number(parsed.cropsHarvested || 0), ordersDelivered: Number(parsed.ordersDelivered || 0) };
+            setLifetimeStats(ls);
+            lifetimeAccRef.current = ls;
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Record a lifetime stat event (debounced persist + badge checks)
+  const recordLifetimeStat = useCallback((kind: "coins" | "harvest" | "deliver", amount: number) => {
+    setLifetimeStats((prev) => {
+      const next = {
+        coinsEarned: kind === "coins" ? prev.coinsEarned + amount : prev.coinsEarned,
+        cropsHarvested: kind === "harvest" ? prev.cropsHarvested + amount : prev.cropsHarvested,
+        ordersDelivered: kind === "deliver" ? prev.ordersDelivered + amount : prev.ordersDelivered,
+      };
+      lifetimeAccRef.current = next;
+      AsyncStorage.setItem("lifetime_stats", JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // Award a badge permanently; idempotent (only records once)
+  const awardAchievement = useCallback((id: string, week?: string) => {
+    setEarnedAchievements((prev) => {
+      if (prev.some((a) => a.id === id)) return prev;
+      const next = [...prev, { id, earnedAt: new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", ...(week ? { week } : {}) }];
+      AsyncStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(next)).catch(() => {});
+      const def = ACHIEVEMENT_DEFS.find((d) => d.id === id);
+      if (def) {
+        setNewBadgeBanner(`🏅 New Badge: ${def.emoji} ${def.name}!`);
+        if (newBadgeTimer.current) clearTimeout(newBadgeTimer.current);
+        newBadgeTimer.current = setTimeout(() => setNewBadgeBanner(null), 4000);
+        popEffectsRef.current.play?.();
+        popEffectsRef.current.trigger?.();
+      }
+      return next;
+    });
+  }, []);
+
+  // Badge checks driven by lifetime stats
+  useEffect(() => {
+    if (lifetimeStats.coinsEarned >= 5000) awardAchievement("coins_5000");
+    if (lifetimeStats.cropsHarvested >= 100) awardAchievement("harvest_100");
+    if (lifetimeStats.ordersDelivered >= 25) awardAchievement("order_25");
+  }, [lifetimeStats, awardAchievement]);
+
+  // Streak badge
+  useEffect(() => {
+    if (streakLevel >= 3) awardAchievement("streak_3");
+  }, [streakLevel, awardAchievement]);
+
+  // Reactive achievement checks (level milestones etc.)
+  const prevLevelRef = useRef<number[]>([]);
+  useEffect(() => {
+    if (prevLevelRef.current.length > 0 && playerLevel > prevLevelRef.current[prevLevelRef.current.length - 1]) {
+      if (playerLevel >= 5) awardAchievement("level_5");
+      if (playerLevel >= 10) awardAchievement("level_10");
+    }
+    prevLevelRef.current.push(playerLevel);
+    if (prevLevelRef.current.length > 20) prevLevelRef.current.splice(0, prevLevelRef.current.length - 20);
+  }, [playerLevel, awardAchievement]);
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
 
   // --- Orders Board: NPC customers request goods for premium coin rewards ---
@@ -3187,6 +3291,8 @@ export default function IsometricMap() {
       }
       saveBackpack(updated);
       setCoins((c) => c + order.rewardCoins);
+      recordLifetimeStat("coins", order.rewardCoins);
+      recordLifetimeStat("deliver", 1);
       grantXp(XP_ORDER_DELIVERY, "Order");
       trackQuestProgress("coins", order.rewardCoins);
       trackQuestProgress("deliver", 1);
@@ -4795,6 +4901,9 @@ export default function IsometricMap() {
     }, 550);
   }, [claimPopOpacity, claimPopScale]);
 
+  // Achievement badges reuse the celebration pop effect
+  popEffectsRef.current = { play: playClaimPopEffect, trigger: triggerClaimPopAnimation };
+
   // Handle crop selection from farmland tap (places crop on the tapped tile)
   // Plant a seed bought from the inventory for free (consumes 1 seed from backpack)
   const plantBoughtSeed = useCallback((crop: CropType, suffix: string | null = null) => {
@@ -5303,6 +5412,7 @@ export default function IsometricMap() {
       const nextDates = [...weeklyProgress, today];
       saveWeeklyProgress(nextDates);
       setCoins((c) => c + 50); // all-quests-day streak bonus
+      recordLifetimeStat("coins", 50);
       grantXp(25, "Daily Streak");
       setQuestRewardBanner(`🔥 All quests done today! +50 🪙 +25 ⭐ (Day ${nextDates.length}/7)`);
       if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
@@ -5322,16 +5432,49 @@ export default function IsometricMap() {
           return updated;
         });
         setCoins((c) => c + MEGA_REWARD_COINS);
+        recordLifetimeStat("coins", MEGA_REWARD_COINS);
         grantXp(MEGA_REWARD_XP, "Weekly Mega-Quest");
         setQuestRewardBanner(`🌟 WEEKLY MEGA-QUEST COMPLETE! +${MEGA_REWARD_SEEDS} 🌟 Golden Seeds +${MEGA_REWARD_COINS} 🪙 +${MEGA_REWARD_XP} ⭐`);
         if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
         questRewardTimer.current = setTimeout(() => setQuestRewardBanner(null), 5500);
         playClaimPopEffect();
         triggerClaimPopAnimation();
+        // ---- Achievement Badge Wall: permanent mega-quest record ----
+        // Count how many mega-quest badges exist already (before this one) to derive tier badges
+        setEarnedAchievements((prev) => {
+          // Every mega-quest completion gets a unique permanent record (mega_1, mega_2, ...)
+          // so the lifetime mega-quest count grows with each completion.
+          const prevMega = prev.filter((a) => /^mega_\d+$/.test(a.id)).length;
+          const totalMega = prevMega + 1;
+          const next = [...prev];
+          const pushBadge = (id: string) => {
+            if (!next.some((a) => a.id === id)) {
+              next.push({ id, earnedAt: new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", week: awardedWeek });
+            }
+          };
+          // unique completion record for this mega-quest (permanent count)
+          pushBadge(`mega_${totalMega}`);
+          // first mega-quest badge (awarded exactly once, week-anchored)
+          if (totalMega === 1) pushBadge("first_mega");
+          // tier badges based on total mega-quests completed including this one
+          if (totalMega >= 10) pushBadge("mega_10");
+          else if (totalMega >= 5) pushBadge("mega_5");
+          AsyncStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(next)).catch(() => {});
+          const newly = next.slice(prev.length);
+          const def = newly.length > 0 ? ACHIEVEMENT_DEFS.find((d) => d.id === newly[newly.length - 1].id) : null;
+          if (def) {
+            setNewBadgeBanner(`🏅 New Badge: ${def.emoji} ${def.name}!`);
+            if (newBadgeTimer.current) clearTimeout(newBadgeTimer.current);
+            newBadgeTimer.current = setTimeout(() => setNewBadgeBanner(null), 4000);
+            popEffectsRef.current.play?.();
+            popEffectsRef.current.trigger?.();
+          }
+          return next;
+        });
       }
       return prev;
     });
-  }, [weeklyProgress, saveWeeklyProgress, grantXp, megaQuestAwarded, playClaimPopEffect, triggerClaimPopAnimation]);
+  }, [weeklyProgress, saveWeeklyProgress, grantXp, megaQuestAwarded, playClaimPopEffect, triggerClaimPopAnimation, awardAchievement]);
 
   // Claim reward for a completed quest: +150 coins and a massive +100 XP boost
   const claimQuestReward = useCallback((questId: number) => {
@@ -5341,6 +5484,7 @@ export default function IsometricMap() {
       const updated = prev.map((q) => (q.id === questId ? { ...q, claimed: true } : q));
       AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(updated)).catch(() => {});
       setCoins((c) => c + QUEST_REWARD_COINS);
+      recordLifetimeStat("coins", QUEST_REWARD_COINS);
       grantXp(QUEST_XP_BOOST, "Daily Quest");
       setQuestRewardBanner(`⚡ Claimed! +${QUEST_REWARD_COINS} 🪙 +${QUEST_XP_BOOST} ⭐`);
       if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
@@ -5363,6 +5507,7 @@ export default function IsometricMap() {
       const updated = prev.map((t) => (t.id === taskId ? { ...t, claimed: true } : t));
       AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(updated)).catch(() => {});
       setCoins((c) => c + TASK_REWARD_COINS);
+      recordLifetimeStat("coins", TASK_REWARD_COINS);
       grantXp(XP_TASK_COMPLETE, "Task");
       setTaskRewardMessage(`Claimed +${TASK_REWARD_COINS} 🪙`);
       setShowTaskReward(true);
@@ -5928,6 +6073,13 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* New achievement badge banner */}
+      {newBadgeBanner && (
+        <View style={[styles.dailyRewardMsg, { borderColor: "#FFD700", backgroundColor: "rgba(60, 45, 10, 0.95)" }]}>
+          <Text style={[styles.dailyRewardMsgText, { color: "#FFD700" }]}>{newBadgeBanner}</Text>
+        </View>
+      )}
+
       {/* Daily Reward banner: granted once per day */}
       {showDailyReward && (
         <View style={styles.dailyRewardMsg}>
@@ -5972,6 +6124,7 @@ export default function IsometricMap() {
                         const next = (updated[crop] || 0) - 1;
                         if (next <= 0) delete updated[crop]; else updated[crop] = next;
                         setCoins((c) => c + price);
+                        recordLifetimeStat("coins", price);
                         grantXp(XP_SELL, "Sell");
                         saveBackpack(updated);
                         trackQuestProgress("coins", price);
@@ -5989,6 +6142,7 @@ export default function IsometricMap() {
                         const updated = { ...harvestedItems };
                         delete updated[crop];
                         setCoins((c) => c + sellCoins);
+                        recordLifetimeStat("coins", sellCoins);
                         grantXp(XP_SELL * count, "Sell");
                         saveBackpack(updated);
                         trackQuestProgress("coins", sellCoins);
@@ -6024,6 +6178,7 @@ export default function IsometricMap() {
                           const next = (updated[key] || 0) - 1;
                           if (next <= 0) delete updated[key]; else updated[key] = next;
                         setCoins((c) => c + meta.price);
+                        recordLifetimeStat("coins", meta.price);
                         grantXp(XP_SELL, "Sell");
                         saveBackpack(updated);
                         trackQuestProgress("coins", meta.price);
@@ -6041,6 +6196,7 @@ export default function IsometricMap() {
                           const updated = { ...harvestedItems };
                           delete updated[key];
                         setCoins((c) => c + sellAllCoins);
+                        recordLifetimeStat("coins", sellAllCoins);
                         grantXp(XP_SELL * count, "Sell");
                         saveBackpack(updated);
                         trackQuestProgress("coins", sellAllCoins);
@@ -6546,6 +6702,55 @@ export default function IsometricMap() {
               💰 Items invested: {itemStats.totalItems} × 100 = 🪙 {itemStats.totalItems * ITEM_COST}
             </Text>
           </View>
+
+          {/* Achievement Badge Wall: permanent record of earned mega-quests & milestones */}
+          <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: "#3a3a3a", paddingTop: 8 }}>
+            <Text style={{ color: "#FFD700", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>🏅 Badge Wall ({earnedAchievements.length}/{ACHIEVEMENT_DEFS.length})</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {ACHIEVEMENT_DEFS.map((def) => {
+                const earned = earnedAchievements.find((a) => a.id === def.id);
+                return (
+                  <View
+                    key={def.id}
+                    style={{
+                      width: 84,
+                      minHeight: 84,
+                      borderRadius: 10,
+                      padding: 4,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: earned ? "rgba(255, 215, 0, 0.18)" : "rgba(60, 60, 70, 0.5)",
+                      borderWidth: 1,
+                      borderColor: earned ? "#FFD700" : "#3a3a3a",
+                    }}
+                  >
+                    <Text style={{ fontSize: earned ? 26 : 18, opacity: earned ? 1 : 0.35, lineHeight: 24 }}>{def.emoji}</Text>
+                    <Text
+                      style={{
+                        fontSize: 8.5,
+                        fontWeight: "bold",
+                        color: earned ? "#FFD700" : "#777",
+                        textAlign: "center",
+                        lineHeight: 11,
+                      }}
+                    >
+                      {def.name}
+                    </Text>
+                    {earned ? (
+                      <Text style={{ fontSize: 7.5, color: "#bbb", textAlign: "center", lineHeight: 10 }}>
+                        {earned.week || ""} {earned.earnedAt.slice(0, 10)}
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 7.5, color: "#555", textAlign: "center", lineHeight: 10 }}>🔒 Locked</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={{ color: "#888", fontSize: 10, marginTop: 6, lineHeight: 13 }}>
+              🌟 Mega-quests are recorded forever on your Badge Wall — complete all 7 daily-quest days each week to earn more!
+            </Text>
+          </View>
         </View>
       )}
 
@@ -6682,6 +6887,7 @@ export default function IsometricMap() {
             setGrid((prev) => {
               let totalHarvested = 0;
               let totalCoins = 0;
+              let totalGoldenHarvested = 0;
               const goldenTagsCleared: Record<string, boolean> = {};
               const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
               const newBackpack = { ...harvestedItems };
@@ -6698,6 +6904,7 @@ export default function IsometricMap() {
                     totalHarvested++;
                     totalCoins += isGolden ? 100 : 25;
                     newBackpack[backpackKey] = (newBackpack[backpackKey] || 0) + 1;
+                    if (isGolden) totalGoldenHarvested++;
                     playHarvestChime(cropType);
                     triggerHarvestSparkles(col, row);
                     // Clear the golden tag once this tagged crop has been harvested
@@ -6710,6 +6917,9 @@ export default function IsometricMap() {
               if (totalHarvested > 0) {
                 setCoins((c) => c + totalCoins);
                 saveBackpack(newBackpack);
+                if (totalGoldenHarvested > 0) awardAchievement("golden_harvest");
+                recordLifetimeStat("harvest", totalHarvested);
+                recordLifetimeStat("coins", totalCoins);
                 setGoldenCropTags((prev) => {
                   if (Object.keys(goldenTagsCleared).length === 0) return prev;
                   const next = { ...prev };
@@ -6988,6 +7198,9 @@ export default function IsometricMap() {
                             const updated = { ...harvestedItems };
                             updated[goldenBackpackKey] = (updated[goldenBackpackKey] || 0) + 1;
                             saveBackpack(updated);
+                            if (isGolden) awardAchievement("golden_harvest");
+                            recordLifetimeStat("harvest", 1);
+                            recordLifetimeStat("coins", goldenReward);
                           }
                         }
                       }

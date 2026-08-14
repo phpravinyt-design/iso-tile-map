@@ -463,3 +463,10 @@
 - [x] Mega-quest celebration: banner + claim-pop animation when rare seeds are awarded; golden seed row shows in 🎒 Buy Seeds as owned reward with a golden 🌟 Plant button
 - [x] Golden visuals: brighter/wider pulsing glow + golden shimmer text-shadow on golden crops, tagged through BuildingOnTile → EmojiCrop → ReadyCropGlow
 - [x] Verify: tsc clean, 44 tests passing (8 new mega-quest tests), render check
+
+## Achievement Badge Wall
+- [x] Achievement registry: permanent record of earned achievements (mega-quests as unique mega_N per week, milestone levels, streaks, stats) persisted via AsyncStorage with 10-badge ACHIEVEMENT_DEFS
+- [x] Auto-unlock achievements when earned: first_mega (+week anchor), mega_5 at 5 mega-quests, mega_10 at 10, level_5/level_10, coins_5000, harvest_100, order_25, streak_3, golden_harvest — idempotent awards
+- [x] Display badge wall in Profile panel: 🏅 grid of earned (gold, big emoji, date) / locked (dim, 🔒) badges with earned count, plus lifetime stat tracking behind all earnings (coins, harvests, orders)
+- [x] Unlock celebration: gold "🏅 New Badge" banner + claim-pop animation when a new badge is earned
+- [x] Verify: tsc clean, 53 tests passing (9 new badge tests), render check
