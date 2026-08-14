@@ -412,3 +412,9 @@
 - [x] Glow pulses on a 1.2s sine loop (scale 0.85→1.15, opacity 0.35→0.75) with per-crop stagger seed (col/row hash) so pulses don't sync; 80ms tick keeps smooth motion and follows zoom
 - [x] Glow uses pointerEvents="none" at zIndex 8 so tile taps (harvest/place) still work
 - [x] Verified: tsc clean, 18 tests passing, render check OK
+
+## Harvest SFX and Sparkles
+- [x] Added playHarvestChime: synthesized bright rising two-note "ting" (sine 720→1180Hz ding + delayed triangle 1480→1650Hz shimmer, 0.32s) wired into both single-crop harvest and Harvest All; respects sound toggle, native fallback = Success haptic
+- [x] Added HarvestSparkles overlay: 6 staggered ✨ particles per harvested crop rise/fan out and fade over ~0.7s (60ms tick, bursts auto-cleared after 0.9s, capped at 10 bursts); per-star delay creates a burst feel
+- [x] Sparkles use pointerEvents="none" at zIndex 50, follow zoom via currentScale, render for both single harvest and Harvest All (one burst per cell)
+- [x] Verified: tsc clean, 18 tests passing, render check OK

@@ -2240,6 +2240,66 @@ function ReadyCropGlow({ col, row, scale, seed }: { col: number; row: number; sc
   );
 }
 
+// --- Harvest Sparkles: burst of small ✨/⭐ particles rising and fading at a harvested tile ---
+function HarvestSparkles({ burst, scale }: { burst: { key: string; col: number; row: number; at: number; stars: { dx: number; dy: number; delay: number }[] }; scale: number }) {
+  const pos = gridToScreen(burst.col + 0.5, burst.row + 0.5, scale);
+  const ts = TILE_SIZE * scale;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - ts / 2,
+        top: pos.y - ts / 2,
+        width: ts,
+        height: ts,
+        zIndex: 50,
+      }}
+    >
+      {burst.stars.map((s, i) => (
+        <HarvestStar key={`${burst.key}-${i}`} x={ts / 2} y={ts * 0.3} dx={s.dx * ts * 0.45} dy={s.dy * ts * 0.6} delay={s.delay} at={burst.at} />
+      ))}
+    </View>
+  );
+}
+
+function HarvestStar({ x, y, dx, dy, delay, at }: { x: number; y: number; dx: number; dy: number; delay: number; at: number }) {
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceRender((n) => n + 1);
+    }, 40);
+    return () => clearInterval(interval);
+  }, []);
+  const now = Date.now();
+  const age = Math.max(0, now - at - delay);
+  const DURATION = 700;
+  const t = Math.min(1, age / DURATION);
+  const opacity = 1 - t;
+  const rise = dy * t;
+  const xOff = dx * Math.sin(t * Math.PI) * t;
+  const sc = 0.5 + t * 0.9;
+  if (t >= 1) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: x + xOff - 8,
+        top: y + rise - 8,
+        width: 16,
+        height: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity,
+        transform: [{ scale: sc }],
+      }}
+    >
+      <Text style={{ fontSize: 14, lineHeight: 16 }}>✨</Text>
+    </View>
+  );
+}
+
 // --- Farmer Harvest Hint: bubble shown above a ready crop while the 3D farmer stands nearby ---
 function FarmerHintBubble({
   col,
@@ -3305,6 +3365,71 @@ export default function IsometricMap() {
       // audio/haptics unavailable, ignore
     }
   }, [settings]);
+  // --- Harvest chime: bright rising two-note "ting" when a crop is successfully harvested ---
+  const playHarvestChime = useCallback(() => {
+    if (!settings.sound) return;
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        const now = ctx.currentTime;
+        // Note 1: quick rising ding
+        const o1 = ctx.createOscillator();
+        const g1 = ctx.createGain();
+        o1.type = "sine";
+        o1.frequency.setValueAtTime(720, now);
+        o1.frequency.exponentialRampToValueAtTime(1180, now + 0.09);
+        g1.gain.setValueAtTime(0.22, now);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        o1.connect(g1).connect(ctx.destination);
+        o1.start(now);
+        o1.stop(now + 0.32);
+        // Note 2: brighter shimmer slightly delayed
+        const o2 = ctx.createOscillator();
+        const g2 = ctx.createGain();
+        o2.type = "triangle";
+        o2.frequency.setValueAtTime(1480, now + 0.06);
+        o2.frequency.exponentialRampToValueAtTime(1650, now + 0.15);
+        g2.gain.setValueAtTime(0.0, now + 0.06);
+        g2.gain.linearRampToValueAtTime(0.12, now + 0.09);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        o2.connect(g2).connect(ctx.destination);
+        o2.start(now + 0.06);
+        o2.stop(now + 0.32);
+      } else {
+        if (settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, [settings]);
+  // --- Harvest sparkles: bursts of small sparkle particles at harvested crops ---
+  type HarvestSparkle = { key: string; col: number; row: number; at: number; stars: { dx: number; dy: number; delay: number }[] };
+  const [harvestSparkles, setHarvestSparkles] = useState<HarvestSparkle[]>([]);
+  const harvestSparkleTick = useRef(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      harvestSparkleTick.current += 1;
+      setHarvestSparkles((prev) => prev.filter((s) => Date.now() - s.at < 900));
+    }, 60);
+    return () => clearInterval(interval);
+  }, []);
+  const triggerHarvestSparkles = useCallback((col: number, row: number) => {
+    const stars: HarvestSparkle["stars"] = Array.from({ length: 6 }, (_, i) => ({
+      dx: (Math.random() - 0.5) * 2,
+      dy: -0.3 - Math.random() * 1.4,
+      delay: i * 40,
+    }));
+    setHarvestSparkles((prev: HarvestSparkle[]) => [...prev.slice(-10), { key: `${col}-${row}-${Date.now()}`, col, row, at: Date.now(), stars }]);
+  }, []);
   // --- Delivery pickup chime: subtle C-E-G sine triplet when NPC receives the goods ---
   const playDeliveryChime = useCallback(() => {
     if (!settings.sound) return;
@@ -5463,6 +5588,10 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Harvest sparkles: ✨ particle bursts at each harvested crop */}
+      {harvestSparkles.map((burst) => (
+        <HarvestSparkles key={burst.key} burst={burst} scale={currentScale} />
+      ))}
       {/* Removal: 💨 dust cloud at the tile where an item was removed */}
       {dustPos ? (
         <DustCloud
@@ -5720,12 +5849,14 @@ export default function IsometricMap() {
                     cell.cropGrowthStage = 0;
                     totalHarvested++;
                     newBackpack[cropType] = (newBackpack[cropType] || 0) + 1;
+                    triggerHarvestSparkles(col, row);
                   }
                 }
               }
               if (totalHarvested > 0) {
                 setCoins((c) => c + totalHarvested * 25);
                 saveBackpack(newBackpack);
+                playHarvestChime();
                 if (Platform.OS !== "web") {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -5972,6 +6103,8 @@ export default function IsometricMap() {
                             cell.building = "none";
                             cell.cropGrowthStage = 0;
                             setCoins((c) => c + 25);
+                            playHarvestChime();
+                            triggerHarvestSparkles(col, row);
                             if (Platform.OS !== "web") {
                               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             }
