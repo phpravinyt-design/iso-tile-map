@@ -1452,6 +1452,47 @@ function PickupPop({
   );
 }
 
+// --- Place Pop: sparkle celebration at a placed tile (triggered on successful item placement) ---
+function PlacePop({
+  col,
+  row,
+  scale,
+  scaleValue,
+  opacityValue,
+}: {
+  col: number;
+  row: number;
+  scale: number;
+  scaleValue: SharedValue<number>;
+  opacityValue: SharedValue<number>;
+}) {
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scaleValue.value }],
+    opacity: opacityValue.value,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - ts / 2,
+        top: pos.y - ts / 2,
+        width: ts,
+        height: ts,
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 120,
+        ...animStyle,
+      }}
+    >
+      <Text style={{ fontSize: ts * 0.6, lineHeight: ts * 0.8 }}>✨</Text>
+    </Animated.View>
+  );
+}
+
 // --- Claim Pop: same bounce + sparkle celebration, centered on screen (for task reward claims) ---
 function ClaimPop({
   dims,
@@ -2148,6 +2189,55 @@ export default function IsometricMap() {
   const claimPopScale = useSharedValue(0);
   const claimPopOpacity = useSharedValue(0);
   const [claimPopActive, setClaimPopActive] = useState(false);
+
+  // --- Place success pop + sound ---
+  const placePopScale = useSharedValue(0);
+  const placePopOpacity = useSharedValue(0);
+  const [placePopPos, setPlacePopPos] = useState<{ col: number; row: number } | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const playPlaceSound = useCallback(() => {
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(980, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.2);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, []);
+  const triggerPlacePopAnimation = useCallback((col: number, row: number) => {
+    playPlaceSound();
+    setPlacePopPos({ col, row });
+    placePopOpacity.value = 1;
+    placePopScale.value = withSequence(
+      withTiming(1.35, { duration: 120, easing: Easing.out(Easing.back(1.7)) }),
+      withDelay(80, withTiming(0.4, { duration: 220, easing: Easing.inOut(Easing.cubic) }))
+    );
+    placePopOpacity.value = withDelay(320, withTiming(0, { duration: 150 }));
+    setTimeout(() => {
+      setPlacePopPos(null);
+    }, 550);
+  }, [placePopOpacity, placePopScale, playPlaceSound]);
   const screenDims = useMemo(() => Dimensions.get("window"), []);
   const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
   const [isItemPress, setIsItemPress] = useState(false);
@@ -2907,6 +2997,8 @@ export default function IsometricMap() {
               newGrid[row][col].flipped = mirrorMode;
               if (coins < ITEM_COST) flashLowCoins();
               setCoins((c) => Math.max(0, c - ITEM_COST));
+              // Celebration pop + subtle sound on successful road placement
+              triggerPlacePopAnimation(col, row);
             }
           } else if (mode === "tiles") {
             // Tiles mode: apply the selected tile texture to this tile
@@ -2923,6 +3015,8 @@ export default function IsometricMap() {
                   newGrid[row][col].cropGrowthStage = 0; // Reset growth to stage 1 (seedling)
                   if (coins < ITEM_COST) flashLowCoins();
                   setCoins((c) => Math.max(0, c - ITEM_COST));
+                  // Celebration pop + subtle sound on successful crop planting
+                  triggerPlacePopAnimation(col, row);
                 }
               } else {
                 // Regular tile texture change
@@ -3040,6 +3134,8 @@ export default function IsometricMap() {
               if (placedNewBuilding) {
                 if (coins < ITEM_COST) flashLowCoins();
                 setCoins((c) => Math.max(0, c - ITEM_COST));
+                // Celebration pop + subtle sound on successful new placement
+                triggerPlacePopAnimation(col, row);
               }
             }
           }
@@ -3049,7 +3145,7 @@ export default function IsometricMap() {
       // Daily tasks: refresh progress against the new grid (after placement)
       advanceDailyTasks();
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode, triggerPlacePopAnimation]
   );
 
   // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
@@ -3767,6 +3863,16 @@ export default function IsometricMap() {
       )}
 
       {/* Claim celebration: same ✨ pop used for pickup, centered on screen for task claims */}
+      {placePopPos ? (
+        <PlacePop
+          key={`place-${placePopPos.col}-${placePopPos.row}-${placePopScale.value}`}
+          col={placePopPos.col}
+          row={placePopPos.row}
+          scale={currentScale}
+          scaleValue={placePopScale}
+          opacityValue={placePopOpacity}
+        />
+      ) : null}
       {claimPopActive ? (
         <ClaimPop dims={screenDims} scaleValue={claimPopScale} opacityValue={claimPopOpacity} />
       ) : null}

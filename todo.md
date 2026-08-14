@@ -287,3 +287,9 @@
 - [x] Preview snaps to the nearest tile under the cursor and renders horizontally flipped (scaleX -1); crops shown as emoji preview
 - [x] Preview hidden outside placement modes and during item move; does not interfere with pan/tap logic
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Place Success Pop + Sound
+- [x] When an item is successfully placed, show a brief pop animation (scale burst + ✨ sparkle) at the placed tile
+- [x] Play a subtle synthesized placement "pop" sound (Web Audio API, no external file) on web; light haptic on native
+- [x] Animation/sound only on NEW placements (buildings, roads, crops, farmland); free remove/toggle/corner rotation not triggered
+- [x] Verify TypeScript clean, 6 tests passing, app renders
