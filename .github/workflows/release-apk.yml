@@ -1,0 +1,128 @@
+# ============================================================
+# Release APK Workflow — Iso Tile Farm
+# ------------------------------------------------------------
+# How it works:
+#   1. Push a new tag (e.g. `v1.0.0`) OR manually trigger
+#      the workflow from the "Actions" tab in GitHub.
+#   2. This workflow installs dependencies, runs typecheck +
+#      tests, then asks EAS Build (expo.dev cloud) to build
+#      a signed Android APK (`preview` profile from eas.json).
+#   3. The finished APK is downloaded and attached to a
+#      GitHub Release so you can install/share it.
+#
+# One-time setup:
+#   * In this repo create an EAS Build token secret named
+#     `EXPO_TOKEN`:
+#       https://expo.dev/accounts/[your-account]/settings/access-tokens
+#       GitHub → Settings → Secrets and variables → Actions
+#       → New repository secret → name: EXPO_TOKEN
+#   * First time, run locally once to link the project:
+#       npx eas-cli login        (login with your expo account)
+#       npx eas build:configure  (creates/updates app.json eas.projectId)
+#     and commit the resulting app.json change.
+# ============================================================
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for the release (e.g. 1.0.10)"
+        required: false
+        default: "1.0.10"
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck & tests
+        run: |
+          pnpm check
+          pnpm test
+
+      - name: Setup Expo tools
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android APK with EAS (preview profile)
+        id: eas_build
+        run: |
+          set -e
+          # Start the build without waiting and capture the JSON output
+          BUILD_JSON=$(eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --no-wait \
+            --json)
+          echo "${BUILD_JSON}" | tee /tmp/eas-build.json
+          # eas-cli prints "Builds:" header lines before JSON — strip them
+          BUILD_ID=$(echo "${BUILD_JSON}" | grep -Eo '\{.*\}' | jq -r '.[0].id')
+          echo "build_id=${BUILD_ID}" >> "$GITHUB_OUTPUT"
+          echo "Build started: ${BUILD_ID}"
+
+      - name: Wait for build to finish & download APK
+        id: eas_result
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
+        run: |
+          set -e
+          ACCOUNT_SLUG=$(jq -r '.expo.owner // empty' app.json 2>/dev/null)
+          SLUG=$(jq -r '.expo.slug' app.json)
+          echo "account=${ACCOUNT_SLUG} slug=${SLUG}"
+          # Poll build status via Expo API
+          while true; do
+            RESP=$(curl -s -H "Authorization: Bearer ${EXPO_TOKEN}" \
+              "https://api.expo.dev/v2/accounts/${ACCOUNT_SLUG}/projects/${SLUG}/builds/${BUILD_ID}")
+            STATUS=$(echo "${RESP}" | jq -r '.data.status // .errors[0].message // "UNKNOWN"')
+            echo "Build status: ${STATUS}"
+            case "${STATUS}" in
+              FINISHED) echo "${RESP}" > /tmp/build-final.json; break ;;
+              ERRORED|CANCELLED) echo "Build failed: ${RESP}"; exit 1 ;;
+              *) sleep 30 ;;
+            esac
+          done
+          ARTIFACT_URL=$(jq -r '.data.artifacts.buildUrl' /tmp/build-final.json)
+          echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
+          curl -sL "${ARTIFACT_URL}" -o IsoTileFarm.apk
+          ls -lh IsoTileFarm.apk
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Iso Tile Farm APK ${{ github.event.inputs.version || github.ref_name }}"
+          tag_name: "v${{ github.event.inputs.version || 'latest' }}"
+          files: IsoTileFarm.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

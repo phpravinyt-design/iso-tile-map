@@ -565,3 +565,9 @@
 
 State after sandbox reset (2026-08-14): project restored at HEAD a1f9a1b2 (slower NPCs + butterfly orbits). Saved notes at /home/ubuntu/.recovery/flower_task_notes.md and build_fix_notes.md. Previous fixes applied: removed expo-video plugin, dropped armeabi-v7a (arm64-v8a only). Tests: 72 passing. EAS build still failing with "Gradle build failed with unknown error" (retryable: false) on the build server.
 EAS build logs are NOT directly accessible from sandbox (no eas-cli token/credentials in sandbox). Best approach: run `npx expo prebuild --platform android` locally, inspect generated android/ gradle config, and check for known Expo SDK 54 build-breakers (react-compiler, react-native 0.81, expo-video removed OK, newArchEnabled, kotlin version, etc.).
+
+## GitHub Actions Release APK Workflow (user: build APK via GitHub)
+- [x] Add `.github/workflows/release-apk.yml` — on tag push or manual dispatch: pnpm install → typecheck+tests → eas build (preview, APK) → poll status → download APK → GitHub Release artifact
+- [x] Add `eas.json` with preview/preview-arm64 (apk) and production (AAB) profiles
+- [x] Add minimal app.json (expo.owner placeholder + slug) required by eas-cli
+- [x] Validated: YAML OK, app.json OK, tsc clean, 72 tests passing; checkpoint + delivery instructions (EXPO_TOKEN secret, eas login + build:configure)
