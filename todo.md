@@ -548,3 +548,8 @@
 - [x] Persist regrowth queue to AsyncStorage (flower_regrowth_v1), pruned of expired entries
 - [x] Visual bloom effect: ✨ HarvestSparkles overlay + place sound + haptic when flower regrows
 - [x] 8 new vitest tests for regrowth queue semantics (72 passing, tsc clean), checkpoint
+
+## NPC/Bird Speed & Butterfly Behavior (user request)
+- [x] Reduced speeds: NPCs 1.2→0.5, animals 0.8→0.35, vehicles 2.0→0.8 tiles/s; birds 0.07-0.14→0.03-0.06, butterflies 0.04-0.07→0.015-0.03, bats/fireflies halved; idle times increased (NPC 3s, animals 4s) for calmer random wandering
+- [x] Butterflies attracted to placed flowers: 🌸 Butterflies orbit flower tiles (ellipse flutter above each flower, ~9s lap, targets rotate every 25s); falls back to slow meander when no flowers; matches gridToScreen projection so orbits follow pan/zoom
+- [x] Tests + tsc clean (72 passing), checkpoint

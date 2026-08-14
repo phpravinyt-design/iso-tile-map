@@ -183,8 +183,8 @@ const NPC_SOURCES: Record<string, any> = {
 
 // NPC walking config
 const NPC_COUNT = 4;
-const NPC_WALK_SPEED = 1.2; // tiles per second
-const NPC_IDLE_TIME = 1500; // ms to wait before picking a new destination
+const NPC_WALK_SPEED = 0.5; // tiles per second (calmer, leisurely stroll)
+const NPC_IDLE_TIME = 3000; // ms to wait before picking a new destination
 
 // Speech bubble messages for NPCs and animals
 const NPC_MESSAGES: Record<string, string[]> = {
@@ -211,8 +211,8 @@ const FARMER_3D_MESSAGES: string[] = [
 
 // Animal walking config
 const ANIMAL_COUNT = 3;
-const ANIMAL_WALK_SPEED = 0.8; // animals walk slower
-const ANIMAL_IDLE_TIME = 2500; // animals idle longer
+const ANIMAL_WALK_SPEED = 0.35; // animals wander slowly
+const ANIMAL_IDLE_TIME = 4000; // animals idle longer
 
 // Farmer task-helper: hint messages shown above a ready crop
 const FARMER_HINT_MESSAGES: string[] = [
@@ -280,8 +280,8 @@ const VEHICLE_SOURCES: Record<string, any> = {
 
 // Vehicle config
 const VEHICLE_COUNT = 3;
-const VEHICLE_WALK_SPEED = 2.0; // faster than NPCs
-const VEHICLE_IDLE_TIME = 500; // shorter idle on roads
+const VEHICLE_WALK_SPEED = 0.8; // slower, relaxed cruise
+const VEHICLE_IDLE_TIME = 1500; // idle on roads
 
 // Get all road tiles on the map
 function getRoadTiles(grid: GridCell[][]): { x: number; y: number }[] {
@@ -570,7 +570,7 @@ function createWildlife(w: Partial<WildlifeCreature> = {}): WildlifeCreature {
     type: isBird ? "bird" : "butterfly",
     startX: isBird ? (Math.random() < 0.5 ? -0.08 : 1.08) : -0.08,
     y: isBird ? 0.08 + Math.random() * 0.3 : 0.35 + Math.random() * 0.45,
-    speed: isBird ? 0.07 + Math.random() * 0.07 : 0.04 + Math.random() * 0.03,
+    speed: isBird ? 0.03 + Math.random() * 0.03 : 0.015 + Math.random() * 0.015,
     phase: Math.random() * Math.PI * 2,
     dir: isBird ? (Math.random() < 0.5 ? 1 : -1) : 1,
     emoji: isBird ? (Math.random() < 0.6 ? "🐦" : "🕊️") : Math.random() < 0.5 ? "🦋" : "🐝",
@@ -578,7 +578,7 @@ function createWildlife(w: Partial<WildlifeCreature> = {}): WildlifeCreature {
     ...w,
   };
 }
-function WildlifeOverlay({ scale, weather }: { scale: number; weather: "sunny" | "cloudy" | "rainy" }) {
+function WildlifeOverlay({ scale, weather, flowerCells, camera }: { scale: number; weather: "sunny" | "cloudy" | "rainy"; flowerCells: { row: number; col: number }[]; camera: { scale: number; offsetX: number; offsetY: number; viewW: number; viewH: number } }) {
   // Ambient wildlife only visible at moderate zooms (too small when zoomed out, too crowded when zoomed in)
   const [, setTick] = useState(0);
   // Weather reactivity: birds hide during rain (they take shelter); butterflies/bees love sunny
@@ -608,29 +608,82 @@ function WildlifeOverlay({ scale, weather }: { scale: number; weather: "sunny" |
   const fadeElapsed = (Date.now() - fadeStart) / 1000;
   const fadeAlpha = Math.min(1, fadeElapsed / 0.8); // 0.8s fade when weather changes
   const baseOpacity = visible ? 0.9 * fadeAlpha : Math.max(0, 0.9 * (1 - fadeAlpha));
+  // 🦋 Butterflies are drawn to the flowers on the map: each butterfly locks onto a
+  // flower target and gently flutters around it in a slow elliptical orbit with a
+  // bob; when no flowers exist, it meanders slowly across the screen as before.
+  // Targets are re-picked every ~25s so butterflies visit different flowers.
+  const hasFlowers = flowerCells.length > 0;
+  type Target = { row: number; col: number; since: number };
+  const [targets, setTargets] = useState<Target[]>(() =>
+    creatures.map(() => {
+      const f = hasFlowers ? flowerCells[Math.floor(Math.random() * flowerCells.length)] : null;
+      return { row: f?.row ?? 0, col: f?.col ?? 0, since: Date.now() };
+    })
+  );
+  const targetsRef = useRef<Target[]>(targets);
+  useEffect(() => {
+    targetsRef.current = targets;
+  }, [targets]);
+  useEffect(() => {
+    if (!hasFlowers) return;
+    const interval = setInterval(() => {
+      setTargets((prev: Target[]) => prev.map((t: Target) => {
+        if (flowerCells.length === 0) return t;
+        const f = flowerCells[Math.floor(Math.random() * flowerCells.length)];
+        return f ? { ...t, row: f.row, col: f.col, since: Date.now() } : t;
+      }));
+    }, 25000);
+    return () => clearInterval(interval);
+  }, [hasFlowers]);
+  // Map tile → screen pixels (same isometric math as gridToScreen + the map transform)
+  const tileToScreenXY = (row: number, col: number) => {
+    const cx = GRID_SIZE / 2 - 0.5;
+    const cy = GRID_SIZE / 2 - 0.5;
+    const x = (col - cx) * TILE_SIZE * camera.scale + camera.offsetX;
+    const y = (row - cy) * TILE_SIZE * camera.scale + camera.offsetY;
+    return { x, y };
+  };
   if (baseOpacity <= 0.01) return null;
   return (
     <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, zIndex: 12 }}>
-      {creatures.slice(0, activeCount).map((c) => {
+      {creatures.slice(0, activeCount).map((c, idx) => {
         // Weather-reactive visibility per creature type
         if (c.type === "bird" && weather === "rainy") return null; // birds take shelter in rain
         if (c.type === "butterfly" && !visible) return null;
-        // Recycle creature position for a continuous stream
-        const cycleSec = 1 / c.speed;
-        const t = (elapsed + c.startX / c.speed) % 1;
-        const x = c.startX + t; // 0→1 across screen
-        if (x < -0.12 || x > 1.12) return null;
-        // Cloudy = calmer flight; birds fly lower and slower under clouds
+        let leftPct: number;
+        let topPct: number;
         const bobAmp = weather === "cloudy" ? 3 : 6;
-        const bob = Math.sin(elapsed * 3 + c.phase) * bobAmp; // gentle bob/zigzag
         const z = Math.sin(elapsed * 1.5 + c.phase * 0.5) * 0.06; // subtle altitude drift (scale)
+        const isButterflyAtFlower = c.type === "butterfly" && hasFlowers;
+        if (isButterflyAtFlower) {
+          const target = targets[idx] ?? { row: 0, col: 0 };
+          const { x: fx, y: fy } = tileToScreenXY(target.row, target.col);
+          const angle = elapsed * 0.7 + c.phase; // slow ellipse orbit (~9s lap)
+          const rad = 38 + c.phase * 8; // orbit radius varies per butterfly
+          const px = fx + Math.cos(angle) * rad;
+          const py = fy + Math.sin(angle) * rad * 0.55 - 22; // squashed ellipse above the flower
+          const bob = Math.sin(elapsed * 4 + c.phase) * bobAmp;
+          leftPct = (px / camera.viewW) * 100;
+          topPct = ((py + bob) / camera.viewH) * 100;
+        } else {
+          const cycleSec = 1 / c.speed;
+          const t = (elapsed + c.startX / c.speed) % 1;
+          const x = c.startX + t; // 0→1 across screen
+          if (x < -0.12 || x > 1.12) return null;
+          const bob = Math.sin(elapsed * 3 + c.phase) * bobAmp; // gentle bob/zigzag
+          leftPct = x * 100;
+          topPct = (c.y * 100) + (bob * 0.15);
+        }
+        const bob = isButterflyAtFlower
+          ? Math.sin(elapsed * 4 + c.phase) * bobAmp
+          : Math.sin(elapsed * 3 + c.phase) * bobAmp;
         return (
           <Text
             key={c.id}
             style={{
               position: "absolute",
-              left: `${x * 100}%`,
-              top: `${(c.y * 100) + (bob * 0.15)}%`,
+              left: `${leftPct}%`,
+              top: `${topPct}%`,
               fontSize: c.size,
               lineHeight: c.size + 8,
               opacity: baseOpacity,
@@ -668,7 +721,7 @@ function createNightCreature(type: "bat" | "firefly"): NightCreature {
     type,
     startX: isBat ? (Math.random() < 0.5 ? -0.08 : 1.08) : Math.random(),
     y: isBat ? 0.05 + Math.random() * 0.3 : 0.5 + Math.random() * 0.4,
-    speed: isBat ? 0.08 + Math.random() * 0.06 : 0.01 + Math.random() * 0.015,
+    speed: isBat ? 0.04 + Math.random() * 0.03 : 0.005 + Math.random() * 0.008,
     phase: Math.random() * Math.PI * 2,
     dir: isBat ? (Math.random() < 0.5 ? 1 : -1) : 1,
     size: isBat ? 22 + Math.random() * 10 : 12 + Math.random() * 6,
@@ -6242,6 +6295,24 @@ export default function IsometricMap() {
     return { width: totalSize, height: totalSize };
   }, []);
 
+  // 🌸 Tiles with placed flower decorations — butterflies orbit these positions
+  const FLOWER_DECORATION_TYPES = [
+    "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender",
+    "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies",
+  ] as const;
+  const placedFlowerCells = useMemo(() => {
+    const cells: { row: number; col: number }[] = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const b = grid[row][col].building;
+        if (FLOWER_DECORATION_TYPES.includes(b as (typeof FLOWER_DECORATION_TYPES)[number])) {
+          cells.push({ row, col });
+        }
+      }
+    }
+    return cells;
+  }, [grid]);
+
   return (
     <View style={styles.container}>
       <GestureHandlerRootView style={styles.mapContainer}>
@@ -7076,7 +7147,13 @@ export default function IsometricMap() {
       ) : null}
 
       {/* Ambient wildlife: birds and butterflies drifting across the farm */}
-      <WildlifeOverlay key={Math.floor(currentScale * 10)} scale={currentScale} weather={weather} />
+      <WildlifeOverlay
+        key={Math.floor(currentScale * 10)}
+        scale={currentScale}
+        weather={weather}
+        flowerCells={placedFlowerCells}
+        camera={{ scale: currentScale, offsetX: offsetX.value, offsetY: offsetY.value, viewW: gridBounds.width, viewH: gridBounds.height }}
+      />
 
       {/* Nighttime wildlife: bats and fireflies, only visible in the dark */}
       <NightlifeOverlay isNight={isNight} />
