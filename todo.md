@@ -281,3 +281,9 @@
 - [x] When mirror toggle is ON, the placed item renders mirrored (flipped stored in grid cell)
 - [x] Mirror state applies to all placement modes (community, temple, decoration, industry, farm, tree, house, town market, roads)
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Mirrored Cursor Preview
+- [x] When mirror toggle is ON and a placement mode is active, show the selected item as a semi-transparent mirrored preview that follows the cursor on the map (web)
+- [x] Preview snaps to the nearest tile under the cursor and renders horizontally flipped (scaleX -1); crops shown as emoji preview
+- [x] Preview hidden outside placement modes and during item move; does not interfere with pan/tap logic
+- [x] Verify TypeScript clean, 6 tests passing, app renders

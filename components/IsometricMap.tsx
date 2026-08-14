@@ -2583,6 +2583,20 @@ export default function IsometricMap() {
     return () => clearInterval(interval);
   }, [grid, timeOfDay, isNight, nearestBuilding, weather]);
 
+  // Mirrored cursor preview (web): track pointer position for the preview overlay
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const handlePointerMove = useCallback((e: any) => {
+    // On web, capture pointer position relative to the map container for the cursor preview
+    const locX = e.nativeEvent?.locationX;
+    const locY = e.nativeEvent?.locationY;
+    if (typeof locX === "number" && typeof locY === "number") {
+      setCursorPos({ x: locX, y: locY });
+    }
+  }, []);
+  const handlePointerLeave = useCallback(() => {
+    setCursorPos(null);
+  }, []);
+
   // Pan gesture
   const panGesture = useMemo(
     () =>
@@ -3373,6 +3387,71 @@ export default function IsometricMap() {
               {animalSprites}
               {/* Vehicle NPCs: cars/trucks driving on roads */}
               {vehicleSprites}
+              {/* Mirrored cursor preview (web): semi-transparent flipped item following the pointer */}
+              {cursorPos && mirrorMode && mode !== "tile" && mode !== "grass_plant" && !moveClipboard && (() => {
+                let previewSrc: number | null = null;
+                const placementModes: string[] = ["community", "temple", "decoration", "industry", "farm", "tree", "house_small", "house_big", "town_market", "road", "tiles"];
+                if (placementModes.includes(mode)) {
+                  if (mode === "community") previewSrc = selectedCommunityType ? (COMMUNITY_SOURCES as any)[selectedCommunityType] ?? null : null;
+                  else if (mode === "temple") previewSrc = selectedTempleType ? (TEMPLE_SOURCES as any)[selectedTempleType] ?? null : null;
+                  else if (mode === "decoration") previewSrc = selectedDecorationType ? (DECORATION_SOURCES as any)[selectedDecorationType] ?? null : null;
+                  else if (mode === "industry") previewSrc = selectedIndustryType ? (INDUSTRY_SOURCES as any)[selectedIndustryType] ?? null : null;
+                  else if (mode === "farm") previewSrc = selectedFarmType ? (FARM_SOURCES as any)[selectedFarmType] ?? null : null;
+                  else if (mode === "tree") previewSrc = selectedTreeType ? (TREE_SOURCES as any)[selectedTreeType] ?? TREE_PNG : null;
+                  else if (mode === "road") previewSrc = selectedRoadType ? (ROAD_SOURCES as any)[selectedRoadType] ?? ROAD_STRAIGHT_PNG : null;
+                  else if (mode === "tiles") {
+                    if (selectedTileType === "farmland") previewSrc = null; // crop preview uses emoji below
+                    else previewSrc = (TILE_TEXTURE_SOURCES as any)[selectedTileType] ?? null;
+                  }
+                  else previewSrc = selectedHouseType ? (HOUSE_SOURCES as any)[selectedHouseType] ?? HOUSE_PNG : null;
+                }
+                // Crop preview: render the selected crop emoji (crops are emoji-based, not PNG sprites)
+                const cropEmojiPreview = mode === "tiles" && selectedTileType === "farmland" ? (CROP_EMOJIS as any)[selectedCropType] ?? null : null;
+                if (!previewSrc && !cropEmojiPreview) return null;
+                // Convert pointer coords (map container space) to grid coords
+                const halfMap = (GRID_SIZE * TILE_SIZE) / 2;
+                const gx = (cursorPos.x - halfMap + offsetX.value + halfMap) / (TILE_SIZE * currentScale) + (GRID_SIZE / 2 - 0.5);
+                const gy = (cursorPos.y - halfMap + offsetY.value + halfMap) / (TILE_SIZE * currentScale) + (GRID_SIZE / 2 - 0.5);
+                const snapCol = Math.round(gx);
+                const snapRow = Math.round(gy);
+                const inBounds = snapCol >= 0 && snapCol < GRID_SIZE && snapRow >= 0 && snapRow < GRID_SIZE;
+                const pos = gridToScreen(inBounds ? snapCol : gx, inBounds ? snapRow : gy, currentScale);
+                return cropEmojiPreview ? (
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: "absolute",
+                      width: TILE_SIZE * currentScale * 0.9,
+                      height: TILE_SIZE * currentScale * 0.9,
+                      left: pos.x - (TILE_SIZE * currentScale * 0.9) / 2,
+                      top: pos.y - (TILE_SIZE * currentScale * 0.9) / 2,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: 0.55,
+                      transform: [{ scaleX: -1 }],
+                      zIndex: 60,
+                    }}
+                  >
+                    <Text style={{ fontSize: TILE_SIZE * currentScale * 0.6 }}>{cropEmojiPreview}</Text>
+                  </View>
+                ) : (
+                  <Image
+                    source={previewSrc}
+                    pointerEvents="none"
+                    style={{
+                      position: "absolute",
+                      width: TILE_SIZE * currentScale * 0.9,
+                      height: TILE_SIZE * currentScale * 0.9,
+                      left: pos.x - (TILE_SIZE * currentScale * 0.9) / 2,
+                      top: pos.y - (TILE_SIZE * currentScale * 0.9) / 2,
+                      opacity: 0.55,
+                      transform: [{ scaleX: -1 }],
+                      zIndex: 60,
+                    }}
+                    resizeMode="contain"
+                  />
+                );
+              })()}
               {/* Night overlay: dark blue tint during nighttime */}
               {nightOpacity > 0 && (
                 <View
