@@ -532,28 +532,51 @@ function createWildlife(w: Partial<WildlifeCreature> = {}): WildlifeCreature {
     ...w,
   };
 }
-function WildlifeOverlay({ scale }: { scale: number }) {
+function WildlifeOverlay({ scale, weather }: { scale: number; weather: "sunny" | "cloudy" | "rainy" }) {
   // Ambient wildlife only visible at moderate zooms (too small when zoomed out, too crowded when zoomed in)
   const [, setTick] = useState(0);
+  // Weather reactivity: birds hide during rain (they take shelter); butterflies/bees love sunny
+  // weather and reduce in clouds; everyone hides in heavy rain. Fades in/out smoothly.
+  const visible = weather !== "rainy";
+  // Sunny = full cast, cloudy = fewer butterflies/bees, birds still fly under clouds
+  const activeCount = weather === "sunny" ? 5 : weather === "cloudy" ? 3 : 0;
   const [creatures] = useState<WildlifeCreature[]>(() =>
     Array.from({ length: 5 }, () => createWildlife())
   );
   const bornRef = useRef(Date.now());
+  const visibleRef = useRef(visible);
+  // Track when visibility last changed to drive a fade transition
+  const [fadeStart, setFadeStart] = useState(() => Date.now());
   useEffect(() => {
     bornRef.current = Date.now();
     const interval = setInterval(() => setTick((n) => n + 1), 50); // 20fps ambient, not gameplay-critical
     return () => clearInterval(interval);
   }, []);
+  useEffect(() => {
+    if (visibleRef.current !== visible) {
+      visibleRef.current = visible;
+      setFadeStart(Date.now());
+    }
+  }, [visible]);
   const elapsed = (Date.now() - bornRef.current) / 1000;
+  const fadeElapsed = (Date.now() - fadeStart) / 1000;
+  const fadeAlpha = Math.min(1, fadeElapsed / 0.8); // 0.8s fade when weather changes
+  const baseOpacity = visible ? 0.9 * fadeAlpha : Math.max(0, 0.9 * (1 - fadeAlpha));
+  if (baseOpacity <= 0.01) return null;
   return (
     <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, zIndex: 12 }}>
-      {creatures.map((c) => {
+      {creatures.slice(0, activeCount).map((c) => {
+        // Weather-reactive visibility per creature type
+        if (c.type === "bird" && weather === "rainy") return null; // birds take shelter in rain
+        if (c.type === "butterfly" && !visible) return null;
         // Recycle creature position for a continuous stream
         const cycleSec = 1 / c.speed;
         const t = (elapsed + c.startX / c.speed) % 1;
         const x = c.startX + t; // 0→1 across screen
         if (x < -0.12 || x > 1.12) return null;
-        const bob = Math.sin(elapsed * 3 + c.phase) * 6; // gentle bob/zigzag
+        // Cloudy = calmer flight; birds fly lower and slower under clouds
+        const bobAmp = weather === "cloudy" ? 3 : 6;
+        const bob = Math.sin(elapsed * 3 + c.phase) * bobAmp; // gentle bob/zigzag
         const z = Math.sin(elapsed * 1.5 + c.phase * 0.5) * 0.06; // subtle altitude drift (scale)
         return (
           <Text
@@ -564,7 +587,7 @@ function WildlifeOverlay({ scale }: { scale: number }) {
               top: `${(c.y * 100) + (bob * 0.15)}%`,
               fontSize: c.size,
               lineHeight: c.size + 8,
-              opacity: 0.9,
+              opacity: baseOpacity,
               zIndex: 12,
               transform: [{ scaleX: c.dir }, { scale: 1 + z }, { rotate: `${bob * 0.8}deg` }],
             }}
@@ -4792,7 +4815,7 @@ export default function IsometricMap() {
       ) : null}
 
       {/* Ambient wildlife: birds and butterflies drifting across the farm */}
-      <WildlifeOverlay key={Math.floor(currentScale * 10)} scale={currentScale} />
+      <WildlifeOverlay key={Math.floor(currentScale * 10)} scale={currentScale} weather={weather} />
 
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (

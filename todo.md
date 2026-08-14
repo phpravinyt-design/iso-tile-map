@@ -350,3 +350,8 @@
 - [x] Birds (🐦/🕊️) drift across the screen with a gentle bob and slight rotation; butterflies (🦋) and bees (🐝) flutter near the map's middle band with zigzag drift
 - [x] Wildlife renders as a pointerEvents="none" overlay (zIndex 12) below UI panels, never blocking pan/zoom/placement; 5 creatures max, each recycled in a continuous stream at ~20fps
 - [x] Each creature has random entry side, height band, speed, and size; TypeScript clean, 14 tests passing, visual check confirmed (birds visible in screenshot)
+
+## Weather-Reactive Wildlife
+- [x] Birds hide during rain (fade out over 0.8s, stop rendering) and return when weather clears; cloudy = calmer, lower-amplitude flight
+- [x] Butterflies/bees are at full cast (5) in sunny weather, reduced (3) in cloudy, and 0 in rain; wildlife opacity fades smoothly (0.8s) on weather change
+- [x] Wired into the existing weather system state (sunny/cloudy/rainy), not random; TypeScript clean, 14 tests passing
