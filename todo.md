@@ -576,3 +576,10 @@ EAS build logs are NOT directly accessible from sandbox (no eas-cli token/creden
 - [x] eas.json autoIncrement enabled (preview/preview-arm64/production) with remote appVersionSource
 - [x] Workflow "Auto bump version" step: patch/minor/major semver bump of package.json version + eas build:version:increment when eas.projectId linked; release name/tag use bumped version; manual trigger input `bump_type`
 - [x] Validated: YAML OK, bump logic tested (1.0.10→1.0.11 patch, 1.0.10→1.1.0 minor), tsc clean, 72 tests passing; checkpoint + updated instructions
+
+## Release APK Workflow Hardening (user checklist)
+- [x] Inspected: scripts exist (check=tsc, test=vitest), pnpm@9.12.0 + pnpm-lock.yaml, no eas.projectId (not linked), app.json placeholder owner, no debug workflow exists (only release-apk.yml)
+- [x] Workflow rewrite: fail-fast EXPO_TOKEN check (::error::), EAS link validation step before build, robust build-ID extraction (grep '"id"' tolerant), custom Expo API polling with .data validation + status whitelist + 35-min timeout, APK non-empty validation with curl --fail --retry, release tag collision fails loudly (unique version tag)
+- [x] Versioning: removed `|| true` error-swallowing; remote versionCode handled by eas.json autoIncrement (appVersionSource remote) — no manual version:increment needed; clear notice log added
+- [x] app.json: added version 1.0.0, platforms, android.package; owner placeholder kept (must be replaced by user) with clear workflow error if missing
+- [x] Validated: YAML/JSON/expressions OK, tsc clean, 72 tests passing; checkpoint + full fix report (changed files, reasons, secrets, exact run steps)

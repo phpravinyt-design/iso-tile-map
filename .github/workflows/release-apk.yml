@@ -2,24 +2,30 @@
 # Release APK Workflow — Iso Tile Farm
 # ------------------------------------------------------------
 # How it works:
-#   1. Push a new tag (e.g. `v1.0.0`) OR manually trigger
-#      the workflow from the "Actions" tab in GitHub.
+#   1. Push a new tag (e.g. `v1.0.0`) OR manually trigger this
+#      workflow from the "Actions" tab in GitHub.
 #   2. This workflow installs dependencies, runs typecheck +
-#      tests, then asks EAS Build (expo.dev cloud) to build
-#      a signed Android APK (`preview` profile from eas.json).
-#   3. The finished APK is downloaded and attached to a
-#      GitHub Release so you can install/share it.
+#      tests, then asks EAS Build (expo.dev cloud) to build a
+#      signed Android APK (`preview` profile from eas.json).
+#   3. The finished APK is downloaded, validated (non-empty),
+#      and attached to a GitHub Release so you can share it.
 #
 # One-time setup:
-#   * In this repo create an EAS Build token secret named
-#     `EXPO_TOKEN`:
-#       https://expo.dev/accounts/[your-account]/settings/access-tokens
-#       GitHub → Settings → Secrets and variables → Actions
-#       → New repository secret → name: EXPO_TOKEN
-#   * First time, run locally once to link the project:
-#       npx eas-cli login        (login with your expo account)
-#       npx eas build:configure  (creates/updates app.json eas.projectId)
-#     and commit the resulting app.json change.
+#   1. Create an EAS Build access token:
+#        https://expo.dev/accounts/[your-account]/settings/access-tokens
+#      then add it to this repo as a secret named EXPO_TOKEN:
+#        GitHub repo → Settings → Secrets and variables → Actions
+#        → New repository secret → name: EXPO_TOKEN
+#   2. Replace the owner placeholder in app.json:
+#        "owner": "TO_BE_REPLACED"  →  "owner": "<your-expo-username>"
+#      (must be a lowercase letter followed by letters/digits/
+#       underscores/hyphens; find it at expo.dev → your profile)
+#   3. Link the project once (any machine, terminal):
+#        npx eas login            (login with your expo account)
+#        npx eas build:configure  (writes expo.eas.projectId)
+#      and commit the resulting app.json change. Without this,
+#      `eas build` fails with a clear error telling you to run
+#      `eas init`/`eas build:configure`.
 # ============================================================
 name: Release APK
 
@@ -30,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: "Version bump type: major / minor / patch (defaults to patch)"
+        description: "Version bump type: major / minor / patch"
         required: false
         default: "patch"
 
@@ -45,15 +51,30 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # ----------------------------------------------------------
+      # 1. Fail-fast: EXPO_TOKEN must exist before doing any work
+      # ----------------------------------------------------------
+      - name: Check required secrets
+        if: ${{ secrets.EXPO_TOKEN == '' }}
+        run: |
+          echo "::error::EXPO_TOKEN secret is missing."
+          echo "::error::Create it: https://expo.dev/accounts/[account]/settings/access-tokens"
+          echo "::error::Then add in this repo: Settings → Secrets and variables → Actions → New repository secret → EXPO_TOKEN"
+          exit 1
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
 
+      # ----------------------------------------------------------
+      # 2. pnpm setup — matches package.json "packageManager":
+      #    "pnpm@9.12.0" and pnpm-lock.yaml (no npm/yarn lockfiles)
+      # ----------------------------------------------------------
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -62,28 +83,54 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ----------------------------------------------------------
+      # 3. Pre-build checks — actual scripts in package.json:
+      #    "check": "tsc --noEmit" , "test": "vitest run"
+      # ----------------------------------------------------------
       - name: Typecheck & tests
         run: |
           pnpm check
           pnpm test
 
-      # ------------------------------------------------------------------
-      # AUTO VERSION BUMP
-      # Increments package.json "version" (major|minor|patch) using the
-      # remote source of truth from EAS, so every release gets a fresh
-      # incremented versionCode automatically — no manual version edits.
-      # ------------------------------------------------------------------
+      # ----------------------------------------------------------
+      # 4. Expo CLI tools (authenticates eas-cli with EXPO_TOKEN)
+      # ----------------------------------------------------------
+      - name: Setup Expo tools
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # ----------------------------------------------------------
+      # 5. Validate EAS linkage BEFORE starting a build, so a
+      #    missing projectId fails here with a clear message
+      #    instead of after a 30-minute build.
+      # ----------------------------------------------------------
+      - name: Validate EAS project link
+        run: |
+          set -e
+          if [ -z "$(jq -r '.expo.eas.projectId // empty' app.json 2>/dev/null)" ]; then
+            echo "::error::EAS project is not linked. Run these once and commit app.json:"
+            echo "::error::  npx eas login"
+            echo "::error::  npx eas build:configure"
+            echo "::error::Also make sure app.json has \"owner\": \"<your-expo-username>\"."
+            exit 1
+          fi
+          echo "EAS project linked: $(jq -r '.expo.eas.projectId' app.json)"
+
+      # ----------------------------------------------------------
+      # 6. AUTO VERSION BUMP (dispatch or tag push)
+      #    Bumps package.json "version" (semver) so the local app
+      #    version stays monotonic. Remote versionCode increment
+      #    is handled by eas.json "autoIncrement": true (source:
+      #    remote) — no manual eas build:version:increment needed.
+      # ----------------------------------------------------------
       - name: Auto bump version
         id: bump
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -e
           BUMP_TYPE="${{ github.event.inputs.bump_type || 'patch' }}"
-          # 1) Current local version
           CURRENT=$(jq -r '.version' package.json)
-          echo "Current version: ${CURRENT}"
-          # 2) Compute bumped version (semver) on CI shell
           MAJOR=$(echo "${CURRENT}" | cut -d. -f1)
           MINOR=$(echo "${CURRENT}" | cut -d. -f2)
           PATCH=$(echo "${CURRENT}" | cut -d. -f3)
@@ -93,74 +140,122 @@ jobs:
             patch) NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
             *)     NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
           esac
-          echo "New version: ${NEXT}"
-          # 3) Write bumped version back to package.json
-          jq --arg v "${NEXT}" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
-          # 4) If EAS is linked (eas.projectId in app.json), ask EAS to bump
-          #    the remote appVersion too (source: remote) so versionCode
-          #    increments on EAS's side as well.
-          HAS_PROJECT_ID=$(jq -r '.expo.eas.projectId // empty' app.json 2>/dev/null)
-          if [ -n "${HAS_PROJECT_ID}" ]; then
-            eas build:version:increment --platform android --non-interactive || true
-          fi
+          echo "Bumping version: ${CURRENT} -> ${NEXT} (${BUMP_TYPE})"
+          jq --arg v "${NEXT}" '.version = $v' package.json > package.json.tmp \
+            && mv package.json.tmp package.json
           echo "new_version=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "new_tag=v${NEXT}" >> "$GITHUB_OUTPUT"
           grep '"version"' package.json
+          echo "::notice::Remote versionCode is auto-incremented by eas.json autoIncrement (appVersionSource: remote)."
 
-      - name: Setup Expo tools
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Build Android APK with EAS (preview profile)
+      # ----------------------------------------------------------
+      # 7. Start the EAS Build (APK, preview profile)
+      #    Build ID is parsed from the CLI JSON output with a
+      #    tolerant extractor that ignores header lines.
+      # ----------------------------------------------------------
+      - name: Start EAS build (Android APK, preview profile)
         id: eas_build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -e
-          # Start the build without waiting and capture the JSON output
           BUILD_JSON=$(eas build \
             --platform android \
             --profile preview \
             --non-interactive \
             --no-wait \
-            --json)
+            --json 2>&1) || {
+            echo "::error::eas build failed to start. Output:"
+            echo "${BUILD_JSON}"
+            exit 1
+          }
           echo "${BUILD_JSON}" | tee /tmp/eas-build.json
-          # eas-cli prints "Builds:" header lines before JSON — strip them
-          BUILD_ID=$(echo "${BUILD_JSON}" | grep -Eo '\{.*\}' | jq -r '.[0].id')
+          BUILD_ID=$(echo "${BUILD_JSON}" | grep -Eo '"id"\s*:\s*"[^"]+"' \
+            | head -1 | sed -E 's/.*"id"\s*:\s*"([^"]+)".*/\1/')
+          if [ -z "${BUILD_ID}" ]; then
+            echo "::error::Could not parse build ID from eas-cli output:"
+            echo "${BUILD_JSON}"
+            exit 1
+          fi
           echo "build_id=${BUILD_ID}" >> "$GITHUB_OUTPUT"
           echo "Build started: ${BUILD_ID}"
 
-      - name: Wait for build to finish & download APK
+      # ----------------------------------------------------------
+      # 8. Poll build status via the Expo GraphQL public API
+      #    (custom polling is required because EAS CLI has no
+      #    "wait-for-one-build" command). Response format is
+      #    validated at each step with clear errors.
+      # ----------------------------------------------------------
+      - name: Wait for build & download APK
         id: eas_result
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
+          MAX_ATTEMPTS: "70"
         run: |
           set -e
-          ACCOUNT_SLUG=$(jq -r '.expo.owner // empty' app.json 2>/dev/null)
+          OWNER=$(jq -r '.expo.owner' app.json)
           SLUG=$(jq -r '.expo.slug' app.json)
-          echo "account=${ACCOUNT_SLUG} slug=${SLUG}"
-          # Poll build status via Expo API
-          while true; do
-            RESP=$(curl -s -H "Authorization: Bearer ${EXPO_TOKEN}" \
-              "https://api.expo.dev/v2/accounts/${ACCOUNT_SLUG}/projects/${SLUG}/builds/${BUILD_ID}")
-            STATUS=$(echo "${RESP}" | jq -r '.data.status // .errors[0].message // "UNKNOWN"')
-            echo "Build status: ${STATUS}"
+          if [ -z "${OWNER}" ] || [ "${OWNER}" = "TO_BE_REPLACED" ]; then
+            echo "::error::app.json \"owner\" is empty or still the placeholder. Set it to your Expo username and commit."
+            exit 1
+          fi
+          API="https://api.expo.dev/v2/accounts/${OWNER}/projects/${SLUG}/builds/${BUILD_ID}"
+          ATTEMPT=0
+          while [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; do
+            RESP=$(curl -sS -H "Authorization: Bearer ${EXPO_TOKEN}" "${API}")
+            if ! echo "${RESP}" | jq -e '.data' >/dev/null 2>&1; then
+              echo "::error::Unexpected Expo API response (no .data field):"
+              echo "${RESP}"
+              exit 1
+            fi
+            STATUS=$(jq -r '.data.status' "${RESP}")
+            echo "Attempt $((ATTEMPT+1))/${MAX_ATTEMPTS} — build status: ${STATUS}"
             case "${STATUS}" in
               FINISHED) echo "${RESP}" > /tmp/build-final.json; break ;;
-              ERRORED|CANCELLED) echo "Build failed: ${RESP}"; exit 1 ;;
-              *) sleep 30 ;;
+              ERRORED)
+                echo "::error::EAS build ERRORED. Details:"
+                jq -r '.data | {platform, status, error: (.completedWithErrorCode // .distributionUrl // "see Expo dashboard"), logsUrl: .logUrl // "https://expo.dev/dashboard" }' /tmp/build-final.json 2>/dev/null || echo "${RESP}"
+                exit 1 ;;
+              CANCELLED)
+                echo "::error::EAS build was CANCELLED."; exit 1 ;;
+              IN_QUEUE|IN_PROGRESS|CREATED) sleep 30 ;;
+              *)
+                echo "::warning::Unknown status '${STATUS}', waiting..."
+                sleep 30 ;;
             esac
+            ATTEMPT=$((ATTEMPT+1))
           done
-          ARTIFACT_URL=$(jq -r '.data.artifacts.buildUrl' /tmp/build-final.json)
+          if [ "${ATTEMPT}" -ge "${MAX_ATTEMPTS}" ]; then
+            echo "::error::Build did not finish within $((MAX_ATTEMPTS*30/60)) minutes. Check https://expo.dev/dashboard"
+            exit 1
+          fi
+          ARTIFACT_URL=$(jq -r '.data.artifacts.buildUrl // empty' /tmp/build-final.json)
+          if [ -z "${ARTIFACT_URL}" ]; then
+            echo "::error::Build finished but no APK artifact URL in response."
+            echo "::error::Final response:"
+            cat /tmp/build-final.json
+            exit 1
+          fi
           echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
-          curl -sL "${ARTIFACT_URL}" -o IsoTileFarm.apk
+          echo "Downloading APK..."
+          curl -sSL --fail --retry 3 --retry-delay 5 "${ARTIFACT_URL}" -o IsoTileFarm.apk
+          if [ ! -s IsoTileFarm.apk ]; then
+            echo "::error::Downloaded APK is empty or download failed."
+            exit 1
+          fi
           ls -lh IsoTileFarm.apk
+          file IsoTileFarm.apk || true
 
+      # ----------------------------------------------------------
+      # 9. Attach the validated APK to a GitHub Release.
+      #    Tag collisions fail loudly (release stays unique).
+      # ----------------------------------------------------------
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          name: "Iso Tile Farm APK ${{ steps.bump.outputs.new_version || 'latest' }}"
-          tag_name: "v${{ steps.bump.outputs.new_version || 'latest' }}"
+          name: "Iso Tile Farm APK ${{ steps.bump.outputs.new_version }}"
+          tag_name: "${{ steps.bump.outputs.new_tag }}"
           files: IsoTileFarm.apk
           generate_release_notes: true
         env:
