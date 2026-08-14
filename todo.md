@@ -406,3 +406,9 @@
 - [x] FarmerHintBubble overlay rendered above the ready crop: white card, orange border, 🧑‍🌾 emoji + harvest hint text (5 rotating messages), arrow tail, fades in/out via Reanimated shared value; pointerEvents="none" so taps still work
 - [x] Farmer re-picks a new crop after harvest/cooldown (8s hint window); idle wander resumes when none ready; sleeping at night still works
 - [x] Verified: tsc clean, 18 tests passing, render check (map OK, bird/bee overlays fine)
+
+## Golden Glow on Ready Crops
+- [x] Added ReadyCropGlow component: pulsating golden ring (#FFD700 border, soft gold fill, glow shadow) under/around crops with cropGrowthStage >= 100
+- [x] Glow pulses on a 1.2s sine loop (scale 0.85→1.15, opacity 0.35→0.75) with per-crop stagger seed (col/row hash) so pulses don't sync; 80ms tick keeps smooth motion and follows zoom
+- [x] Glow uses pointerEvents="none" at zIndex 8 so tile taps (harvest/place) still work
+- [x] Verified: tsc clean, 18 tests passing, render check OK

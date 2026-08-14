@@ -1773,6 +1773,8 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
   const isFullyGrown = growthStage >= MAX_GROWTH;
   // Scale grows from 0.3 (seedling) to 1.0 (fully grown)
   const growthScale = Math.min(1.0, 0.3 + (growthStage / MAX_GROWTH) * 0.7);
+  // Per-crop stagger seed so pulses don't sync (hash of position)
+  const glowSeed = (col * 7 + row * 13) % 100;
   // Opacity grows from 0.4 to 1.0
   const growthOpacity = Math.min(1.0, 0.4 + (growthStage / MAX_GROWTH) * 0.6);
   return (
@@ -1787,6 +1789,8 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
       alignItems: "center",
       justifyContent: "center",
     }}>
+      {/* Pulsating golden glow ring behind fully grown crops */}
+      {isFullyGrown && <ReadyCropGlow col={col} row={row} scale={scale} seed={glowSeed} />}
       <Text
         style={{
           fontSize: emojiSize * 0.7 * growthScale,
@@ -2181,6 +2185,58 @@ function DustCloud({
     >
       <Text style={{ fontSize: ts * 0.75, lineHeight: ts }}>💨</Text>
     </Animated.View>
+  );
+}
+
+// --- Golden Glow: pulsating golden ring under a harvest-ready crop to make it more visible ---
+function ReadyCropGlow({ col, row, scale, seed }: { col: number; row: number; scale: number; seed: number }) {
+  const [, setTick] = useState(0);
+  const bornRef = useRef(Date.now() + seed * 400); // stagger each crop's pulse
+  useEffect(() => {
+    const interval = setInterval(() => setTick((n) => n + 1), 80);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pos = gridToScreen(col, row, scale);
+  const ts = TILE_SIZE * scale;
+  // Pulsate between 0.85 and 1.15 scale, opacity 0.35-0.75, on a 1.2s loop
+  const t = ((Date.now() - bornRef.current) % 1200) / 1200;
+  const pulse = Math.sin(t * Math.PI * 2) * 0.5 + 0.5; // 0..1
+  const glowScale = 0.85 + pulse * 0.3;
+  const glowOpacity = 0.35 + pulse * 0.4;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - ts / 2,
+        top: pos.y - ts / 2,
+        width: ts,
+        height: ts,
+        zIndex: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [{ scale: glowScale }],
+        opacity: glowOpacity,
+      }}
+    >
+      <View
+        style={{
+          width: ts * 0.92,
+          height: ts * 0.62,
+          borderRadius: ts * 0.31,
+          borderWidth: 2,
+          borderColor: "#FFD700",
+          backgroundColor: "rgba(255, 215, 0, 0.25)",
+          shadowColor: "#FFD700",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: glowOpacity,
+          shadowRadius: 10,
+          elevation: 6,
+        }}
+      />
+    </View>
   );
 }
 
