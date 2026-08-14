@@ -517,3 +517,16 @@
 - [x] Add guide entry button in the Badge Wall panel
 - [x] Kid-friendly styling matching badge wall (colored header, big emojis, earned/locked states)
 - [x] 5 new vitest tests for guide progress/ratio logic (58 passing, tsc clean)
+
+## APK Build Failure Investigation (user report: EAS Gradle build failed)
+- [ ] Check app.config.ts + plugins for Android build-breaking config (adaptive icon resources, intent filters, permissions)
+- [ ] Check asset files referenced by app.config.ts (splash-icon.png, android adaptive icons, android-icon-background.png) exist and are valid
+- [ ] Check package.json dependencies for known EAS Gradle breakage (expo-video, expo-audio, react-native-worklets)
+- [ ] Fix identified issues and save a checkpoint so user can retry Build APK
+- [ ] Document remaining failure causes (EAS server-side) for user
+
+## Flower Decoration Additions (user request: 9 new flower items)
+- [x] Crop 9 flower items from uploaded image into individual transparent PNGs (tulips, daisies, hydrangea, lavender, roses, sunflowers, lily-of-valley, pansies, lilies)
+- [x] Add 9 flowers to Decoration section (types, sources, emojis, BUILDING_TYPES, task categories)
+- [x] Place all 9 flowers on the map, one each (pre-placed around the farmstead, no coin cost; MAP_SAVE_VERSION bumped to 3)
+- [x] Verify render + tsc clean + 58 tests passing, checkpoint

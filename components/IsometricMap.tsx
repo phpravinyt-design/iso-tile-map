@@ -96,6 +96,17 @@ const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decoratio
 const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
 const DECORATION_WATER_WELL_PNG = require("@/assets/images/water_well.png");
 
+// 9 Flower decoration PNGs (cropped from user's flower sheet)
+const FLOWER_TULIPS_PNG = require("@/assets/images/flowers/flower_tulips_pink.png");
+const FLOWER_DAISIES_PNG = require("@/assets/images/flowers/flower_daisies_white.png");
+const FLOWER_HYDRANGEA_PNG = require("@/assets/images/flowers/flower_hydrangea_colorful.png");
+const FLOWER_LAVENDER_PNG = require("@/assets/images/flowers/flower_lavender_purple.png");
+const FLOWER_ROSES_PNG = require("@/assets/images/flowers/flower_roses_red.png");
+const FLOWER_SUNFLOWERS_PNG = require("@/assets/images/flowers/flower_sunflowers.png");
+const FLOWER_LILY_VALLEY_PNG = require("@/assets/images/flowers/flower_lily_of_valley.png");
+const FLOWER_PANSIES_PNG = require("@/assets/images/flowers/flower_pansies.png");
+const FLOWER_LILIES_PNG = require("@/assets/images/flowers/flower_lilies_pink.png");
+
 // Farm building PNG sources
 const FARM_SHEEP_BARN_PNG = require("@/assets/images/farm_sheep_barn.png");
 const FARM_CHICKEN_COOP_PNG = require("@/assets/images/farm_chicken_coop.png");
@@ -864,7 +875,7 @@ const TASK_ITEM_CATEGORIES: { category: string; types: string[]; label: string }
   { category: "trees", types: ["tree_png", "palm_tree", "green_tree", "pine_tree", "willow_tree", "apple_tree", "cherry_blossom", "birch_tree", "autumn_tree", "blue_tree"], label: "Tree" },
   { category: "temples", types: ["temple_pink", "temple_gold_tower", "temple_brown_complex", "temple_white_marble", "temple_dark_bronze", "temple_gold_small", "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram"], label: "Temple" },
   { category: "community", types: ["town_hall", "hospital", "school", "fire_station", "police_station", "market", "library", "train_station", "park"], label: "Community Building" },
-  { category: "decorations", types: ["flower_arch", "fountain", "bench", "topiary", "gazebo", "flower_pot", "swing", "waterfall_pond", "flower_bed"], label: "Decoration" },
+  { category: "decorations", types: ["flower_arch", "fountain", "bench", "topiary", "gazebo", "flower_pot", "swing", "waterfall_pond", "flower_bed", "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender", "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies"], label: "Decoration" },
   { category: "roads", types: ["road_straight", "road_corner", "road_intersection"], label: "Road" },
 ];
 
@@ -1329,9 +1340,11 @@ const BUILDING_TYPES = [
   "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram",
   // 3 road tile types
   "road_straight", "road_corner", "road_intersection",
-  // 10 decoration types
+  // 19 decoration types (10 original + 9 flowers)
   "flower_arch", "fountain", "bench", "topiary", "gazebo",
   "flower_pot", "swing", "waterfall_pond", "flower_bed", "water_well",
+  "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender",
+  "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies",
   // 9 industry/factory types
   "steel_factory", "oil_refinery", "food_factory",
   "recycling_plant", "dairy_factory", "yarn_factory",
@@ -1382,6 +1395,8 @@ const TEMPLE_SOURCES: Record<string, any> = {
 const DECORATION_TYPES = [
   "flower_arch", "fountain", "bench", "topiary", "gazebo",
   "flower_pot", "swing", "waterfall_pond", "flower_bed", "water_well",
+  "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender",
+  "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies",
 ] as const;
 type DecorationType = (typeof DECORATION_TYPES)[number];
 
@@ -1397,6 +1412,15 @@ const DECORATION_SOURCES: Record<string, any> = {
   waterfall_pond: DECORATION_WATERFALL_POND_PNG,
   flower_bed: DECORATION_FLOWER_BED_PNG,
   water_well: DECORATION_WATER_WELL_PNG,
+  flower_tulips: FLOWER_TULIPS_PNG,
+  flower_daisies: FLOWER_DAISIES_PNG,
+  flower_hydrangea: FLOWER_HYDRANGEA_PNG,
+  flower_lavender: FLOWER_LAVENDER_PNG,
+  flower_roses: FLOWER_ROSES_PNG,
+  flower_sunflowers: FLOWER_SUNFLOWERS_PNG,
+  flower_lily_valley: FLOWER_LILY_VALLEY_PNG,
+  flower_pansies: FLOWER_PANSIES_PNG,
+  flower_lilies: FLOWER_LILIES_PNG,
 };
 
 // Industry/Factory types for selection (9 factories)
@@ -1547,6 +1571,15 @@ const DECORATION_EMOJIS: Record<string, string> = {
   waterfall_pond: "💧",
   flower_bed: "🌷",
   water_well: "🪣",
+  flower_tulips: "🌷",
+  flower_daisies: "🌼",
+  flower_hydrangea: "💐",
+  flower_lavender: "🪻",
+  flower_roses: "🌹",
+  flower_sunflowers: "🌻",
+  flower_lily_valley: "🤍",
+  flower_pansies: "🌈",
+  flower_lilies: "🩷",
 };
 
 // Temple emoji labels
@@ -2087,13 +2120,26 @@ function gridToScreen(col: number, row: number, scale: number) {
 
 // Map save version - bumped when the saved map schema/format changes.
 // Old saves with a different version are ignored so the map always starts fresh.
-const MAP_SAVE_VERSION = 2;
+const MAP_SAVE_VERSION = 3; // bumped: default map now includes 9 starter flowers
 const MAP_SAVE_KEY = `map_grid_v${MAP_SAVE_VERSION}`;
 
-// Clean start map: everything empty except ONE tree and ONE house
+// Clean start map: everything empty except ONE tree, ONE house, and 9 starter flowers
 // (placed at fixed spots near the center). User buys everything else with coins.
 const START_TREE_POS = { row: 14, col: 13 } as const;
 const START_HOUSE_POS = { row: 14, col: 16 } as const;
+
+// 9 starter flowers (from the user's flower sheet) placed randomly-ish around the farmstead
+const START_FLOWERS: { row: number; col: number; flower: BuildingType }[] = [
+  { row: 10, col: 8, flower: "flower_tulips" },
+  { row: 12, col: 11, flower: "flower_daisies" },
+  { row: 16, col: 9, flower: "flower_hydrangea" },
+  { row: 9, col: 18, flower: "flower_lavender" },
+  { row: 11, col: 21, flower: "flower_roses" },
+  { row: 15, col: 20, flower: "flower_sunflowers" },
+  { row: 18, col: 13, flower: "flower_lily_valley" },
+  { row: 17, col: 6, flower: "flower_pansies" },
+  { row: 19, col: 22, flower: "flower_lilies" },
+];
 
 function createDefaultGrid(): GridCell[][] {
   const grid: GridCell[][] = [];
@@ -2106,6 +2152,10 @@ function createDefaultGrid(): GridCell[][] {
       }
       if (row === START_HOUSE_POS.row && col === START_HOUSE_POS.col) {
         building = "house_small" as BuildingType;
+      }
+      const starter = START_FLOWERS.find((f) => f.row === row && f.col === col);
+      if (starter) {
+        building = starter.flower as BuildingType;
       }
       rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass", flipped: false, cropGrowthStage: 0 });
     }
