@@ -506,3 +506,10 @@
 - [x] Weather + day/night: sun/moon, night overlay, sleeping animals with Zzz, bats/fireflies at night, morning bell (code verified)
 - [x] Orders board, tasks, settings toggles, coins + level persistence all wired (code + tests verified)
 - [x] Browser render verified: map, crops, inventory, quests, profile panels all healthy — no blocking bugs; economics (place -100 / harvest +25 / sell = profit) is intentional design
+
+## Kid-Friendly UI Redesign
+- [ ] Big colorful toolbar buttons: sticker-style cartoon buttons (thick 3px dark outline, bright saturated colors per button, soft 3D bottom shadow, bigger emoji + bold text, bounce on press)
+- [ ] Coins (🪙) and Level (⭐) displays as bigger gold/star pills
+- [ ] Colorful themed header bars on all panels (items, tasks, quests, inventory, orders, profile, settings) with big emoji titles
+- [ ] Bigger emoji + brighter cards in crop picker, seed cards, badge wall
+- [ ] Verify render + tsc clean + tests passing, checkpoint

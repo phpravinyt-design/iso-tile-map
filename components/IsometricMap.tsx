@@ -6319,8 +6319,8 @@ export default function IsometricMap() {
       {/* Inventory & Sell panel: grouped crops + farm/factory goods with quantity steppers */}
       {showBackpack && (
         <View style={styles.itemsPanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>🎒 Inventory & Sell</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#6A1B9A", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>🎒 Inventory & Sell</Text>
             <TouchableOpacity onPress={() => setShowBackpack(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -6565,8 +6565,8 @@ export default function IsometricMap() {
       {/* Daily Tasks panel (shown when Tasks button is tapped) */}
       {showTasks && (
         <View style={styles.profilePanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>📋 Daily Tasks</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#33691E", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>📋 Daily Tasks</Text>
             <TouchableOpacity onPress={() => setShowTasks(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -6610,8 +6610,8 @@ export default function IsometricMap() {
       {/* Daily Quests panel (shown when 🎯 Quests button is tapped) — big goals with massive XP boosts */}
       {showQuests && (
         <View style={styles.profilePanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>🎯 Daily Quests</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#880E4F", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>🎯 Daily Quests</Text>
             <TouchableOpacity onPress={() => setShowQuests(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -6701,8 +6701,8 @@ export default function IsometricMap() {
       {/* Orders Board panel (shown when 📌 Orders button is tapped) */}
       {showOrders && (
         <View style={styles.profilePanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>📌 Orders Board</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#BF360C", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>📌 Orders Board</Text>
             <TouchableOpacity onPress={() => setShowOrders(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -6848,8 +6848,8 @@ export default function IsometricMap() {
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (
         <View style={styles.profilePanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>🧑 Profile</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#B26A00", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>🧑 Profile</Text>
             <TouchableOpacity onPress={() => setShowProfile(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -7058,8 +7058,8 @@ export default function IsometricMap() {
       {/* Items Popup Panel (shown when Items menu is open) */}
       {showItemsMenu && (
         <View style={styles.itemsPanel}>
-          <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>Items</Text>
+          <View style={[styles.itemsPanelHeader, { backgroundColor: "#1B4965", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0 }]}>
+            <Text style={[styles.itemsPanelTitle, { fontSize: 17 }]}>🔧 Items</Text>
             <TouchableOpacity onPress={() => setShowItemsMenu(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
@@ -7114,73 +7114,45 @@ export default function IsometricMap() {
         </View>
       )}
 
-      {/* Placement Mode Toolbar */}
+      {/* Placement Mode Toolbar (kid-friendly sticker buttons) */}
       <View style={styles.toolbar}>
-        <TouchableOpacity
-          style={[styles.modeButton, showItemsMenu && styles.modeButtonActive, { width: 56 }]}
-          onPress={() => setShowItemsMenu(!showItemsMenu)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.modeIcon, showItemsMenu && styles.modeIconActive]}>🔧</Text>
-        </TouchableOpacity>
+        <KidBtn color="items" active={showItemsMenu} onPress={() => setShowItemsMenu(!showItemsMenu)} style={{ width: 60 }}>
+          <Text style={{ fontSize: 24 }}>🔧</Text>
+        </KidBtn>
         {/* Settings button */}
-        <TouchableOpacity
-          style={[styles.profileButton, settingsPanel && styles.profileButtonActive]}
-          onPress={() => setSettingsPanel(!settingsPanel)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, settingsPanel && styles.profileButtonIconActive]}>⚙️</Text>
-        </TouchableOpacity>
+        <KidBtn color="settings" active={settingsPanel} onPress={() => setSettingsPanel(!settingsPanel)} style={{ width: 52 }}>
+          <Text style={{ fontSize: 22 }}>⚙️</Text>
+        </KidBtn>
         {/* Profile button with coin balance */}
-        <TouchableOpacity
-          style={[styles.profileButton, showProfile && styles.profileButtonActive]}
-          onPress={() => { setShowProfile(!showProfile); setShowTasks(false); }}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, showProfile && styles.profileButtonIconActive]}>🧑</Text>
-          <Text style={styles.profileCoinText}>🪙 {coins.toLocaleString()}</Text>
-        </TouchableOpacity>
+        <KidBtn color="profile" active={showProfile} onPress={() => { setShowProfile(!showProfile); setShowTasks(false); }}>
+          <Text style={{ fontSize: 20 }}>🧑</Text>
+          <Text style={{ color: "#6D4C00", fontSize: 15, fontWeight: "bold", lineHeight: 20 }}>🪙 {coins.toLocaleString()}</Text>
+        </KidBtn>
         {/* Player level badge */}
-        <View style={[styles.profileButton, { justifyContent: "center", backgroundColor: "rgba(255,215,0,0.18)", borderColor: "#FFD700" }]}>
-          <Text style={[styles.profileButtonIcon, { fontSize: 14 }]}>⭐</Text>
-          <Text style={[styles.profileCoinText, { color: "#FFD700", fontWeight: "bold" }]}>Lv {playerLevel}</Text>
-        </View>
+        <KidBtn color="level" style={{ width: 74 }}>
+          <Text style={{ fontSize: 20 }}>⭐</Text>
+          <Text style={{ color: "#B26A00", fontSize: 15, fontWeight: "bold", lineHeight: 20 }}>Lv {playerLevel}</Text>
+        </KidBtn>
         {/* Daily Tasks button */}
-        <TouchableOpacity
-          style={[styles.profileButton, showTasks && styles.profileButtonActive]}
-          onPress={() => { setShowTasks(!showTasks); setShowProfile(false); setShowBackpack(false); }}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, showTasks && styles.profileButtonIconActive]}>📋</Text>
-          <Text style={styles.profileCoinText}>Tasks</Text>
-        </TouchableOpacity>
+        <KidBtn color="tasks" active={showTasks} onPress={() => { setShowTasks(!showTasks); setShowProfile(false); setShowBackpack(false); }}>
+          <Text style={{ fontSize: 20 }}>📋</Text>
+          <Text style={{ color: "#1B3A00", fontSize: 14, fontWeight: "bold", lineHeight: 19 }}>Tasks</Text>
+        </KidBtn>
         {/* Daily Quests button */}
-        <TouchableOpacity
-          style={[styles.profileButton, showQuests && styles.profileButtonActive]}
-          onPress={() => { setShowQuests(!showQuests); setShowProfile(false); setShowBackpack(false); setShowTasks(false); }}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, showQuests && styles.profileButtonIconActive]}>🎯</Text>
-          <Text style={styles.profileCoinText}>Quests</Text>
-        </TouchableOpacity>
+        <KidBtn color="quests" active={showQuests} onPress={() => { setShowQuests(!showQuests); setShowProfile(false); setShowBackpack(false); setShowTasks(false); }}>
+          <Text style={{ fontSize: 20 }}>🎯</Text>
+          <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "bold", lineHeight: 19 }}>Quests</Text>
+        </KidBtn>
         {/* Backpack button */}
-        <TouchableOpacity
-          style={[styles.profileButton, showBackpack && styles.profileButtonActive]}
-          onPress={() => { setShowBackpack(!showBackpack); setShowProfile(false); setShowTasks(false); }}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, showBackpack && styles.profileButtonIconActive]}>🎒</Text>
-          <Text style={styles.profileCoinText}>{Object.values(harvestedItems).reduce((a, b) => a + b, 0)}</Text>
-        </TouchableOpacity>
+        <KidBtn color="backpack" active={showBackpack} onPress={() => { setShowBackpack(!showBackpack); setShowProfile(false); setShowTasks(false); }} style={{ width: 58 }}>
+          <Text style={{ fontSize: 20 }}>🎒</Text>
+          <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "bold", lineHeight: 19 }}>{Object.values(harvestedItems).reduce((a, b) => a + b, 0)}</Text>
+        </KidBtn>
         {/* Orders Board button - NPC customers request goods for coins */}
-        <TouchableOpacity
-          style={[styles.profileButton, showOrders && styles.profileButtonActive]}
-          onPress={() => { setShowOrders(!showOrders); setShowProfile(false); setShowTasks(false); setShowBackpack(false); }}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.profileButtonIcon, showOrders && styles.profileButtonIconActive]}>📌</Text>
-          <Text style={styles.profileCoinText}>Orders</Text>
-        </TouchableOpacity>
+        <KidBtn color="orders" active={showOrders} onPress={() => { setShowOrders(!showOrders); setShowProfile(false); setShowTasks(false); setShowBackpack(false); }}>
+          <Text style={{ fontSize: 20 }}>📌</Text>
+          <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "bold", lineHeight: 19 }}>Orders</Text>
+        </KidBtn>
         {/* Harvest All button - collects all fully grown crops at once */}
         <TouchableOpacity
           style={styles.harvestAllButton}
@@ -8034,6 +8006,102 @@ export default function IsometricMap() {
   );
 }
 
+// ============ KID-FRIENDLY UI: chunky cartoon sticker buttons ============
+// Bright sticker colors with thick dark outlines + soft 3D bottom shadow, so
+// small kids can instantly recognize each button by its color and emoji.
+const KID_COLORS: Record<string, { bg: string; shadow: string; outline: string }> = {
+  items: { bg: "#5BC0EB", shadow: "#2E86AB", outline: "#1B4965" }, // 🔧 blue
+  settings: { bg: "#B0BEC5", shadow: "#78909C", outline: "#455A64" }, // ⚙️ grey
+  profile: { bg: "#FFD54F", shadow: "#F9A825", outline: "#B26A00" }, // 🧑 golden
+  level: { bg: "#FFE082", shadow: "#FFC107", outline: "#B26A00" }, // ⭐ star pill
+  tasks: { bg: "#8BC34A", shadow: "#558B2F", outline: "#33691E" }, // 📋 green
+  quests: { bg: "#E91E63", shadow: "#AD1457", outline: "#880E4F" }, // 🎯 pink
+  backpack: { bg: "#9C27B0", shadow: "#6A1B9A", outline: "#4A148C" }, // 🎒 purple
+  orders: { bg: "#FF7043", shadow: "#E64A19", outline: "#BF360C" }, // 📌 orange
+};
+
+const KidBtn: React.FC<{
+  color: string; // key of KID_COLORS
+  active?: boolean;
+  onPress?: () => void;
+  children: React.ReactNode;
+  style?: any;
+}> = ({ color, active, onPress, children, style }) => {
+  const pressed = useSharedValue(false);
+  const c = KID_COLORS[color] ?? KID_COLORS.items;
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: pressed.value ? 0 : 3 },
+      { scale: pressed.value ? 0.95 : 1 },
+    ],
+  }));
+  const interactive = !!onPress;
+  return interactive ? (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPressIn={() => {
+        pressed.value = true;
+        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }}
+      onPressOut={() => {
+        pressed.value = false;
+      }}
+      onPress={onPress!}
+    >
+      <Animated.View
+        style={[
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: active ? "#4CAF50" : c.bg,
+            borderRadius: 18,
+            paddingHorizontal: 10,
+            height: 48,
+            borderWidth: 3,
+            borderColor: c.outline,
+            shadowColor: c.shadow,
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.6,
+            shadowRadius: 2,
+            elevation: 4,
+            gap: 5,
+          },
+          animStyle,
+          style,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  ) : (
+    <Animated.View
+      style={[
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: active ? "#4CAF50" : c.bg,
+          borderRadius: 18,
+          paddingHorizontal: 10,
+          height: 48,
+          borderWidth: 3,
+          borderColor: c.outline,
+          shadowColor: c.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.6,
+          shadowRadius: 2,
+          elevation: 4,
+          gap: 5,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: WATER_BG },
   mapContainer: { flex: 1 },
@@ -8130,13 +8198,20 @@ const styles = StyleSheet.create({
   },
   harvestButton: {
     backgroundColor: "#4CAF50",
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: "#1B5E20",
+    shadowColor: "#1B5E20",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 1,
+    elevation: 3,
   },
   harvestButtonText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "bold",
   },
   harvestAllButton: {
@@ -8167,8 +8242,8 @@ const styles = StyleSheet.create({
   invRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 14,
     padding: 8,
   },
   invStepBtn: {
@@ -8240,17 +8315,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   itemsPanelClose: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EF5350",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#B71C1C",
+    shadowColor: "#B71C1C",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 1,
+    elevation: 3,
   },
   itemsPanelCloseText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
+    lineHeight: 20,
   },
   itemsGrid: {
     flexDirection: "row",
@@ -8259,14 +8342,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   itemsGridButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.16)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.55)",
   },
   clipboardBar: {
     position: "absolute",
