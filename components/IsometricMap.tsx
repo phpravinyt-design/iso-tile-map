@@ -331,6 +331,94 @@ function NpcSprite({ npc, scale, onTap }: { npc: NpcState; scale: number; onTap:
   );
 }
 
+// --- NPC Delivery Sprite (animated walk-to-collect on order delivery) ---
+// Walks from origin to delivery spot (1.2s), does a pickup pop (0.7s), then walks back (1.2s).
+const DELIVERY_TO_MS = 1200;
+const DELIVERY_PICKUP_MS = 700;
+const DELIVERY_RETURN_MS = 1200;
+function DeliveryNpcSprite({ delivery, scale }: { delivery: DeliveryState; scale: number }) {
+  // Re-render at ~30fps while the delivery animation is active so the walk stays smooth
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const total = DELIVERY_TO_MS + DELIVERY_PICKUP_MS + DELIVERY_RETURN_MS;
+    const interval = setInterval(() => setTick((n) => n + 1), 33);
+    const timeout = setTimeout(() => clearInterval(interval), total + 100);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
+  }, []);
+  // Interpolate between origin and spot based on elapsed time within current step
+  const now = Date.now();
+  const elapsed = now - delivery.startedAt;
+  let t: number; // progress 0..1 within current step
+  let from: { x: number; y: number };
+  let to: { x: number; y: number };
+  let showEmoji = false;
+  let emojiBounce = false;
+  let facing: 1 | -1 = 1;
+  if (delivery.step === "toSpot") {
+    from = delivery.origin;
+    to = delivery.spot;
+    t = Math.min(1, Math.max(0, elapsed / DELIVERY_TO_MS));
+    facing = to.x >= from.x ? 1 : -1;
+  } else if (delivery.step === "pickup") {
+    from = delivery.spot;
+    to = delivery.spot;
+    t = Math.min(1, Math.max(0, (elapsed - DELIVERY_TO_MS) / DELIVERY_PICKUP_MS));
+    showEmoji = true;
+    emojiBounce = t < 0.7;
+  } else {
+    from = delivery.spot;
+    to = delivery.origin;
+    t = Math.min(1, Math.max(0, (elapsed - DELIVERY_TO_MS - DELIVERY_PICKUP_MS) / DELIVERY_RETURN_MS));
+    facing = to.x >= from.x ? 1 : -1;
+  }
+  // Smoothstep easing for natural walk feel
+  const eased = t * t * (3 - 2 * t);
+  const cx = from.x + (to.x - from.x) * eased;
+  const cy = from.y + (to.y - from.y) * eased;
+  const pos = gridToScreen(cx, cy, scale);
+  const npcSize = TILE_SIZE * scale * 0.7;
+  // Bobbing while walking
+  const bob = delivery.step !== "pickup" ? Math.sin(t * Math.PI * 2) * 4 : 0;
+  // Pickup pop: quick scale burst
+  const popScale = showEmoji ? 1 + Math.sin(t * Math.PI * 2) * 0.18 : 1;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: pos.x - npcSize / 2,
+        top: pos.y - npcSize / 2 - 20 + bob,
+        width: npcSize,
+        height: npcSize + 20,
+        zIndex: 25, // Above buildings so delivery walk is clearly visible
+        transform: [{ scaleX: facing }],
+      }}
+    >
+      <View style={{ width: npcSize, height: npcSize, transform: [{ scale: popScale }] }}>
+        <Image source={delivery.sprite} style={{ width: npcSize, height: npcSize }} contentFit="contain" />
+      </View>
+      {showEmoji && (
+        <View
+          style={{
+            position: "absolute",
+            top: -14 - (emojiBounce ? 4 : 0),
+            left: npcSize / 2 - 16,
+            width: 32,
+            height: 32,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(255,255,255,0.92)",
+            borderRadius: 16,
+            transform: [{ scaleX: facing }],
+          }}
+        >
+          <Text style={{ fontSize: 18, lineHeight: 24 }}>📦</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // --- Vehicle Sprite Renderer (road-only NPCs) ---
 function VehicleSprite({ vehicle, scale }: { vehicle: VehicleState; scale: number }) {
   const pos = gridToScreen(vehicle.x, vehicle.y, scale);
@@ -634,6 +722,16 @@ interface OrderBoardItem {
   quantity: number;
   rewardCoins: number;
   claimed: boolean;
+}
+// Delivery animation: NPC walks from their building (origin) to a nearby delivery spot, does a pickup pop, and walks back.
+type DeliveryStep = "toSpot" | "pickup" | "returning";
+interface DeliveryState {
+  sprite: any; // NPC sprite PNG source
+  emoji: string;
+  origin: { x: number; y: number };
+  spot: { x: number; y: number };
+  step: DeliveryStep;
+  startedAt: number;
 }
 // Deterministic daily shuffle (no loops over retries)
 function orderShuffle<T>(arr: T[], salt: string): T[] {
@@ -2128,6 +2226,8 @@ export default function IsometricMap() {
   const [orders, setOrders] = useState<OrderBoardItem[]>(() => generateDailyOrders());
   const [orderRewardBanner, setOrderRewardBanner] = useState<string | null>(null);
   const orderRewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // --- NPC delivery animation: ordering NPC walks to collect goods then returns ---
+  const [delivery, setDelivery] = useState<DeliveryState | null>(null);
   // Load persisted orders; regenerate on a new day
   useEffect(() => {
     AsyncStorage.multiGet([ORDERS_KEY, ORDERS_DATE_KEY]).then(([ordersEntry, dateEntry]) => {
@@ -2153,6 +2253,69 @@ export default function IsometricMap() {
     setOrders(next);
     AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
+  // Delivery animation: find a spot where the NPC's community building stands (origin),
+  // plus an empty grass tile nearby (delivery point). Falls back to map-center spots.
+  const findDeliverySpots = useCallback((npcType: string): { origin: { x: number; y: number }; spot: { x: number; y: number } } => {
+    const buildCol: number[] = [];
+    const buildRow: number[] = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        if (grid[row][col].building === npcType) {
+          buildCol.push(col);
+          buildRow.push(row);
+        }
+      }
+    }
+    let origin: { x: number; y: number };
+    if (buildCol.length > 0) {
+      origin = { x: buildCol[0], y: buildRow[0] };
+    } else {
+      origin = { x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) };
+    }
+    // Look for an empty grass/dirt/farmland tile near the origin for the delivery point
+    let best: { x: number; y: number } | null = null;
+    let bestDist = Infinity;
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const cell = grid[row][col];
+        const isWalkable = cell.building === "none" && !CROP_EMOJIS[cell.building as CropType];
+        if (!isWalkable) continue;
+        const dist = Math.abs(col - origin.x) + Math.abs(row - origin.y);
+        if (dist >= 1 && dist <= 3 && dist < bestDist) {
+          bestDist = dist;
+          best = { x: col, y: row };
+        }
+      }
+    }
+    const spot = best || { x: (origin.x + 2) % GRID_SIZE, y: (origin.y + 2) % GRID_SIZE };
+    return { origin, spot };
+  }, [grid]);
+  const deliveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Run the delivery walk: origin -> delivery spot (pickup pop) -> origin
+  const startNpcDelivery = useCallback((npc: OrderNpc) => {
+    const { origin, spot } = findDeliverySpots(npc.npcType);
+    setDelivery({ sprite: npc.sprite, emoji: "📦", origin, spot, step: "toSpot", startedAt: Date.now() });
+    const toSpotMs = 1200;
+    const pickupMs = 700;
+    const returnMs = 1200;
+    if (deliveryTimer.current) clearTimeout(deliveryTimer.current);
+    deliveryTimer.current = setTimeout(() => {
+      setDelivery((d) => d ? { ...d, step: "pickup" } : d);
+      deliveryTimer.current = setTimeout(() => {
+        setDelivery((d) => d ? { ...d, step: "returning" } : d);
+        deliveryTimer.current = setTimeout(() => {
+          setDelivery((d) => (d ? null : d));
+          deliveryTimer.current = null;
+        }, returnMs);
+      }, pickupMs);
+    }, toSpotMs);
+  }, [findDeliverySpots]);
+  useEffect(() => {
+    return () => {
+      if (deliveryTimer.current) clearTimeout(deliveryTimer.current);
+    };
+  }, []);
+
   const fulfillOrder = useCallback((orderId: number) => {
     setOrders((prev) => {
       const order = prev.find((o) => o.id === orderId);
@@ -2186,6 +2349,9 @@ export default function IsometricMap() {
       setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
       if (orderRewardTimer.current) clearTimeout(orderRewardTimer.current);
       orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
+      // Start delivery walk animation: NPC walks from a building spot to a
+      // delivery point near their community building, picks up the goods, and returns
+      startNpcDelivery(npc);
       return prev.map((o) => (o.id === orderId ? { ...o, claimed: true } : o));
     });
   }, [harvestedItems]);
@@ -4417,6 +4583,11 @@ export default function IsometricMap() {
           <Text style={styles.taskRewardMsgText}>{orderRewardBanner}</Text>
         </View>
       )}
+
+      {/* NPC delivery animation: walks to collect goods, picks them up, and returns */}
+      {delivery ? (
+        <DeliveryNpcSprite key={`delivery-${delivery.startedAt}`} delivery={delivery} scale={currentScale} />
+      ) : null}
 
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (

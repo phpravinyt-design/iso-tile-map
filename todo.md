@@ -323,3 +323,10 @@
 - [x] Fulfill logic: tapping Deliver & Collect deducts goods from backpack (crops + farm goods), grants coin reward + success banner
 - [x] Shows pending "Need more goods…" state (disabled greyed button); delivered orders show ✅ Delivered!
 - [x] 8 new vitest cases covering generation, determinism, distinct goods/NPCs, fulfillment math, insufficient-stock blocking; TypeScript clean, 14 tests passing, app renders verified
+
+## NPC Delivery Animation (Walk-to-Collect)
+- [x] On order delivery, animate the ordering NPC walking from their building to a delivery point on the map (starts at the NPC's placed community building; falls back to map center)
+- [x] NPC sprite moves smoothly between isometric grid points with smoothstep easing and a walking bob; faces the walking direction
+- [x] NPC reaches delivery spot, does a scale-burst pickup pop with 📦 badge above head, then walks back to origin (~3.1s total at ~30fps)
+- [x] Animation renders as a pointerEvents="none" overlay (zIndex 25) that does not interfere with pan/zoom/placement
+- [x] Timer cleaned up on unmount; TypeScript clean, 14 tests passing, app renders verified
