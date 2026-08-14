@@ -493,3 +493,16 @@
 ## Toast with Badge Description
 - [x] Toast shows badge name on the first line and the badge's short description underneath (badgeUnlockDesc state, smaller muted-gold subtitle, center-aligned)
 - [x] Verify: tsc clean, 53 tests passing, render check
+
+## Full Feature QA Check
+- [x] TypeScript clean + all vitest tests passing (53 pass / 1 skipped)
+- [x] Core map: pan/zoom OK, clear start (1 tree + 1 house), item placement -100 coins, long-press move + clipboard bar + 🗑️, mirror
+- [x] Items: trees, homes, community, rods, tiles (5 textures incl. farmland), temples, decorations, industry — distinct PNGs verified
+- [x] Farming loop: tap farmland → 14-emoji picker → growth stages → golden glow + farmer hint bubble → harvest (+25/+100 golden) + per-crop chime pitch + sparkles + Harvest All; inventory sell/All + buy seeds + free Plant mode verified end-to-end in browser
+- [x] Golden wheat: seeds awarded by weekly mega-quest, free plant from 🎒, 100-coin premium harvest (handler + Harvest All verified in code; golden row renders when owned)
+- [x] Daily quests + weekly mega-quest streak + golden seed reward (quests panel UI verified)
+- [x] Badge wall: 10 badges earned/locked, tap hint with live progress, Next Up card with % bar, unlock toast + confetti + arpeggio chime
+- [x] NPCs: farmer task helper with hint bubbles, building character chat, wheel NPCs on roads (code verified; NPCs walking on live map)
+- [x] Weather + day/night: sun/moon, night overlay, sleeping animals with Zzz, bats/fireflies at night, morning bell (code verified)
+- [x] Orders board, tasks, settings toggles, coins + level persistence all wired (code + tests verified)
+- [x] Browser render verified: map, crops, inventory, quests, profile panels all healthy — no blocking bugs; economics (place -100 / harvest +25 / sell = profit) is intentional design
