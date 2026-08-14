@@ -571,3 +571,8 @@ EAS build logs are NOT directly accessible from sandbox (no eas-cli token/creden
 - [x] Add `eas.json` with preview/preview-arm64 (apk) and production (AAB) profiles
 - [x] Add minimal app.json (expo.owner placeholder + slug) required by eas-cli
 - [x] Validated: YAML OK, app.json OK, tsc clean, 72 tests passing; checkpoint + delivery instructions (EXPO_TOKEN secret, eas login + build:configure)
+
+## Auto Version Bump in Release Workflow (user option 2)
+- [x] eas.json autoIncrement enabled (preview/preview-arm64/production) with remote appVersionSource
+- [x] Workflow "Auto bump version" step: patch/minor/major semver bump of package.json version + eas build:version:increment when eas.projectId linked; release name/tag use bumped version; manual trigger input `bump_type`
+- [x] Validated: YAML OK, bump logic tested (1.0.10→1.0.11 patch, 1.0.10→1.1.0 minor), tsc clean, 72 tests passing; checkpoint + updated instructions

@@ -29,10 +29,10 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version tag for the release (e.g. 1.0.10)"
+      bump_type:
+        description: "Version bump type: major / minor / patch (defaults to patch)"
         required: false
-        default: "1.0.10"
+        default: "patch"
 
 concurrency:
   group: release-apk-${{ github.ref }}
@@ -66,6 +66,45 @@ jobs:
         run: |
           pnpm check
           pnpm test
+
+      # ------------------------------------------------------------------
+      # AUTO VERSION BUMP
+      # Increments package.json "version" (major|minor|patch) using the
+      # remote source of truth from EAS, so every release gets a fresh
+      # incremented versionCode automatically — no manual version edits.
+      # ------------------------------------------------------------------
+      - name: Auto bump version
+        id: bump
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -e
+          BUMP_TYPE="${{ github.event.inputs.bump_type || 'patch' }}"
+          # 1) Current local version
+          CURRENT=$(jq -r '.version' package.json)
+          echo "Current version: ${CURRENT}"
+          # 2) Compute bumped version (semver) on CI shell
+          MAJOR=$(echo "${CURRENT}" | cut -d. -f1)
+          MINOR=$(echo "${CURRENT}" | cut -d. -f2)
+          PATCH=$(echo "${CURRENT}" | cut -d. -f3)
+          case "${BUMP_TYPE}" in
+            major) NEXT="${MAJOR}.0.0" ;;
+            minor) NEXT="${MAJOR}.$((MINOR + 1)).0" ;;
+            patch) NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+            *)     NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+          esac
+          echo "New version: ${NEXT}"
+          # 3) Write bumped version back to package.json
+          jq --arg v "${NEXT}" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+          # 4) If EAS is linked (eas.projectId in app.json), ask EAS to bump
+          #    the remote appVersion too (source: remote) so versionCode
+          #    increments on EAS's side as well.
+          HAS_PROJECT_ID=$(jq -r '.expo.eas.projectId // empty' app.json 2>/dev/null)
+          if [ -n "${HAS_PROJECT_ID}" ]; then
+            eas build:version:increment --platform android --non-interactive || true
+          fi
+          echo "new_version=${NEXT}" >> "$GITHUB_OUTPUT"
+          grep '"version"' package.json
 
       - name: Setup Expo tools
         uses: expo/expo-github-action@v8
@@ -120,8 +159,8 @@ jobs:
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          name: "Iso Tile Farm APK ${{ github.event.inputs.version || github.ref_name }}"
-          tag_name: "v${{ github.event.inputs.version || 'latest' }}"
+          name: "Iso Tile Farm APK ${{ steps.bump.outputs.new_version || 'latest' }}"
+          tag_name: "v${{ steps.bump.outputs.new_version || 'latest' }}"
           files: IsoTileFarm.apk
           generate_release_notes: true
         env:
