@@ -216,6 +216,10 @@ interface AnimalNpcState {
   chaseRole?: "chaser" | "chasee";
   chaseTargetId?: number; // id of the other animal involved
   chaseEndsAt?: number;
+  // Night sleep state: animal walks home at dusk and sleeps until morning
+  sleeping?: boolean; // true while asleep at the bed spot
+  bedX?: number; // grid position of the bed (nearest building)
+  bedY?: number;
 }
 
 // Vehicle NPC state - only moves on placed roads
@@ -749,11 +753,48 @@ function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale:
     >
       <Image
         source={ANIMAL_SOURCES[animal.type] || NPC_COW_PNG}
-        style={{ width: animalSize, height: animalSize }}
+        style={{
+          width: animalSize,
+          height: animalSize,
+          transform: animal.sleeping ? [{ scaleY: 0.62 }, { translateY: animalSize * 0.28 }] : undefined,
+        }}
         contentFit="contain"
         cachePolicy="memory"
       />
+      {animal.sleeping && <SleepZzz animalSize={animalSize} />}
     </TouchableOpacity>
+  );
+}
+
+// Small floating "Zzz" above a sleeping animal — rises, fades, and loops
+function SleepZzz({ animalSize }: { animalSize: number }) {
+  const [, setTick] = useState(0);
+  const bornRef = useRef(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setTick((n) => n + 1), 60);
+    return () => clearInterval(interval);
+  }, []);
+  const t = ((Date.now() - bornRef.current) % 2400) / 2400; // 2.4s loop
+  const yRise = t * 26; // rises 26px
+  const opacity = t < 0.25 ? t / 0.25 : t > 0.8 ? (1 - t) / 0.2 : 1;
+  const scale = 0.7 + t * 0.5; // grows slightly as it rises
+  return (
+    <Text
+      style={{
+        position: "absolute",
+        left: animalSize * 0.3,
+        top: -yRise - 4,
+        fontSize: 14,
+        lineHeight: 20,
+        fontWeight: "700",
+        color: "#e8eef7",
+        opacity,
+        zIndex: 15,
+        transform: [{ scale }],
+      }}
+    >
+      Z
+    </Text>
   );
 }
 
@@ -3641,10 +3682,6 @@ export default function IsometricMap() {
           const dy = animal.targetY - animal.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 0.15) {
-            // Animals stay put at night, only wander during day
-            if (isNight) {
-              return { ...animal, idleUntil: now + 5000 };
-            }
             if (animal.chaseRole === "chaser") {
               // Chaser that has caught up keeps its target in range by idling briefly (chasee will dart away)
               return { ...animal, idleUntil: now + 400 };

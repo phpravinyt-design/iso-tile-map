@@ -370,3 +370,8 @@
 - [x] Synthesized subtle owl hoot: two descending "hoo" notes (330→300Hz sine with vibrato and pitch fall per note), quiet 0.10 gain, occasional ambient sound
 - [x] Gated by sound toggle (skipped when off); plays only during night (timeOfDay > 0.85 or < 0.15) at irregular 8-18s intervals, stops when day breaks
 - [x] Shares the existing AudioContext helper; TypeScript clean, 14 tests passing, render verified
+
+## Sleeping Animals at Night
+- [x] At dusk animals walk to their bed (nearest placed building, else grid center) and lie down at night (scaleY 0.62, pressed-down look)
+- [x] A small "Zzz" floats above each sleeping animal — rises 26px, grows, fades, and loops every 2.4s
+- [x] Animals wake at dawn (idleUntil reset) and resume normal wandering; night-wander guard removed in favor of sleep logic; TypeScript clean, 14 tests passing, render verified
