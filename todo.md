@@ -345,3 +345,8 @@
 - [x] During delivery pickup, a "+{rewardCoins} 🪙" gold text floats above the NPC, rising 22px and fading out over the pickup phase
 - [x] Float is tied to pickup progress with slight scale-up and dark text shadow; unflipped, appears with the 📦 badge and clears before return walk
 - [x] DeliveryState carries rewardCoins/goodsLabel from fulfillOrder; TypeScript clean, 14 tests passing
+
+## Ambient Wildlife Animations
+- [x] Birds (🐦/🕊️) drift across the screen with a gentle bob and slight rotation; butterflies (🦋) and bees (🐝) flutter near the map's middle band with zigzag drift
+- [x] Wildlife renders as a pointerEvents="none" overlay (zIndex 12) below UI panels, never blocking pan/zoom/placement; 5 creatures max, each recycled in a continuous stream at ~20fps
+- [x] Each creature has random entry side, height band, speed, and size; TypeScript clean, 14 tests passing, visual check confirmed (birds visible in screenshot)

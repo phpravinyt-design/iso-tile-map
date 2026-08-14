@@ -501,6 +501,82 @@ function DeliveryNpcSprite({ delivery, scale }: { delivery: DeliveryState; scale
   );
 }
 
+// --- Ambient Wildlife (birds + butterflies) ---
+// Birds drift across the screen with a bobbing path; butterflies flutter near the middle with a zigzag drift.
+// Purely ambient, non-interactive overlays that make the farm feel alive.
+interface WildlifeCreature {
+  id: number;
+  type: "bird" | "butterfly";
+  startX: number; // screen fraction 0-1 where it enters
+  y: number; // screen fraction 0-1 of vertical position
+  speed: number; // fraction of screen width per second (0.06-0.14)
+  phase: number; // bob/zigzag offset
+  dir: 1 | -1; // fly direction
+  emoji: string;
+  size: number; // px base size
+}
+let wildlifeIdCounter = 0;
+function createWildlife(w: Partial<WildlifeCreature> = {}): WildlifeCreature {
+  const isBird = (w.type ?? (Math.random() < 0.5 ? "bird" : "butterfly")) === "bird";
+  wildlifeIdCounter += 1;
+  return {
+    id: wildlifeIdCounter,
+    type: isBird ? "bird" : "butterfly",
+    startX: isBird ? (Math.random() < 0.5 ? -0.08 : 1.08) : -0.08,
+    y: isBird ? 0.08 + Math.random() * 0.3 : 0.35 + Math.random() * 0.45,
+    speed: isBird ? 0.07 + Math.random() * 0.07 : 0.04 + Math.random() * 0.03,
+    phase: Math.random() * Math.PI * 2,
+    dir: isBird ? (Math.random() < 0.5 ? 1 : -1) : 1,
+    emoji: isBird ? (Math.random() < 0.6 ? "🐦" : "🕊️") : Math.random() < 0.5 ? "🦋" : "🐝",
+    size: isBird ? 26 + Math.random() * 12 : 16 + Math.random() * 6,
+    ...w,
+  };
+}
+function WildlifeOverlay({ scale }: { scale: number }) {
+  // Ambient wildlife only visible at moderate zooms (too small when zoomed out, too crowded when zoomed in)
+  const [, setTick] = useState(0);
+  const [creatures] = useState<WildlifeCreature[]>(() =>
+    Array.from({ length: 5 }, () => createWildlife())
+  );
+  const bornRef = useRef(Date.now());
+  useEffect(() => {
+    bornRef.current = Date.now();
+    const interval = setInterval(() => setTick((n) => n + 1), 50); // 20fps ambient, not gameplay-critical
+    return () => clearInterval(interval);
+  }, []);
+  const elapsed = (Date.now() - bornRef.current) / 1000;
+  return (
+    <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, zIndex: 12 }}>
+      {creatures.map((c) => {
+        // Recycle creature position for a continuous stream
+        const cycleSec = 1 / c.speed;
+        const t = (elapsed + c.startX / c.speed) % 1;
+        const x = c.startX + t; // 0→1 across screen
+        if (x < -0.12 || x > 1.12) return null;
+        const bob = Math.sin(elapsed * 3 + c.phase) * 6; // gentle bob/zigzag
+        const z = Math.sin(elapsed * 1.5 + c.phase * 0.5) * 0.06; // subtle altitude drift (scale)
+        return (
+          <Text
+            key={c.id}
+            style={{
+              position: "absolute",
+              left: `${x * 100}%`,
+              top: `${(c.y * 100) + (bob * 0.15)}%`,
+              fontSize: c.size,
+              lineHeight: c.size + 8,
+              opacity: 0.9,
+              zIndex: 12,
+              transform: [{ scaleX: c.dir }, { scale: 1 + z }, { rotate: `${bob * 0.8}deg` }],
+            }}
+          >
+            {c.emoji}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
 // --- Vehicle Sprite Renderer (road-only NPCs) ---
 function VehicleSprite({ vehicle, scale }: { vehicle: VehicleState; scale: number }) {
   const pos = gridToScreen(vehicle.x, vehicle.y, scale);
@@ -4714,6 +4790,9 @@ export default function IsometricMap() {
       {delivery ? (
         <DeliveryNpcSprite key={`delivery-${delivery.startedAt}`} delivery={delivery} scale={currentScale} />
       ) : null}
+
+      {/* Ambient wildlife: birds and butterflies drifting across the farm */}
+      <WildlifeOverlay key={Math.floor(currentScale * 10)} scale={currentScale} />
 
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (
