@@ -299,3 +299,11 @@
 - [x] Play a distinct whoosh-style removal sound (sawtooth 220→90Hz, different from the placement pop) via Web Audio API; Medium haptic on native
 - [x] Dust/sound only on actual removals; placement keeps the sparkle pop
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Settings Menu: Sound + Haptic Toggles
+- [x] Settings button in the toolbar (⚙️) that opens a settings panel/sheet
+- [x] Toggle for sound effects (place pop + removal whoosh synthesized sounds) via Switch
+- [x] Toggle for haptic feedback (native devices only) via Switch
+- [x] Preferences persisted via AsyncStorage (iso-settings-v1) and loaded on app start (defaults: both ON)
+- [x] All existing sound/haptic call sites check the settings flags before playing
+- [x] Verify TypeScript clean, 6 tests passing, app renders

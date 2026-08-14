@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   Dimensions,
+  Switch,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -393,6 +394,7 @@ function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale:
 // Flat top-down square tiles (1:1 aspect ratio) - Township style
 const TILE_SIZE = 90;
 const GRID_SIZE = 25;
+const SETTINGS_KEY = "iso-settings-v1";
 const WATER_BG = "#1a2a3a";
 const DEFAULT_SCALE = 1.0;
 const MIN_ZOOM = 0.7;
@@ -2236,7 +2238,33 @@ export default function IsometricMap() {
   const placePopOpacity = useSharedValue(0);
   const [placePopPos, setPlacePopPos] = useState<{ col: number; row: number } | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // --- Settings: sound + haptic toggles, persisted via AsyncStorage ---
+  const [settings, setSettings] = useState<{ sound: boolean; haptics: boolean }>({
+    sound: true,
+    haptics: true,
+  });
+  const saveSettings = useCallback((next: { sound: boolean; haptics: boolean }) => {
+    setSettings(next);
+    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY)
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw) as { sound?: boolean; haptics?: boolean };
+          setSettings({
+            sound: parsed.sound !== false,
+            haptics: parsed.haptics !== false,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const [settingsPanel, setSettingsPanel] = useState(false);
+
   const playPlaceSound = useCallback(() => {
+    if (!settings.sound) return;
     try {
       if (Platform.OS === "web") {
         if (!audioCtxRef.current) {
@@ -2260,17 +2288,18 @@ export default function IsometricMap() {
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.2);
       } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (e) {
       // audio/haptics unavailable, ignore
     }
-  }, []);
+  }, [settings]);
   // --- Removal dust cloud + distinct sound ---
   const dustScale = useSharedValue(0);
   const dustOpacity = useSharedValue(0);
   const [dustPos, setDustPos] = useState<{ col: number; row: number } | null>(null);
   const playRemovalSound = useCallback(() => {
+    if (!settings.sound) return;
     try {
       if (Platform.OS === "web") {
         if (!audioCtxRef.current) {
@@ -2295,12 +2324,12 @@ export default function IsometricMap() {
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.32);
       } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
     } catch (e) {
       // audio/haptics unavailable, ignore
     }
-  }, []);
+  }, [settings.haptics]);
   const triggerRemovalDustAnimation = useCallback((col: number, row: number) => {
     playRemovalSound();
     setDustPos({ col, row });
@@ -2313,7 +2342,7 @@ export default function IsometricMap() {
     setTimeout(() => {
       setDustPos(null);
     }, 520);
-  }, [dustOpacity, dustScale, playRemovalSound]);
+  }, [dustOpacity, dustScale, playRemovalSound, settings.haptics]);
 
   const triggerPlacePopAnimation = useCallback((col: number, row: number) => {
     playPlaceSound();
@@ -2327,7 +2356,7 @@ export default function IsometricMap() {
     setTimeout(() => {
       setPlacePopPos(null);
     }, 550);
-  }, [placePopOpacity, placePopScale, playPlaceSound, audioCtxRef]);
+  }, [placePopOpacity, placePopScale, playPlaceSound, audioCtxRef, settings.haptics]);
   const screenDims = useMemo(() => Dimensions.get("window"), []);
   const [pressTarget, setPressTarget] = useState<{ col: number; row: number } | null>(null);
   const [isItemPress, setIsItemPress] = useState(false);
@@ -2920,14 +2949,14 @@ export default function IsometricMap() {
 
   // Pop sound + haptic feedback when the progress bar fully completes
   const playPopEffect = useCallback(() => {
-    if (Platform.OS !== "web") {
+    if (Platform.OS !== "web" && settings.haptics) {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch (e) {
         // haptics unavailable, ignore
       }
     }
-  }, []);
+  }, [settings.haptics]);
 
   // Small pop animation at the picked-up tile: quick scale bounce + fade out
   const triggerPopAnimation = useCallback((col: number, row: number) => {
@@ -2948,14 +2977,14 @@ export default function IsometricMap() {
 
   // Celebration pop effect reused for other success moments (e.g. task reward claim)
   const playClaimPopEffect = useCallback(() => {
-    if (Platform.OS !== "web") {
+    if (Platform.OS !== "web" && settings.haptics) {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch (e) {
         // haptics unavailable, ignore
       }
     }
-  }, []);
+  }, [settings.haptics]);
 
   const triggerClaimPopAnimation = useCallback(() => {
     setClaimPopActive(true);
@@ -3018,9 +3047,7 @@ export default function IsometricMap() {
               messages: [{ from: "npc", text: npc.opening }],
               userReplied: false,
             });
-            if (Platform.OS !== "web") {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            }
+            if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
             return newGrid; // no grid change
           }
           if (mode === "tile") {
@@ -3422,9 +3449,7 @@ export default function IsometricMap() {
                     return newGrid;
                   });
                   // Haptic feedback
-                  if (Platform.OS !== "web") {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  }
+                  if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 } else if (prev.col === col && prev.row === row && prev.count < 2) {
                   // Increment count
                   const lastTap = now;
@@ -4153,6 +4178,14 @@ export default function IsometricMap() {
         >
           <Text style={[styles.modeIcon, showItemsMenu && styles.modeIconActive]}>🔧</Text>
         </TouchableOpacity>
+        {/* Settings button */}
+        <TouchableOpacity
+          style={[styles.profileButton, settingsPanel && styles.profileButtonActive]}
+          onPress={() => setSettingsPanel(!settingsPanel)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, settingsPanel && styles.profileButtonIconActive]}>⚙️</Text>
+        </TouchableOpacity>
         {/* Profile button with coin balance */}
         <TouchableOpacity
           style={[styles.profileButton, showProfile && styles.profileButtonActive]}
@@ -4571,9 +4604,7 @@ export default function IsometricMap() {
                 style={[styles.treeOption, selectedIndustryType === t && styles.treeOptionActive]}
                 onPress={() => {
                   setSelectedIndustryType(t);
-                  if (Platform.OS !== "web") {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
+                  if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }}
                 activeOpacity={0.7}
               >
@@ -4615,9 +4646,7 @@ export default function IsometricMap() {
                 style={[styles.treeOption, selectedFarmType === t && styles.treeOptionActive]}
                 onPress={() => {
                   setSelectedFarmType(t);
-                  if (Platform.OS !== "web") {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
+                  if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }}
                 activeOpacity={0.7}
               >
@@ -4828,9 +4857,7 @@ export default function IsometricMap() {
                           userReplied: true,
                         };
                       });
-                      if (Platform.OS !== "web") {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                      }
+                      if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       // Typing animation: character "composes" their reply
                       setChatTyping(true);
                       if (chatTypingTimerRef.current) clearTimeout(chatTypingTimerRef.current);
@@ -4843,9 +4870,7 @@ export default function IsometricMap() {
                             messages: [...prev.messages, { from: "npc" as const, text: response }],
                           };
                         });
-                        if (Platform.OS !== "web") {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                        }
+                        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       }, 900);
                     }}
                     activeOpacity={0.7}
@@ -4857,6 +4882,51 @@ export default function IsometricMap() {
             </View>
           </Animated.View>
         </View>
+      )}
+
+      {/* Settings panel (shown when ⚙️ is tapped) */}
+      {settingsPanel && (
+        <>
+          <TouchableOpacity
+            style={chatStyles.backdrop}
+            activeOpacity={1}
+            onPress={() => setSettingsPanel(false)}
+          />
+          <View style={chatStyles.panel}>
+            <View style={chatStyles.panelHeader}>
+              <Text style={chatStyles.panelTitle}>⚙️ Settings</Text>
+              <TouchableOpacity
+                style={chatStyles.closeBtn}
+                onPress={() => setSettingsPanel(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={chatStyles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 280 }}>
+              <View style={styles.settingsRow}>
+                <View style={styles.settingsRowLeft}>
+                  <Text style={styles.settingsRowText}>🔊 Sound Effects</Text>
+                  <Text style={styles.settingsRowNote}>Placement pop, removal whoosh</Text>
+                </View>
+                <Switch
+                  value={settings.sound}
+                  onValueChange={(v) => saveSettings({ ...settings, sound: v })}
+                />
+              </View>
+              <View style={styles.settingsRow}>
+                <View style={styles.settingsRowLeft}>
+                  <Text style={styles.settingsRowText}>📳 Haptic Feedback</Text>
+                  <Text style={styles.settingsRowNote}>Vibration on taps (mobile only)</Text>
+                </View>
+                <Switch
+                  value={settings.haptics}
+                  onValueChange={(v) => saveSettings({ ...settings, haptics: v })}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </>
       )}
     </View>
   );
@@ -5395,8 +5465,32 @@ const styles = StyleSheet.create({
     color: "#11181c",
     lineHeight: 17,
   },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(17,24,28,0.08)",
+  },
+  settingsRowText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#11181c",
+    lineHeight: 21,
+  },
+  settingsRowNote: {
+    fontSize: 12,
+    color: "#687076",
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  settingsRowLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
 });
-
 // Building chat panel styles
 const chatStyles = StyleSheet.create({
   backdrop: {
@@ -5437,6 +5531,13 @@ const chatStyles = StyleSheet.create({
     paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
+  },
+  panelTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#11181c",
+    lineHeight: 22,
+    flex: 1,
   },
   headerRow: {
     flex: 1,
