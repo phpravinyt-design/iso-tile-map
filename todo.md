@@ -553,3 +553,15 @@
 - [x] Reduced speeds: NPCs 1.2→0.5, animals 0.8→0.35, vehicles 2.0→0.8 tiles/s; birds 0.07-0.14→0.03-0.06, butterflies 0.04-0.07→0.015-0.03, bats/fireflies halved; idle times increased (NPC 3s, animals 4s) for calmer random wandering
 - [x] Butterflies attracted to placed flowers: 🌸 Butterflies orbit flower tiles (ellipse flutter above each flower, ~9s lap, targets rotate every 25s); falls back to slow meander when no flowers; matches gridToScreen projection so orbits follow pan/zoom
 - [x] Tests + tsc clean (72 passing), checkpoint
+
+## Deep Gradle Build Diagnosis (user request: find actual root cause of "Gradle build failed with unknown error")
+- [ ] Attempt to access EAS build logs (Manus UI has no API for build logs — check browser/Manus site activity logs if possible)
+- [ ] Audit package.json (deps, versions, lockfile)
+- [ ] Audit app.config.ts (plugins, scheme, icons, adaptive icon, build-properties)
+- [ ] Check eas.json / expo prebuild output gradle files (settings.gradle, app/build.gradle, gradle.properties, gradle-wrapper)
+- [ ] Verify SDK 54 / RN 0.81 / AGP / Kotlin / JDK 17 / compileSdk compatibility matrix
+- [ ] Local prebuild + bundle verification
+- [ ] Apply targeted fix(es), checkpoint, report exact root cause + changes + rebuild steps
+
+State after sandbox reset (2026-08-14): project restored at HEAD a1f9a1b2 (slower NPCs + butterfly orbits). Saved notes at /home/ubuntu/.recovery/flower_task_notes.md and build_fix_notes.md. Previous fixes applied: removed expo-video plugin, dropped armeabi-v7a (arm64-v8a only). Tests: 72 passing. EAS build still failing with "Gradle build failed with unknown error" (retryable: false) on the build server.
+EAS build logs are NOT directly accessible from sandbox (no eas-cli token/credentials in sandbox). Best approach: run `npx expo prebuild --platform android` locally, inspect generated android/ gradle config, and check for known Expo SDK 54 build-breakers (react-compiler, react-native 0.81, expo-video removed OK, newArchEnabled, kotlin version, etc.).
