@@ -479,3 +479,8 @@
 ## Next Up Badge Highlight
 - [x] Compute next-achievable locked badge by progress ratio (weekly quest days/7, mega count, level, coins, harvests, orders, streak) and pin it at top of Badge Wall as a gold "Next Up ⭐" card with hint + live progress bar + %
 - [x] Verify: tsc clean, 53 tests passing, render check
+
+## Next Up Unlock Confetti & Chime
+- [x] Detect when the Next Up badge unlocks (previous nextUp id just got earned) and fire a confetti burst + celebratory chime (E4-G4-B4-E5-E6 major arpeggio, gated by sound toggle, native Success haptic)
+- [x] Confetti: 26 lightweight falling confetti pieces via Reanimated (fade in, fall + rotate over ~2.8s, fade out, auto-clear after 3s), mounted inside the profile panel, pointerEvents none
+- [x] Verify: tsc clean, 53 tests passing, render check

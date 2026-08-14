@@ -2488,6 +2488,58 @@ function HarvestStar({ x, y, dx, dy, delay, at }: { x: number; y: number; dx: nu
   );
 }
 
+// --- Badge Confetti: subtle falling confetti burst over the profile panel when the Next Up badge unlocks ---
+function BadgeConfetti({ burst }: { burst: { pieces: { id: number; left: number; delay: number; hue: number; size: number }[] } }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 200,
+      }}
+    >
+      {burst.pieces.map((p) => (
+        <ConfettiPiece key={p.id} piece={p} />
+      ))}
+    </View>
+  );
+}
+function ConfettiPiece({ piece }: { piece: { id: number; left: number; delay: number; hue: number; size: number } }) {
+  const top = useSharedValue(-10);
+  const rotate = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      opacity.value = withTiming(1, { duration: 120 });
+      top.value = withTiming(420 + Math.random() * 80, { duration: 2600 + Math.random() * 400 });
+      rotate.value = withTiming(180 + Math.random() * 360, { duration: 2600 + Math.random() * 400 });
+    }, piece.delay);
+    const f = setTimeout(() => {
+      opacity.value = withTiming(0, { duration: 400 });
+    }, 2300);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(f);
+    };
+  }, [piece]);
+  const style = useAnimatedStyle(() => ({
+    position: "absolute",
+    left: `${piece.left}%`,
+    top: top.value,
+    opacity: opacity.value,
+    width: piece.size,
+    height: piece.size * 0.62,
+    borderRadius: 2,
+    backgroundColor: `hsl(${piece.hue}, 92%, 58%)`,
+    transform: [{ rotate: `${rotate.value}deg` }],
+  }));
+  return <Animated.View pointerEvents="none" style={style} />;
+}
+
 // --- Farmer Harvest Hint: bubble shown above a ready crop while the 3D farmer stands nearby ---
 function FarmerHintBubble({
   col,
@@ -3074,6 +3126,17 @@ export default function IsometricMap() {
   ];
   const [lockedBadgeHint, setLockedBadgeHint] = useState<string | null>(null);
   const lockedHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // --- Next Up unlock celebration: confetti burst + chime when the pinned badge unlocks ---
+  const [badgeConfetti, setBadgeConfetti] = useState<{ pieces: { id: number; left: number; delay: number; hue: number; size: number }[] } | null>(null);
+  const badgeConfettiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevNextUpRef = useRef<string | null>(null);
+  // Refs for Next Up celebration effect (declared before the state vars it reads — populated in its own effect)
+  const earnedRef = useRef<AchievementRecord[]>([]);
+  const statsRef = useRef<{ coinsEarned: number; cropsHarvested: number; ordersDelivered: number }>({ coinsEarned: 0, cropsHarvested: 0, ordersDelivered: 0 });
+  const levelRef = useRef(1);
+  const streakRef = useRef(0);
+  const weekDaysRef = useRef(0);
+  const prevNextUpIdRef = useRef<string | null>(null);
   type AchievementRecord = { id: string; earnedAt: string; week?: string };
   const [earnedAchievements, setEarnedAchievements] = useState<AchievementRecord[]>([]);
   const [newBadgeBanner, setNewBadgeBanner] = useState<string | null>(null);
@@ -3145,6 +3208,14 @@ export default function IsometricMap() {
     if (lifetimeStats.cropsHarvested >= 100) awardAchievement("harvest_100");
     if (lifetimeStats.ordersDelivered >= 25) awardAchievement("order_25");
   }, [lifetimeStats, awardAchievement]);
+  // Sync Next Up celebration refs
+  useEffect(() => {
+    earnedRef.current = earnedAchievements;
+    statsRef.current = lifetimeStats;
+    levelRef.current = playerLevel;
+    streakRef.current = streakLevel;
+    weekDaysRef.current = weeklyProgress.length;
+  });
 
   // Streak badge
   useEffect(() => {
@@ -3161,6 +3232,46 @@ export default function IsometricMap() {
     prevLevelRef.current.push(playerLevel);
     if (prevLevelRef.current.length > 20) prevLevelRef.current.splice(0, prevLevelRef.current.length - 20);
   }, [playerLevel, awardAchievement]);
+  // Next Up celebration: when the previously pinned badge becomes earned, fire confetti + chime once
+  useEffect(() => {
+    const ratioOf = (def: AchievementDef): number => {
+      if (def.id === "coins_5000") return Math.min(statsRef.current.coinsEarned / 5000, 1);
+      if (def.id === "harvest_100") return Math.min(statsRef.current.cropsHarvested / 100, 1);
+      if (def.id === "order_25") return Math.min(statsRef.current.ordersDelivered / 25, 1);
+      if (def.id === "level_5") return Math.min(levelRef.current / 5, 1);
+      if (def.id === "level_10") return Math.min(levelRef.current / 10, 1);
+      if (def.id === "streak_3") return Math.min(streakRef.current / 3, 1);
+      const megaCount = earnedRef.current.filter((a) => /^mega_\d+$/.test(a.id)).length;
+      if (def.id === "mega_5") return Math.min(megaCount / 5, 1);
+      if (def.id === "mega_10") return Math.min(megaCount / 10, 1);
+      if (def.id === "first_mega") return Math.min((weekDaysRef.current || 0) / 7, 1);
+      return 0;
+    };
+    const nextUp = ACHIEVEMENT_DEFS.filter((d) => !earnedRef.current.some((a) => a.id === d.id))
+      .map((d) => ({ def: d, ratio: ratioOf(d) }))
+      .sort((a, b) => b.ratio - a.ratio)[0]?.def;
+    const prev = prevNextUpIdRef.current;
+    prevNextUpIdRef.current = nextUp ? nextUp.id : null;
+    if (prev && nextUp && prev !== nextUp.id && earnedRef.current.some((a) => a.id === prev)) {
+      const burst = {
+        pieces: Array.from({ length: 26 }, (_, i) => ({
+          id: i,
+          left: 8 + Math.random() * 84,
+          delay: Math.random() * 250,
+          hue: Math.floor(Math.random() * 60) + (Math.random() > 0.5 ? 35 : 0),
+          size: 6 + Math.random() * 7,
+        })),
+      };
+      setBadgeConfetti(burst);
+      if (badgeConfettiTimer.current) clearTimeout(badgeConfettiTimer.current);
+      badgeConfettiTimer.current = setTimeout(() => setBadgeConfetti(null), 3000);
+      playBadgeChime();
+      if (Platform.OS !== "web" && settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } else if (!nextUp) {
+      prevNextUpIdRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [earnedAchievements, lifetimeStats.coinsEarned, lifetimeStats.cropsHarvested, lifetimeStats.ordersDelivered, playerLevel, streakLevel]);
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
 
   // --- Orders Board: NPC customers request goods for premium coin rewards ---
@@ -3815,6 +3926,49 @@ export default function IsometricMap() {
         o2.connect(g2).connect(ctx.destination);
         o2.start(now + 0.06);
         o2.stop(now + 0.32);
+      } else {
+        if (settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, [settings]);
+  // --- Badge chime: celebratory four-note arpeggio when the Next Up badge unlocks ---
+  const playBadgeChime = useCallback(() => {
+    if (!settings.sound) return;
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        const now = ctx.currentTime;
+        // Bright major arpeggio E4→G4→B4→E5 with a sparkling triangle top note
+        const notes: [number, number, OscillatorType, number][] = [
+          [330, 0.0, "sine", 0.14],
+          [392, 0.10, "sine", 0.14],
+          [494, 0.20, "sine", 0.14],
+          [659, 0.30, "sine", 0.16],
+          [988, 0.42, "triangle", 0.10],
+        ];
+        notes.forEach(([freq, start, type, gain]) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = type;
+          osc.frequency.value = freq;
+          g.gain.setValueAtTime(0, now + start);
+          g.gain.linearRampToValueAtTime(gain, now + start + 0.04);
+          g.gain.exponentialRampToValueAtTime(0.001, now + start + 0.55);
+          osc.connect(g).connect(ctx.destination);
+          osc.start(now + start);
+          osc.stop(now + start + 0.6);
+        });
       } else {
         if (settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
@@ -6823,6 +6977,9 @@ export default function IsometricMap() {
               💡 Tap a locked badge to see how to unlock it 🌟 Mega-quests are recorded forever — complete all 7 daily-quest days each week to earn more!
             </Text>
           </View>
+
+          {/* Next Up unlock confetti: subtle falling confetti when the pinned badge unlocks */}
+          {badgeConfetti && <BadgeConfetti burst={badgeConfetti} />}
         </View>
       )}
 
