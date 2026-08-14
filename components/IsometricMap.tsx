@@ -699,6 +699,53 @@ const FARM_SOURCES: Record<string, any> = {
   farm_beehive: FARM_BEEHIVE_PNG,
 };
 
+// Farm production data (Goathed-style popup)
+// Each farm building produces one or more goods over time; left/right arrows cycle products.
+type FarmProduct = {
+  label: string;      // e.g. "Goats"
+  emoji: string;      // display emoji for the product
+  goods: string;      // what's shown inside the building in the popup image area
+  readyTimeMs: number; // time for one good to become ready
+  rewardCoins: number; // coins earned per collected good
+  collectLabel: string; // name used in backpack / banner
+};
+type FarmProduction = {
+  title: string;       // popup title bar text
+  products: FarmProduct[];
+};
+const FARM_PRODUCTIONS: Record<string, FarmProduction> = {
+  farm_sheep_barn: { title: "SHEEP BARN", products: [
+    { label: "Wool", emoji: "🐑", goods: "🐑 🐑 🐑 🐑 🐑", readyTimeMs: 30000, rewardCoins: 15, collectLabel: "Wool" },
+  ] },
+  farm_chicken_coop: { title: "CHICKEN COOP", products: [
+    { label: "Eggs", emoji: "🥚", goods: "🐔 🐔 🥚 🥚 🐔", readyTimeMs: 20000, rewardCoins: 10, collectLabel: "Eggs" },
+  ] },
+  farm_goat_farm: { title: "GOATHED", products: [
+    { label: "Goats", emoji: "🐐", goods: "🐐 🐐 🐐 🐐 🐐", readyTimeMs: 35000, rewardCoins: 20, collectLabel: "Goats" },
+  ] },
+  farm_buffalo_pen: { title: "BUFFALO PEN", products: [
+    { label: "Milk", emoji: "🥛", goods: "🐃 🐃 🥛 🐃 🐃", readyTimeMs: 40000, rewardCoins: 20, collectLabel: "Milk" },
+  ] },
+  farm_dairy_farm: { title: "DAIRY FARM", products: [
+    { label: "Cheese", emoji: "🧀", goods: "🥛 🧀 🧀 🥛 🧀", readyTimeMs: 45000, rewardCoins: 25, collectLabel: "Cheese" },
+  ] },
+  farm_fish_pond: { title: "FISH POND", products: [
+    { label: "Fish", emoji: "🐟", goods: "🐟 🐟 🐟 🐟 🐟", readyTimeMs: 30000, rewardCoins: 15, collectLabel: "Fish" },
+  ] },
+  farm_llama_farm: { title: "LLAMA FARM", products: [
+    { label: "Llama Wool", emoji: "🦙", goods: "🦙 🦙 🦙 🦙 🦙", readyTimeMs: 40000, rewardCoins: 20, collectLabel: "Llama Wool" },
+  ] },
+  farm_duck_pond: { title: "DUCK POND", products: [
+    { label: "Feathers", emoji: "🪶", goods: "🦆 🦆 🪶 🦆 🦆", readyTimeMs: 30000, rewardCoins: 15, collectLabel: "Feathers" },
+  ] },
+  farm_beehive: { title: "BEEHIVE", products: [
+    { label: "Honey", emoji: "🍯", goods: "🐝 🐝 🍯 🐝 🐝", readyTimeMs: 35000, rewardCoins: 18, collectLabel: "Honey" },
+  ] },
+};
+
+// Production progress: map of "row,col" → { productIndex, readyCount, startedAt }
+const FARM_PROD_KEY = "farm_production_v1";
+
 // Industry PNG sources
 const INDUSTRY_SOURCES: Record<string, any> = {
   steel_factory: INDUSTRY_STEEL_PNG,
@@ -2134,6 +2181,94 @@ export default function IsometricMap() {
   const [chatTyping, setChatTyping] = useState(false);
   const chatTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Settings preferences (sound/haptic toggles) — declared early so handlers can reference settings.haptics
+  const [settings, setSettings] = useState<{ sound: boolean; haptics: boolean }>({
+    sound: true,
+    haptics: true,
+  });
+  const settingsLoadedRef = useRef(false);
+
+  // Farm building production popup (Goathed-style)
+  const [farmPopup, setFarmPopup] = useState<{
+    buildingType: string;
+    col: number;
+    row: number;
+    productIndex: number;
+    ready: number;       // goods currently ready to collect
+    startedAt: number;   // timestamp the current batch started
+    ticking: boolean;    // refresh tick active
+  } | null>(null);
+  const farmPopupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load/save farm production progress per building cell: "row,col" → { startedAt }
+  const loadFarmProd = useCallback(() => {
+    return AsyncStorage.getItem(FARM_PROD_KEY).then((saved) => {
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+      return {};
+    });
+  }, []);
+
+  const openFarmPopup = useCallback((buildingType: string, col: number, row: number) => {
+    const prod = FARM_PRODUCTIONS[buildingType];
+    if (!prod || !prod.products.length) return;
+    loadFarmProd().then((saved: Record<string, any>) => {
+      const key = `${row},${col}`;
+      const startedAt = saved?.[key]?.startedAt ?? Date.now();
+      const p = prod.products[0];
+      const elapsed = Date.now() - startedAt;
+      const ready = Math.floor(elapsed / p.readyTimeMs);
+      setFarmPopup({ buildingType, col, row, productIndex: 0, ready, startedAt, ticking: true });
+      if (farmPopupIntervalRef.current) clearInterval(farmPopupIntervalRef.current);
+      farmPopupIntervalRef.current = setInterval(() => {
+        setFarmPopup((prev) => {
+          if (!prev || !prev.ticking) return prev;
+          const cur = FARM_PRODUCTIONS[prev.buildingType]?.products?.[prev.productIndex];
+          if (!cur) return prev;
+          const elapsedNow = Date.now() - prev.startedAt;
+          return { ...prev, ready: Math.floor(elapsedNow / cur.readyTimeMs) };
+        });
+      }, 1000);
+    });
+    if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, [loadFarmProd, settings.haptics]);
+
+  const closeFarmPopup = useCallback(() => {
+    setFarmPopup(null);
+    if (farmPopupIntervalRef.current) {
+      clearInterval(farmPopupIntervalRef.current);
+      farmPopupIntervalRef.current = null;
+    }
+  }, []);
+
+  const collectFarmGoods = useCallback(() => {
+    setFarmPopup((prev) => {
+      if (!prev || prev.ready <= 0) return prev;
+      const prod = FARM_PRODUCTIONS[prev.buildingType];
+      const p = prod.products[prev.productIndex];
+      const earned = p.rewardCoins * prev.ready;
+      // Add coins
+      setCoins((c) => Math.max(0, c + earned));
+      // Add to backpack inventory
+      saveBackpack({ ...harvestedItems, [p.collectLabel]: (harvestedItems[p.collectLabel] || 0) + prev.ready });
+      // Persist progress: reset batch clock to now
+      loadFarmProd().then((saved: Record<string, any>) => {
+        const key = `${prev.row},${prev.col}`;
+        AsyncStorage.setItem(FARM_PROD_KEY, JSON.stringify({ ...saved, [key]: { startedAt: Date.now() } })).catch(() => {});
+      });
+      return { ...prev, ready: 0, startedAt: Date.now() };
+    });
+    if (Platform.OS !== "web" && settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, [harvestedItems, saveBackpack, loadFarmProd, settings.haptics]);
+
+  // Clean up farm popup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (farmPopupIntervalRef.current) clearInterval(farmPopupIntervalRef.current);
+    };
+  }, []);
+
   // Building hover tooltip: shows character name + profession
   const [buildingTooltip, setBuildingTooltip] = useState<{
     buildingType: string;
@@ -2240,15 +2375,13 @@ export default function IsometricMap() {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   // --- Settings: sound + haptic toggles, persisted via AsyncStorage ---
-  const [settings, setSettings] = useState<{ sound: boolean; haptics: boolean }>({
-    sound: true,
-    haptics: true,
-  });
   const saveSettings = useCallback((next: { sound: boolean; haptics: boolean }) => {
     setSettings(next);
     AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
   useEffect(() => {
+    if (settingsLoadedRef.current) return;
+    settingsLoadedRef.current = true;
     AsyncStorage.getItem(SETTINGS_KEY)
       .then((raw) => {
         if (raw) {
@@ -3048,6 +3181,13 @@ export default function IsometricMap() {
               userReplied: false,
             });
             if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            return newGrid; // no grid change
+          }
+          // Farm production popup: tapping a placed farm building opens the Goathed-style
+          // production popup to cycle products and collect goods (only outside farm placement mode).
+          // In farm mode, tap keeps its existing select/remove toggle behavior.
+          if (mode !== "farm" && tappedBuilding !== "none" && FARM_PRODUCTIONS[tappedBuilding]) {
+            openFarmPopup(tappedBuilding, col, row);
             return newGrid; // no grid change
           }
           if (mode === "tile") {
@@ -4884,6 +5024,92 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Farm Production Popup (Goathed-style: tap a placed farm building) */}
+      {farmPopup && (() => {
+        const prod = FARM_PRODUCTIONS[farmPopup.buildingType];
+        if (!prod) return null;
+        const p = prod.products[farmPopup.productIndex];
+        const imgSrc = (FARM_SOURCES as any)[farmPopup.buildingType] ?? null;
+        return (
+          <>
+            <TouchableOpacity
+              style={chatStyles.backdrop}
+              activeOpacity={1}
+              onPress={() => closeFarmPopup()}
+            />
+            <View style={chatStyles.panel}>
+              <View style={chatStyles.panelHeader}>
+                <Text style={chatStyles.panelTitle}>🏠 {prod.title}</Text>
+                <TouchableOpacity
+                  style={chatStyles.closeBtn}
+                  onPress={() => closeFarmPopup()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={chatStyles.closeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Product arrows + goods emoji strip */}
+              <View style={farmStyles.prodRow}>
+                <TouchableOpacity
+                  style={farmStyles.arrowBtn}
+                  onPress={() => {
+                    setFarmPopup((prev) => {
+                      if (!prev || !prod.products.length) return prev;
+                      return { ...prev, productIndex: (prev.productIndex - 1 + prod.products.length) % prod.products.length, ready: 0, startedAt: Date.now() };
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={farmStyles.arrowText}>◀</Text>
+                </TouchableOpacity>
+                <View style={farmStyles.goodsBox}>
+                  <Text style={farmStyles.goodsEmoji}>{p.goods}</Text>
+                  <Text style={farmStyles.goodsLabel}>{p.emoji} {p.label}</Text>
+                </View>
+                <TouchableOpacity
+                  style={farmStyles.arrowBtn}
+                  onPress={() => {
+                    setFarmPopup((prev) => {
+                      if (!prev || !prod.products.length) return prev;
+                      return { ...prev, productIndex: (prev.productIndex + 1) % prod.products.length, ready: 0, startedAt: Date.now() };
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={farmStyles.arrowText}>▶</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Building image */}
+              {imgSrc ? (
+                <Image
+                  source={imgSrc}
+                  style={farmStyles.buildingImg}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={[farmStyles.buildingImg, farmStyles.buildingImgPlaceholder]}>
+                  <Text style={{ fontSize: 44 }}>🏠</Text>
+                </View>
+              )}
+              <Text style={farmStyles.prodInfo}>
+                ⏱️ New batch every {Math.round(p.readyTimeMs / 1000)}s • 💰 {p.rewardCoins} coins per batch
+              </Text>
+              {/* Collect button with ready-count badge */}
+              <TouchableOpacity
+                style={[farmStyles.collectBtn, farmPopup.ready <= 0 && farmStyles.collectBtnDisabled]}
+                onPress={() => collectFarmGoods()}
+                disabled={farmPopup.ready <= 0}
+                activeOpacity={0.8}
+              >
+                <Text style={farmStyles.collectBtnText}>
+                  {farmPopup.ready > 0 ? `Collect ${farmPopup.ready > 1 ? `×${farmPopup.ready}` : ""} 🎁` : "Producing… ⏳"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        );
+      })()}
+
       {/* Settings panel (shown when ⚙️ is tapped) */}
       {settingsPanel && (
         <>
@@ -5696,5 +5922,96 @@ const chatStyles = StyleSheet.create({
     color: "#687076",
     fontStyle: "italic",
     lineHeight: 17,
+  },
+});
+
+// --- Farm Production Popup (Goathed-style) ---
+const farmStyles = StyleSheet.create({
+  prodRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    marginTop: 10,
+  },
+  arrowBtn: {
+    backgroundColor: "#eef3f7",
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#d6e0e8",
+  },
+  arrowText: {
+    fontSize: 20,
+    color: "#0a7ea4",
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  goodsBox: {
+    flex: 1,
+    backgroundColor: "#fff8ea",
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#f0e2c0",
+  },
+  goodsEmoji: {
+    fontSize: 22,
+    lineHeight: 30,
+    marginBottom: 2,
+  },
+  goodsLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6b4d1a",
+    lineHeight: 18,
+  },
+  buildingImg: {
+    width: 150,
+    height: 90,
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  buildingImgPlaceholder: {
+    backgroundColor: "#eef3f7",
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prodInfo: {
+    fontSize: 12,
+    color: "#687076",
+    textAlign: "center",
+    marginTop: 6,
+    lineHeight: 17,
+  },
+  collectBtn: {
+    backgroundColor: "#f59e0b",
+    borderRadius: 18,
+    paddingVertical: 10,
+    marginHorizontal: 24,
+    marginTop: 10,
+    marginBottom: 8,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  collectBtnDisabled: {
+    backgroundColor: "#d6e0e8",
+  },
+  collectBtnText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 22,
   },
 });

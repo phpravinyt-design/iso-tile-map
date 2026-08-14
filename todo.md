@@ -307,3 +307,11 @@
 - [x] Preferences persisted via AsyncStorage (iso-settings-v1) and loaded on app start (defaults: both ON)
 - [x] All existing sound/haptic call sites check the settings flags before playing
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Farm Building Production Popup (Goathed-style)
+- [x] Tapping a placed farm building (e.g. goat farm) on the map opens a production popup styled like the Goathed panel: title bar with farm name, close (×) button, left/right navigation arrows
+- [x] Popup shows the farm building image with its production goods (e.g. 5 goats with bells, 4 haystacks), a ready-to-collect counter badge, and a bag-of-goods "Collect" button below
+- [x] Left/right arrows cycle between the farm building's production items (next/previous product)
+- [x] Collect button gathers produced goods (adds to inventory/coins) and updates the counter; production timers persist per cell via AsyncStorage (FARM_PROD_KEY)
+- [x] Popup closes via × button or backdrop tap (reuses the chat panel slide styles)
+- [x] Popup only opens outside farm placement mode; in farm mode tap keeps select/remove behavior; TypeScript clean, tests passing, app renders verified
