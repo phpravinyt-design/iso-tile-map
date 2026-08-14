@@ -335,3 +335,8 @@
 - [x] During the pickup phase of the delivery animation, show a small dialogue bubble above the NPC with a thank-you message ("Shukriya! Achhe goods hain!")
 - [x] Bubble styled with white rounded card, orange border, arrow tail, and unflipped text (not affected by NPC facing flip)
 - [x] Bubble fades in/out with a small pop (opacity + scale tied to pickup progress); TypeScript clean, 14 tests passing
+
+## Delivery Pickup Chime Sound
+- [x] Play a subtle synthesized chime (sine-wave triplet C5-E5-G5, staggered 110ms apart, soft 0.12 gain) when the NPC receives the goods at the start of the pickup phase
+- [x] Chime respects the sound toggle (skipped when off); native fallback uses a Success haptic notification like other SFX; shares the same AudioContext helper as placement/removal sounds
+- [x] TypeScript clean, 14 tests passing

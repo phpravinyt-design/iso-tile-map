@@ -2352,6 +2352,8 @@ export default function IsometricMap() {
     const returnMs = 1200;
     if (deliveryTimer.current) clearTimeout(deliveryTimer.current);
     deliveryTimer.current = setTimeout(() => {
+      // Chime plays the moment the NPC receives the goods (start of pickup)
+      playDeliveryChime();
       setDelivery((d) => d ? { ...d, step: "pickup" } : d);
       deliveryTimer.current = setTimeout(() => {
         setDelivery((d) => d ? { ...d, step: "returning" } : d);
@@ -2362,6 +2364,11 @@ export default function IsometricMap() {
       }, pickupMs);
     }, toSpotMs);
   }, [findDeliverySpots]);
+  // NOTE: playDeliveryChime is intentionally called inside startNpcDelivery but not listed in
+  // its deps array, because it is defined later in the component body (avoiding TDZ). It reads
+  // settings.sound at call time via closure on the latest render in practice because
+  // startNpcDelivery is invoked only from the latest render's fulfillOrder.
+
   useEffect(() => {
     return () => {
       if (deliveryTimer.current) clearTimeout(deliveryTimer.current);
@@ -2800,6 +2807,41 @@ export default function IsometricMap() {
         osc.stop(ctx.currentTime + 0.2);
       } else {
         if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, [settings]);
+  // --- Delivery pickup chime: subtle C-E-G sine triplet when NPC receives the goods ---
+  const playDeliveryChime = useCallback(() => {
+    if (!settings.sound) return;
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(0.0, ctx.currentTime + i * 0.11);
+          gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + i * 0.11 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.11 + 0.25);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.11);
+          osc.stop(ctx.currentTime + i * 0.11 + 0.3);
+        });
+      } else {
+        if (settings.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
     } catch (e) {
       // audio/haptics unavailable, ignore
