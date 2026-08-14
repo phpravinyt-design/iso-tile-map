@@ -3560,6 +3560,14 @@ export default function IsometricMap() {
           }
           return newGrid;
         });
+        // 🌸 Flower regrowth: remember removed flowers so they bloom back later.
+        const removed: { row: number; col: number }[] = [];
+        for (let row = 0; row < GRID_SIZE; row += 1) {
+          for (let col = 0; col < GRID_SIZE; col += 1) {
+            if ((grid[row]?.[col] as GridCell | undefined)?.building === flowerType) removed.push({ row, col });
+          }
+        }
+        removed.slice(0, order.quantity).forEach(({ row, col }) => recordFlowerRegrowth(flowerType, row, col));
         // No sell refund for delivered flowers — they were sold to the NPC.
         setCoins((c) => c + order.rewardCoins);
         recordLifetimeStat("coins", order.rewardCoins);
@@ -3612,6 +3620,81 @@ export default function IsometricMap() {
   // Persist backpack
   const BACKPACK_KEY = "backpack_v1";
   const [, forceBackpackRender] = useState(0);
+  // --- Flower regrowth: delivered flowers bloom back at their old spot after FLOWER_REGROWTH_MS ---
+  const FLOWER_REGROWTH_MS = 30_000;
+  const REGROWTH_KEY = "flower_regrowth_v1";
+  const [regrowFlowers, setRegrowFlowers] = useState<RegrowthSparkle[]>([]);
+  const regrowthQueueRef = useRef<RegrowthEntry[]>([]);
+  useEffect(() => {
+    AsyncStorage.getItem(REGROWTH_KEY).then((saved) => {
+      if (saved) {
+        try {
+          const parsed: RegrowthEntry[] = JSON.parse(saved);
+          regrowthQueueRef.current = parsed.filter((e) => e.bloomAt > Date.now());
+          setRegrowFlowers([]);
+        } catch {}
+      }
+    });
+  }, []);
+  const saveRegrowthQueue = useCallback((next: RegrowthEntry[]) => {
+    regrowthQueueRef.current = next;
+    AsyncStorage.setItem(REGROWTH_KEY, JSON.stringify(next.filter((e) => e.bloomAt > Date.now()))).catch(() => {});
+  }, []);
+  // Bloom-ready check every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const ready: RegrowthEntry[] = [];
+      const waiting: RegrowthEntry[] = [];
+      for (const e of regrowthQueueRef.current) {
+        if (e.bloomAt <= now) ready.push(e); else waiting.push(e);
+      }
+      if (ready.length > 0) {
+        saveRegrowthQueue(waiting);
+        setGrid((prev) => {
+          const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+          let changed = false;
+          for (const e of ready) {
+            const cell = newGrid[e.row]?.[e.col];
+            if (cell && cell.building === "none") {
+              newGrid[e.row][e.col] = { ...cell, building: e.type as BuildingType };
+              changed = true;
+            }
+          }
+          return changed ? newGrid : prev;
+        });
+        // ✨ bloom sparkle at each regrown flower
+        setRegrowFlowers((prev) => [
+          ...prev,
+          ...ready.map((e, i) => ({
+            key: `regrow-${e.row}-${e.col}-${i}-${now}`,
+            row: e.row,
+            col: e.col,
+            at: now + i * 120,
+            stars: [
+              { dx: -8, dy: -10, delay: 0 }, { dx: 7, dy: -9, delay: 40 }, { dx: -5, dy: 8, delay: 80 },
+              { dx: 9, dy: 7, delay: 30 }, { dx: 0, dy: -12, delay: 60 }, { dx: -9, dy: -2, delay: 100 },
+            ],
+          })),
+        ].slice(-20));
+        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        playPlaceSound();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [saveRegrowthQueue]);
+  // Clear old regrowth sparkles
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setRegrowFlowers((prev) => prev.filter((s) => now - s.at < 900));
+    }, 200);
+    return () => clearInterval(interval);
+  }, []);
+  const recordFlowerRegrowth = useCallback((type: string, row: number, col: number) => {
+    const next = [...regrowthQueueRef.current, { type, row, col, bloomAt: Date.now() + FLOWER_REGROWTH_MS }];
+    saveRegrowthQueue(next);
+  }, [saveRegrowthQueue]);
   // Load backpack on mount
   useEffect(() => {
     AsyncStorage.getItem(BACKPACK_KEY).then((saved) => {
@@ -4165,6 +4248,9 @@ export default function IsometricMap() {
   }, [settings]);
   // --- Harvest sparkles: bursts of small sparkle particles at harvested crops ---
   type HarvestSparkle = { key: string; col: number; row: number; at: number; stars: { dx: number; dy: number; delay: number }[] };
+  // Flower regrowth queue entry (persisted) + bloom sparkle overlay
+  type RegrowthEntry = { type: string; row: number; col: number; bloomAt: number };
+  type RegrowthSparkle = { key: string; row: number; col: number; at: number; stars: { dx: number; dy: number; delay: number }[] };
   const [harvestSparkles, setHarvestSparkles] = useState<HarvestSparkle[]>([]);
   const harvestSparkleTick = useRef(0);
   useEffect(() => {
@@ -6925,6 +7011,10 @@ export default function IsometricMap() {
       {/* Harvest sparkles: ✨ particle bursts at each harvested crop */}
       {harvestSparkles.map((burst) => (
         <HarvestSparkles key={burst.key} burst={burst} scale={currentScale} />
+      ))}
+      {/* Regrowth: ✨ bloom sparkles at flowers that just grew back */}
+      {regrowFlowers.map((s) => (
+        <HarvestSparkles key={s.key} burst={s} scale={currentScale} />
       ))}
       {/* Removal: 💨 dust cloud at the tile where an item was removed */}
       {dustPos ? (

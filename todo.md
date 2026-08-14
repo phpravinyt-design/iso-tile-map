@@ -542,3 +542,9 @@
 - [x] Apply fixes: removed unused expo-video plugin (native Video SDK was likely breaking Gradle), dropped legacy armeabi-v7a arch (arm64-v8a only)
 - [x] Validate: tsc clean, 64 tests pass, local Android prebuild succeeds, Android JS bundle succeeds, no expo-video references remain
 - [x] Checkpoint + instruct user to rebuild (Build APK); if still failing → https://help.manus.im for server-side gradle logs
+
+## Flower Regrowth (user request 1)
+- [x] Design regrowth: delivered flowers recorded with type/position/bloomAt; re-bloom after 30s at same tile if still empty (FLOWER_REGROWTH_MS=30s)
+- [x] Persist regrowth queue to AsyncStorage (flower_regrowth_v1), pruned of expired entries
+- [x] Visual bloom effect: ✨ HarvestSparkles overlay + place sound + haptic when flower regrows
+- [x] 8 new vitest tests for regrowth queue semantics (72 passing, tsc clean), checkpoint
