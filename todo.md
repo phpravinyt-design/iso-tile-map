@@ -330,3 +330,8 @@
 - [x] NPC reaches delivery spot, does a scale-burst pickup pop with 📦 badge above head, then walks back to origin (~3.1s total at ~30fps)
 - [x] Animation renders as a pointerEvents="none" overlay (zIndex 25) that does not interfere with pan/zoom/placement
 - [x] Timer cleaned up on unmount; TypeScript clean, 14 tests passing, app renders verified
+
+## Delivery Thank-You Bubble
+- [x] During the pickup phase of the delivery animation, show a small dialogue bubble above the NPC with a thank-you message ("Shukriya! Achhe goods hain!")
+- [x] Bubble styled with white rounded card, orange border, arrow tail, and unflipped text (not affected by NPC facing flip)
+- [x] Bubble fades in/out with a small pop (opacity + scale tied to pickup progress); TypeScript clean, 14 tests passing

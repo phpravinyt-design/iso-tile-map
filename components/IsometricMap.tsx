@@ -381,6 +381,10 @@ function DeliveryNpcSprite({ delivery, scale }: { delivery: DeliveryState; scale
   const bob = delivery.step !== "pickup" ? Math.sin(t * Math.PI * 2) * 4 : 0;
   // Pickup pop: quick scale burst
   const popScale = showEmoji ? 1 + Math.sin(t * Math.PI * 2) * 0.18 : 1;
+  // Thank-you bubble: fades in at the start of pickup and pops out by the end
+  const thanksProgress = showEmoji ? Math.sin(t * Math.PI) : 0; // 0→1→0 over pickup
+  const thanks = delivery.step === "pickup" && thanksProgress > 0.25;
+  const bubbleScale = 0.8 + thanksProgress * 0.2;
   return (
     <View
       pointerEvents="none"
@@ -413,6 +417,54 @@ function DeliveryNpcSprite({ delivery, scale }: { delivery: DeliveryState; scale
           }}
         >
           <Text style={{ fontSize: 18, lineHeight: 24 }}>📦</Text>
+        </View>
+      )}
+      {/* Thank-you dialogue bubble above the NPC during pickup */}
+      {thanks && (
+        <View
+          style={{
+            position: "absolute",
+            top: -46,
+            left: npcSize / 2 - 62,
+            width: 124,
+            alignItems: "center",
+            opacity: Math.min(1, thanksProgress * 1.6),
+            transform: [{ scaleX: 1 }, { scale: bubbleScale }],
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: 10,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderWidth: 1.5,
+              borderColor: "#FFB020",
+              shadowColor: "#000",
+              shadowOpacity: 0.12,
+              shadowRadius: 3,
+              shadowOffset: { width: 0, height: 1 },
+              elevation: 2,
+            }}
+          >
+            <Text style={{ color: "#4a3520", fontSize: 10, fontWeight: "700", textAlign: "center", lineHeight: 13 }}>
+              Shukriya! Achhe goods hain!
+            </Text>
+          </View>
+          {/* Bubble tail */}
+          <View
+            style={{
+              width: 0,
+              height: 0,
+              borderLeftWidth: 6,
+              borderRightWidth: 6,
+              borderTopWidth: 8,
+              borderLeftColor: "transparent",
+              borderRightColor: "transparent",
+              borderTopColor: "#FFB020",
+              marginTop: -1,
+            }}
+          />
         </View>
       )}
     </View>
