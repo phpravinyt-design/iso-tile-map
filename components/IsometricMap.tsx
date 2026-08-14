@@ -146,6 +146,9 @@ const NPC_COW_PNG = require("@/assets/images/npc_cow_small.png");
 const NPC_CHICKEN_PNG = require("@/assets/images/npc_chicken_small.png");
 const NPC_DOG_PNG = require("@/assets/images/npc_dog_small.png");
 
+// --- 3D Farmer NPC Sprite ---
+const FARMER_3D_PNG = require("@/assets/images/farmer_3d_npc.png");
+
 // --- Vehicle Sprites (road-only NPCs) ---
 const VEHICLE_CAR_PNG = require("@/assets/images/vehicle_car_small.png");
 const VEHICLE_TRUCK_PNG = require("@/assets/images/vehicle_truck_small.png");
@@ -156,6 +159,7 @@ const ANIMAL_SOURCES: Record<string, any> = {
   cow: NPC_COW_PNG,
   chicken: NPC_CHICKEN_PNG,
   dog: NPC_DOG_PNG,
+  farmer_3d: FARMER_3D_PNG,
 };
 
 // NPC sprite sources (4 different Township-style characters)
@@ -185,6 +189,15 @@ const ANIMAL_MESSAGES: Record<string, string[]> = {
   dog: ["🐕 Woof!", "🦴 Good boy!", "🐕 Woof woof!", "🎾 Fetch!", "🐾 *wags tail*"],
 };
 
+// Speech bubble messages for the 3D farmer NPC
+const FARMER_3D_MESSAGES: string[] = [
+  "🚜 What a lovely farm! 🌾",
+  "Crops looking great! 🌽",
+  "Let's harvest together! 🌻",
+  "Fresh air, fresh crops! 🌿",
+  "This farm is growing nicely! 🍅",
+];
+
 // Animal walking config
 const ANIMAL_COUNT = 3;
 const ANIMAL_WALK_SPEED = 0.8; // animals walk slower
@@ -205,7 +218,7 @@ interface NpcState {
 // Animal NPC state interface
 interface AnimalNpcState {
   id: number;
-  type: "cow" | "chicken" | "dog";
+  type: "cow" | "chicken" | "dog" | "farmer_3d";
   x: number;
   y: number;
   targetX: number;
@@ -735,7 +748,10 @@ function VehicleSprite({ vehicle, scale }: { vehicle: VehicleState; scale: numbe
 function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale: number; onTap: (id: number, type: string, x: number, y: number) => void }) {
   const pos = gridToScreen(animal.x, animal.y, scale);
   const ts = TILE_SIZE * scale;
-  const animalSize = ts * 0.55; // Animals are smaller than humans
+  // The 3D farmer is human-sized; other animals are smaller
+  const isFarmer = animal.type === "farmer_3d";
+  const animalSize = isFarmer ? ts * 1.05 : ts * 0.55;
+  const spriteHeight = isFarmer ? animalSize * 1.25 : animalSize;
 
   return (
     <TouchableOpacity
@@ -744,9 +760,9 @@ function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale:
       style={{
         position: "absolute",
         left: pos.x - animalSize / 2,
-        top: pos.y - animalSize / 2,
+        top: pos.y - spriteHeight / 2,
         width: animalSize,
-        height: animalSize,
+        height: spriteHeight,
         zIndex: 14, // Slightly below human NPCs
         transform: animal.direction === -1 ? [{ scaleX: -1 }] : undefined,
       }}
@@ -755,13 +771,13 @@ function AnimalSprite({ animal, scale, onTap }: { animal: AnimalNpcState; scale:
         source={ANIMAL_SOURCES[animal.type] || NPC_COW_PNG}
         style={{
           width: animalSize,
-          height: animalSize,
-          transform: animal.sleeping ? [{ scaleY: 0.62 }, { translateY: animalSize * 0.28 }] : undefined,
+          height: spriteHeight,
+          transform: animal.sleeping && !isFarmer ? [{ scaleY: 0.62 }, { translateY: animalSize * 0.28 }] : undefined,
         }}
         contentFit="contain"
         cachePolicy="memory"
       />
-      {animal.sleeping && <SleepZzz animalSize={animalSize} />}
+      {animal.sleeping && !isFarmer && <SleepZzz animalSize={animalSize} />}
     </TouchableOpacity>
   );
 }
@@ -3543,7 +3559,7 @@ export default function IsometricMap() {
 
   const handleAnimalTap = useCallback((id: number, type: string, x: number, y: number) => {
     if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-    const msgs = ANIMAL_MESSAGES[type] || ANIMAL_MESSAGES["dog"];
+    const msgs = ANIMAL_MESSAGES[type] || (type === "farmer_3d" ? FARMER_3D_MESSAGES : ANIMAL_MESSAGES["dog"]);
     const msg = msgs[Math.floor(Math.random() * msgs.length)];
     setActiveBubble({ id, message: msg, isAnimal: true, x, y });
     bubbleTimerRef.current = setTimeout(() => setActiveBubble(null), 2000);
@@ -3578,12 +3594,12 @@ export default function IsometricMap() {
   });
 
   // --- Animal NPCs ---
-  const animalTypes: AnimalNpcState["type"][] = ["cow", "chicken", "dog"];
+  const animalTypes: AnimalNpcState["type"][] = ["cow", "chicken", "dog", "farmer_3d"];
   // Playful chase: triggered occasionally; one animal chases another for a few seconds
   const chaseCooldownRef = useRef(20000 + Math.random() * 15000);
   const [animals, setAnimals] = useState<AnimalNpcState[]>(() => {
     const initial: AnimalNpcState[] = [];
-    for (let i = 0; i < ANIMAL_COUNT; i++) {
+    for (let i = 0; i < animalTypes.length; i++) {
       let x = 12 + Math.floor(Math.random() * 4);
       let y = 12 + Math.floor(Math.random() * 4);
       initial.push({

@@ -393,3 +393,9 @@
 - [x] Collect adds coins + backpack goods, resets per-cell production timer, persisted via AsyncStorage
 - [x] Live ready counter ticks every second for factories too
 - [x] 4 new vitest tests (data completeness for all 9 factories, timer/reward sanity, ready math, multi-batch collect math); tsc clean, 18 tests passing, render verified
+
+## 3D Farmer NPC
+- [x] Generated a 3D chibi farmer PNG (straw hat, plaid shirt, suspenders, pitchfork, transparent bg) → assets/images/farmer_3d_npc.png (200px)
+- [x] Added 3D farmer to the animal walking system as type "farmer_3d" (4th entity): walks on grass/dirt with same wander/idle/chase mechanics, direction flip, follows pan/zoom
+- [x] 3D farmer renders human-sized (1.05× tile) with own sprite, no sleeping pose; tappable with its own speech bubble pool (5 messages: 🚜 What a lovely farm! 🌾 etc.)
+- [x] Verified: tsc clean, 18 tests passing, render check — 3D farmer visible on map next to house
