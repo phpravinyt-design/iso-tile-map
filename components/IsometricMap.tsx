@@ -3365,8 +3365,31 @@ export default function IsometricMap() {
       // audio/haptics unavailable, ignore
     }
   }, [settings]);
-  // --- Harvest chime: bright rising two-note "ting" when a crop is successfully harvested ---
-  const playHarvestChime = useCallback(() => {
+  // --- Per-crop harvest chime pitch: each crop gets its own tonal character ---
+  // [ding start Hz, ding end Hz, shimmer start Hz, shimmer end Hz]
+  const HARVEST_PITCH: Record<string, [number, number, number, number]> = {
+    crop_watermelon: [330, 480, 680, 820],   // 🍉 deep bass-heavy thud-tink (big fruit)
+    crop_garlic: [390, 540, 780, 920],       // 🧄 warm mid-low, earthy
+    crop_mushroom: [360, 510, 740, 880],     // 🍄 mellow forest tone
+    crop_peanut: [440, 620, 880, 1040],      // 🥜 cozy mid
+    crop_broccoli: [470, 660, 940, 1110],    // 🥦 fresh mid-high
+    crop_carrot: [520, 740, 1060, 1250],     // 🥕 crisp snappy
+    crop_tomato: [560, 790, 1140, 1340],     // 🍅 juicy medium chime (default-like)
+    crop_eggplant: [600, 840, 1220, 1430],   // 🍆 smooth round
+    crop_potato: [640, 900, 1300, 1520],     // 🥔 hearty earthy
+    crop_wheat: [700, 1000, 1420, 1660],     // 🌾 sharp bright field tink
+    crop_strawberry: [760, 1080, 1540, 1800],// 🍓 sweet high tink
+    crop_cucumber: [820, 1150, 1640, 1900],  // 🥒 light crisp
+    crop_corn: [880, 1220, 1740, 2020],      // 🌽 sunny high bright
+    crop_chili: [940, 1290, 1840, 2130],     // 🌶️ spicy fast sizzle-high
+    crop_sweetpotato: [430, 600, 860, 1020], // 🍠 similar to peanut
+    crop_grapes: [680, 960, 1380, 1610],     // 🍇 plump round
+    crop_lemon: [740, 1050, 1500, 1760],     // 🍋 zesty
+    crop_onion: [490, 680, 990, 1160],       // 🧅 teary-eyed mid
+    crop_peas: [720, 1010, 1450, 1690],      // 🫛 light pop
+    crop_bellpepper: [610, 860, 1240, 1450], // 🫑 crunchy
+  };
+  const playHarvestChime = useCallback((cropType?: string) => {
     if (!settings.sound) return;
     try {
       if (Platform.OS === "web") {
@@ -3381,12 +3404,14 @@ export default function IsometricMap() {
           ctx.resume().catch(() => {});
         }
         const now = ctx.currentTime;
+        const pitch = HARVEST_PITCH[cropType || ""] || [720, 1180, 1480, 1650];
+        const [dStart, dEnd, sStart, sEnd] = pitch;
         // Note 1: quick rising ding
         const o1 = ctx.createOscillator();
         const g1 = ctx.createGain();
         o1.type = "sine";
-        o1.frequency.setValueAtTime(720, now);
-        o1.frequency.exponentialRampToValueAtTime(1180, now + 0.09);
+        o1.frequency.setValueAtTime(dStart, now);
+        o1.frequency.exponentialRampToValueAtTime(dEnd, now + 0.09);
         g1.gain.setValueAtTime(0.22, now);
         g1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         o1.connect(g1).connect(ctx.destination);
@@ -3396,8 +3421,8 @@ export default function IsometricMap() {
         const o2 = ctx.createOscillator();
         const g2 = ctx.createGain();
         o2.type = "triangle";
-        o2.frequency.setValueAtTime(1480, now + 0.06);
-        o2.frequency.exponentialRampToValueAtTime(1650, now + 0.15);
+        o2.frequency.setValueAtTime(sStart, now + 0.06);
+        o2.frequency.exponentialRampToValueAtTime(sEnd, now + 0.15);
         g2.gain.setValueAtTime(0.0, now + 0.06);
         g2.gain.linearRampToValueAtTime(0.12, now + 0.09);
         g2.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
@@ -5849,6 +5874,7 @@ export default function IsometricMap() {
                     cell.cropGrowthStage = 0;
                     totalHarvested++;
                     newBackpack[cropType] = (newBackpack[cropType] || 0) + 1;
+                    playHarvestChime(cropType);
                     triggerHarvestSparkles(col, row);
                   }
                 }
@@ -5856,7 +5882,6 @@ export default function IsometricMap() {
               if (totalHarvested > 0) {
                 setCoins((c) => c + totalHarvested * 25);
                 saveBackpack(newBackpack);
-                playHarvestChime();
                 if (Platform.OS !== "web") {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -6103,7 +6128,7 @@ export default function IsometricMap() {
                             cell.building = "none";
                             cell.cropGrowthStage = 0;
                             setCoins((c) => c + 25);
-                            playHarvestChime();
+                            playHarvestChime(cropType);
                             triggerHarvestSparkles(col, row);
                             if (Platform.OS !== "web") {
                               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

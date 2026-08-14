@@ -418,3 +418,8 @@
 - [x] Added HarvestSparkles overlay: 6 staggered ✨ particles per harvested crop rise/fan out and fade over ~0.7s (60ms tick, bursts auto-cleared after 0.9s, capped at 10 bursts); per-star delay creates a burst feel
 - [x] Sparkles use pointerEvents="none" at zIndex 50, follow zoom via currentScale, render for both single harvest and Harvest All (one burst per cell)
 - [x] Verified: tsc clean, 18 tests passing, render check OK
+
+## Per-Crop Harvest Sound Pitch
+- [x] Added HARVEST_PITCH table: per-crop pitch profiles for 20 crops (🍉 bass 330-480Hz thud-tink → 🌶️ spicy 940-1290Hz sizzle-high); ding + shimmer oscillators both vary per crop, unknown crops fall back to default (720-1180Hz)
+- [x] playHarvestChime(cropType) wired into single-crop harvest and Harvest All (each cell plays its own crop's chime now, no generic summary chime)
+- [x] Verified: tsc clean, 18 tests passing, render check OK
