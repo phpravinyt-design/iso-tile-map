@@ -3117,6 +3117,48 @@ export default function IsometricMap() {
       // audio/haptics unavailable, ignore
     }
   }, [settings]);
+  // --- Morning farm bell: warm metallic strike + shimmer, rings once at dawn
+  const playMorningBell = useCallback(() => {
+    if (!settings.sound) return;
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        // Metallic bell strike + shimmering overtones with long decay tail
+        const strike = (freq: number, start: number, type: OscillatorType, gainPeak: number, decay: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+          gain.gain.setValueAtTime(0.0, ctx.currentTime + start);
+          gain.gain.linearRampToValueAtTime(gainPeak, ctx.currentTime + start + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + decay);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + start);
+          osc.stop(ctx.currentTime + start + decay + 0.05);
+        };
+        // Main strike (triangle, bell-like) + shimmering overtones
+        strike(830, 0.0, "triangle", 0.14, 1.6);
+        strike(1660, 0.0, "sine", 0.06, 1.2);
+        strike(2490, 0.02, "sine", 0.03, 0.9);
+        // Second soft toll, brighter morning feel
+        strike(980, 0.45, "triangle", 0.11, 1.3);
+        strike(1960, 0.45, "sine", 0.05, 1.0);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      // audio/haptics unavailable, ignore
+    }
+  }, [settings]);
   // --- Nighttime owl hoot: quiet two-note "hoo-hoo" descending sine, occasional ambient
   const playOwlHoot = useCallback(() => {
     if (!settings.sound) return;
@@ -3672,10 +3714,61 @@ export default function IsometricMap() {
 
       // Update animal NPCs
       setAnimals((prevAnimals) => {
+        // Sleep bookkeeping: dusk -> walk to bed; dawn -> wake up + ring the farm bell
+        const nightNow = timeOfDay > 0.85 || timeOfDay < 0.15;
+        if (nightNow) {
+          prevAnimals.forEach((animal) => {
+            if (animal.sleeping) return;
+            if (!animal.bedX && !animal.bedY) {
+              // Assign bed: nearest placed building, else grid center
+              let bx = 12;
+              let by = 12;
+              let best = Infinity;
+              for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                  if (grid[row][col].building !== "none") {
+                    const d = (col - animal.x) ** 2 + (row - animal.y) ** 2;
+                    if (d < best) {
+                      best = d;
+                      bx = col;
+                      by = row;
+                    }
+                  }
+                }
+              }
+              animal.bedX = bx + 0.5;
+              animal.bedY = by + 0.5;
+            }
+          });
+        } else if (prevAnimals.some((a) => a.sleeping)) {
+          // Dawn: wake everyone up and ring the morning bell once
+          playMorningBell();
+          setAnimals((prev) => prev.map((a) => (a.sleeping ? { ...a, sleeping: false, idleUntil: Date.now() } : a)));
+        }
         return prevAnimals.map((animal) => {
           // End chase when time's up
           if (animal.chaseRole && animal.chaseEndsAt && now >= animal.chaseEndsAt) {
             return { ...animal, chaseRole: undefined, chaseTargetId: undefined, chaseEndsAt: undefined, idleUntil: now + ANIMAL_IDLE_TIME };
+          }
+          if (animal.sleeping) {
+            // Asleep at the bed: don't wander, just idle in place
+            return { ...animal, idleUntil: now + 5000 };
+          }
+          // Dusk: walk toward the bed before sleeping
+          if (nightNow && animal.bedX !== undefined && animal.bedY !== undefined) {
+            const dxToBed = animal.bedX - animal.x;
+            const dyToBed = animal.bedY - animal.y;
+            const distToBed = Math.sqrt(dxToBed * dxToBed + dyToBed * dyToBed);
+            if (distToBed < 0.4) {
+              return { ...animal, sleeping: true, targetX: animal.bedX, targetY: animal.bedY, idleUntil: now + 5000 };
+            }
+            return {
+              ...animal,
+              targetX: animal.bedX,
+              targetY: animal.bedY,
+              idleUntil: now + 200,
+              direction: dxToBed > 0 ? 1 : dxToBed < 0 ? -1 : animal.direction,
+            };
           }
           if (now < animal.idleUntil) return animal;
           const dx = animal.targetX - animal.x;
