@@ -365,3 +365,8 @@
 - [x] Bats (🦇) drift across the upper sky at night with erratic flutter (wing flap scale + rotate), two directions, hidden during day
 - [x] Fireflies (✨) glow and bob near the map's lower band, pulsing opacity (0.55-1.0) for a warm glow effect
 - [x] Wired to existing isNight state with smooth 1.2s fade in/out, non-interactive overlay (zIndex 13); TypeScript clean, 14 tests passing, render verified
+
+## Nighttime Owl Hoot Sound
+- [x] Synthesized subtle owl hoot: two descending "hoo" notes (330→300Hz sine with vibrato and pitch fall per note), quiet 0.10 gain, occasional ambient sound
+- [x] Gated by sound toggle (skipped when off); plays only during night (timeOfDay > 0.85 or < 0.15) at irregular 8-18s intervals, stops when day breaks
+- [x] Shares the existing AudioContext helper; TypeScript clean, 14 tests passing, render verified

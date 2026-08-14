@@ -3076,6 +3076,52 @@ export default function IsometricMap() {
       // audio/haptics unavailable, ignore
     }
   }, [settings]);
+  // --- Nighttime owl hoot: quiet two-note "hoo-hoo" descending sine, occasional ambient
+  const playOwlHoot = useCallback(() => {
+    if (!settings.sound) return;
+    try {
+      if (Platform.OS === "web") {
+        if (!audioCtxRef.current) {
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (!AC) return;
+          audioCtxRef.current = new AC();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        // "hoo" notes: soft sine with a slight vibrato, falling pitch within each note
+        const hoots = [
+          { start: 0.0, freq: 330 },
+          { start: 0.55, freq: 300 },
+        ];
+        hoots.forEach(({ start, freq }) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const vibrato = ctx.createOscillator();
+          const vibratoGain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.82, ctx.currentTime + start + 0.45);
+          vibrato.type = "sine";
+          vibrato.frequency.setValueAtTime(5.5, ctx.currentTime + start);
+          vibratoGain.gain.setValueAtTime(8, ctx.currentTime + start);
+          gain.gain.setValueAtTime(0.0, ctx.currentTime + start);
+          gain.gain.linearRampToValueAtTime(0.10, ctx.currentTime + start + 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + 0.6);
+          vibrato.connect(vibratoGain).connect(osc.frequency);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + start);
+          osc.stop(ctx.currentTime + start + 0.75);
+          vibrato.start(ctx.currentTime + start);
+          vibrato.stop(ctx.currentTime + start + 0.75);
+        });
+      }
+    } catch (e) {
+      // audio unavailable, ignore
+    }
+  }, [settings]);
   // --- Removal dust cloud + distinct sound ---
   const dustScale = useSharedValue(0);
   const dustOpacity = useSharedValue(0);
@@ -3278,11 +3324,34 @@ export default function IsometricMap() {
     return () => clearInterval(growthInterval);
   }, [isNearWell]);
 
-  // Determine if it's night (0.85 to 0.15 range)
+  // Determine if it's night (0.85 to 0.15 range) and play an occasional owl hoot while dark
+  const owlTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const night = timeOfDay > 0.85 || timeOfDay < 0.15;
     setIsNight(night);
-  }, [timeOfDay]);
+    if (!night) {
+      if (owlTimerRef.current) {
+        clearTimeout(owlTimerRef.current);
+        owlTimerRef.current = null;
+      }
+      return;
+    }
+    // Schedule hoots throughout the night at irregular 8-18s intervals
+    const scheduleNext = () => {
+      if (owlTimerRef.current) clearTimeout(owlTimerRef.current);
+      const delay = 8000 + Math.random() * 10000;
+      owlTimerRef.current = setTimeout(() => {
+        playOwlHoot();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+    return () => {
+      if (owlTimerRef.current) clearTimeout(owlTimerRef.current);
+    };
+    // Re-schedule when the hoot function changes; playOwlHoot is stable on [settings]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeOfDay, playOwlHoot]);
 
   // Calculate night darkness (0 = full day, 0.45 = full night)
   const nightOpacity = useMemo(() => {
