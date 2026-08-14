@@ -269,3 +269,9 @@
 - [x] Replace instant chat panel close with an animated slide-down exit (250ms) when ✕ close button or backdrop is tapped
 - [x] Chat panel slides up on open (250ms) and slides down on close for a smooth enter/exit pair
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Building Hover Tooltip (name + profession)
+- [x] Tapping a community building shows a small floating tooltip with the character's name and profession above the building
+- [x] Tooltip positioned above the tapped building, auto-dismisses after 1.8s
+- [x] Tooltip does not interfere with placement mode or chat tap behavior
+- [x] Verify TypeScript clean, 6 tests passing, app renders

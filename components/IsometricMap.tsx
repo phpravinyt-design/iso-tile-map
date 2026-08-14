@@ -2018,6 +2018,16 @@ export default function IsometricMap() {
     }, 260);
   }, []);
 
+  // Show a brief hover tooltip for a building's character (name + profession)
+  const showBuildingTooltip = useCallback((buildingType: string, col: number, row: number) => {
+    if (!BUILDING_CHAT_NPCS[buildingType]) return;
+    setBuildingTooltip({ buildingType, col, row });
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    tooltipTimerRef.current = setTimeout(() => {
+      setBuildingTooltip(null);
+    }, 1800);
+  }, []);
+
   // Slide-up enter animation when a chat panel opens
   useEffect(() => {
     if (chatPanel) {
@@ -2036,6 +2046,14 @@ export default function IsometricMap() {
   // Chat typing animation state
   const [chatTyping, setChatTyping] = useState(false);
   const chatTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Building hover tooltip: shows character name + profession
+  const [buildingTooltip, setBuildingTooltip] = useState<{
+    buildingType: string;
+    col: number;
+    row: number;
+  } | null>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -2790,6 +2808,8 @@ export default function IsometricMap() {
           const tappedBuilding = newGrid[row][col].building;
           if (mode !== "community" && tappedBuilding !== "none" && BUILDING_CHAT_NPCS[tappedBuilding]) {
             const npc = BUILDING_CHAT_NPCS[tappedBuilding];
+            // Brief hover tooltip showing character name + profession before the chat opens
+            showBuildingTooltip(tappedBuilding, col, row);
             setChatPanel({
               buildingType: tappedBuilding,
               messages: [{ from: "npc", text: npc.opening }],
@@ -4263,6 +4283,33 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Building hover tooltip: character name + profession */}
+      {buildingTooltip && BUILDING_CHAT_NPCS[buildingTooltip.buildingType] && (() => {
+        const npc = BUILDING_CHAT_NPCS[buildingTooltip.buildingType];
+        const pos = gridToScreen(buildingTooltip.col, buildingTooltip.row, scaleValue.value);
+        const winW = Dimensions.get("window").width;
+        const tooltipTop = pos.y - 56;
+        return (
+          <View
+            style={[
+              chatStyles.tooltip,
+              {
+                left: Math.min(Math.max(pos.x - 110, 12), winW - 232),
+                top: Math.max(tooltipTop, 8),
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={chatStyles.tooltipName} numberOfLines={1}>
+              {npc.emoji} {npc.name}
+            </Text>
+            <Text style={chatStyles.tooltipRole} numberOfLines={1}>
+              {COMMUNITY_EMOJIS[buildingTooltip.buildingType] || "🏠"} {buildingTooltip.buildingType.replace(/_/g, " ")}
+            </Text>
+          </View>
+        );
+      })()}
+
       {/* Building Chat Panel (tap a community building to talk with its character) */}
       {chatPanel && BUILDING_CHAT_NPCS[chatPanel.buildingType] && (
         <View style={chatStyles.backdrop} pointerEvents="box-none">
@@ -5051,6 +5098,33 @@ const chatStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     minWidth: 56,
+  },
+  tooltip: {
+    position: "absolute",
+    zIndex: 500,
+    backgroundColor: "rgba(17,24,28,0.92)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    maxWidth: 220,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  tooltipName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#ffffff",
+    lineHeight: 19,
+  },
+  tooltipRole: {
+    fontSize: 12,
+    color: "#c9d4dc",
+    lineHeight: 16,
   },
   msgTextNpc: {
     fontSize: 14,
