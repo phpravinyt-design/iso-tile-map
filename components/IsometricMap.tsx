@@ -604,6 +604,100 @@ function WildlifeOverlay({ scale, weather }: { scale: number; weather: "sunny" |
   );
 }
 
+// --- Nighttime Ambient Wildlife (bats + fireflies) ---
+// Only appears at night (isNight): bats flutter across the upper sky erratically,
+// fireflies glow and bob near the lower band with pulsing light.
+interface NightCreature {
+  id: number;
+  type: "bat" | "firefly";
+  startX: number; // screen fraction 0-1
+  y: number; // screen fraction 0-1
+  speed: number; // fraction of screen width per second
+  phase: number; // movement offset
+  dir: 1 | -1;
+  size: number;
+}
+let nightIdCounter = 0;
+function createNightCreature(type: "bat" | "firefly"): NightCreature {
+  nightIdCounter += 1;
+  const isBat = type === "bat";
+  return {
+    id: nightIdCounter,
+    type,
+    startX: isBat ? (Math.random() < 0.5 ? -0.08 : 1.08) : Math.random(),
+    y: isBat ? 0.05 + Math.random() * 0.3 : 0.5 + Math.random() * 0.4,
+    speed: isBat ? 0.08 + Math.random() * 0.06 : 0.01 + Math.random() * 0.015,
+    phase: Math.random() * Math.PI * 2,
+    dir: isBat ? (Math.random() < 0.5 ? 1 : -1) : 1,
+    size: isBat ? 22 + Math.random() * 10 : 12 + Math.random() * 6,
+  };
+}
+function NightlifeOverlay({ isNight }: { isNight: boolean }) {
+  const [, setTick] = useState(0);
+  const [creatures] = useState<NightCreature[]>(() => [
+    createNightCreature("bat"),
+    createNightCreature("bat"),
+    createNightCreature("bat"),
+    createNightCreature("firefly"),
+    createNightCreature("firefly"),
+    createNightCreature("firefly"),
+    createNightCreature("firefly"),
+  ]);
+  const bornRef = useRef(Date.now());
+  const nightRef = useRef(isNight);
+  const [fadeStart, setFadeStart] = useState(() => (isNight ? Date.now() - 1000 : Date.now()));
+  useEffect(() => {
+    bornRef.current = Date.now();
+    const interval = setInterval(() => setTick((n) => n + 1), 50);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    if (nightRef.current !== isNight) {
+      nightRef.current = isNight;
+      setFadeStart(Date.now());
+      bornRef.current = Date.now();
+    }
+  }, [isNight]);
+  const elapsed = (Date.now() - bornRef.current) / 1000;
+  const fadeElapsed = (Date.now() - fadeStart) / 1000;
+  const fadeAlpha = Math.min(1, fadeElapsed / 1.2); // gentle 1.2s fade for night transitions
+  const baseOpacity = isNight ? fadeAlpha : Math.max(0, 1 - fadeAlpha);
+  if (baseOpacity <= 0.01) return null;
+  return (
+    <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, zIndex: 13 }}>
+      {creatures.map((c) => {
+        const cycleSec = 1 / c.speed;
+        // Bats drift across; fireflies linger and loop within the band
+        const t = c.type === "bat" ? (elapsed + c.startX / c.speed) % 1 : ((elapsed * c.speed) + c.startX) % 1;
+        const x = c.type === "bat" ? c.startX + t * (c.dir === 1 ? 1 : -1) : c.startX + (Math.sin(elapsed * c.speed * 6 + c.phase) * 0.08);
+        if (c.type === "bat" && (x < -0.12 || x > 1.12)) return null;
+        // Bats: erratic flutter; fireflies: soft bob
+        const bob = Math.sin(elapsed * 4 + c.phase) * (c.type === "bat" ? 8 : 4);
+        const flap = c.type === "bat" ? Math.abs(Math.sin(elapsed * 8 + c.phase)) * 0.35 : 0;
+        const glow = c.type === "firefly" ? 0.55 + Math.sin(elapsed * 2.2 + c.phase) * 0.45 : 0;
+        const opacity = c.type === "firefly" ? glow * baseOpacity * 0.95 : 0.85 * baseOpacity;
+        return (
+          <Text
+            key={c.id}
+            style={{
+              position: "absolute",
+              left: `${x * 100}%`,
+              top: `${(c.y * 100) + (bob * 0.15)}%`,
+              fontSize: c.size,
+              lineHeight: c.size + 6,
+              opacity,
+              zIndex: 13,
+              transform: [{ scaleX: c.type === "bat" ? c.dir : 1 }, { scale: c.type === "firefly" ? 1 + Math.sin(elapsed * 2.2 + c.phase) * 0.15 : 1 - flap }, { rotate: `${bob * (c.type === "bat" ? 1.2 : 0.5)}deg` }],
+            }}
+          >
+            {c.type === "bat" ? "🦇" : "✨"}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
 // --- Vehicle Sprite Renderer (road-only NPCs) ---
 function VehicleSprite({ vehicle, scale }: { vehicle: VehicleState; scale: number }) {
   const pos = gridToScreen(vehicle.x, vehicle.y, scale);
@@ -4876,6 +4970,9 @@ export default function IsometricMap() {
 
       {/* Ambient wildlife: birds and butterflies drifting across the farm */}
       <WildlifeOverlay key={Math.floor(currentScale * 10)} scale={currentScale} weather={weather} />
+
+      {/* Nighttime wildlife: bats and fireflies, only visible in the dark */}
+      <NightlifeOverlay isNight={isNight} />
 
       {/* Profile Screen (shown when Profile button is tapped) */}
       {showProfile && (

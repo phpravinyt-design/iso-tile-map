@@ -360,3 +360,8 @@
 - [x] Occasional playful chase: one animal (chaser, e.g. 🐕 dog) runs straight at another (chasee, e.g. 🐔) at 3x speed while the chasee darts away at 2x; chase lasts ~3.5s
 - [x] Triggers every ~20-40s randomly; skipped during rain and item placement (cooldown ticks slower, resumes after); ends gracefully — both animals return to normal wandering with an idle beat
 - [x] Chase roles stored on AnimalNpcState (chaseRole/chaseTargetId/chaseEndsAt) and reused by the existing movement tick; TypeScript clean, 14 tests passing, render verified
+
+## Nighttime Ambient Wildlife
+- [x] Bats (🦇) drift across the upper sky at night with erratic flutter (wing flap scale + rotate), two directions, hidden during day
+- [x] Fireflies (✨) glow and bob near the map's lower band, pulsing opacity (0.55-1.0) for a warm glow effect
+- [x] Wired to existing isNight state with smooth 1.2s fade in/out, non-interactive overlay (zIndex 13); TypeScript clean, 14 tests passing, render verified
