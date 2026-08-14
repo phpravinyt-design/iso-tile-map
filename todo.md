@@ -445,3 +445,11 @@
 - [x] ⭐ Lv badge in toolbar + XP progress bar + unlock hint in profile panel
 - [x] Level-up celebration: gold-bordered banner + arpeggio sound (gated by settingsRef)
 - [x] 9 vitest tests (level math, multi-level splits, unlock gating, XP combos); tsc clean, 27 tests passing, render check OK
+
+## Daily Quests (Big Goals, Massive XP)
+- [x] Defined 5 quest kinds: 🪙 earn 200-500 coins, 🌾 harvest 8-12 crops, 🏪 sell 8-12 goods, 🏗️ place 3-5 items, 📦 deliver 1-2 orders — daily deterministic rotation via simpleHash shuffle, 3 quests per day
+- [x] Quest state persisted via AsyncStorage (daily_quests/daily_quests_date); regenerates on new day
+- [x] trackQuestProgress wired into order delivery, all 4 inventory sell handlers, Harvest All, single-crop harvest, and item placement
+- [x] claimQuestReward grants +150 coins + 100 XP (massive vs 15 XP normal task) with "⚡ Claimed! +150 🪙 +100 ⭐" banner; claim state persisted
+- [x] 🎯 Quests button in toolbar (next to Tasks) opens its own panel: progress bars, reward rows, purple ⚡ Claim button
+- [x] 9 vitest tests (bounds across 400 days, determinism, accumulation/capping, claim math, kind variety); tsc clean, 36 tests passing, render check OK (🎯 button visible in toolbar)

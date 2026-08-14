@@ -1099,6 +1099,66 @@ const XP_TASK_COMPLETE = 15;
 const XP_ITEM_PLACE = 3;
 const XP_SEED_BUY = 1;
 
+// ---------- Daily Quests: big goals with massive XP boosts ----------
+// Separate from Daily Tasks. Quests rotate each day (deterministic per date).
+const DAILY_QUESTS_KEY = "daily_quests";
+const DAILY_QUESTS_DATE_KEY = "daily_quests_date";
+const QUEST_REWARD_COINS = 150;
+const QUEST_XP_BOOST = 100; // massive XP boost on quest completion
+
+interface DailyQuest {
+  id: number;
+  kind: "coins" | "harvest" | "sell" | "place" | "deliver";
+  title: string;
+  emoji: string;
+  target: number; // goal threshold
+  progress: number;
+  done: boolean;
+  claimed: boolean;
+}
+
+const QUEST_POOL: { kind: DailyQuest["kind"]; title: (t: number) => string; emoji: string; targets: (dateStr: string, idx: number) => number }[] = [
+  { kind: "coins", title: (t) => `Earn ${t} coins`, emoji: "🪙", targets: (d, i) => 200 + simpleHash(d + ":qt" + i) % 4 * 100 },
+  { kind: "harvest", title: (t) => `Harvest ${t} crops`, emoji: "🌾", targets: (d, i) => 8 + (simpleHash(d + ":qh" + i) % 5) },
+  { kind: "sell", title: (t) => `Sell ${t} goods`, emoji: "🏪", targets: (d, i) => 8 + (simpleHash(d + ":qs" + i) % 5) },
+  { kind: "place", title: (t) => `Place ${t} items`, emoji: "🏗️", targets: (d, i) => 3 + (simpleHash(d + ":qp" + i) % 3) },
+  { kind: "deliver", title: (t) => `Deliver ${t} orders`, emoji: "📦", targets: (d, i) => 1 + (simpleHash(d + ":qd" + i) % 2) },
+];
+
+function generateQuestsForDate(dateStr: string): DailyQuest[] {
+  const n = QUEST_POOL.length;
+  const indices = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i -= 1) {
+    const j = simpleHash(dateStr + ":qpick" + i) % (i + 1);
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  return Array.from({ length: 3 }, (_, i) => {
+    const q = QUEST_POOL[indices[i]];
+    const target = q.targets(dateStr, i);
+    return {
+      id: i,
+      kind: q.kind,
+      title: q.title(target),
+      emoji: q.emoji,
+      target,
+      progress: 0,
+      done: false,
+      claimed: false,
+    };
+  });
+}
+
+// Increment a quest counter for a completed action (coinsEarned/sellCount are raw numbers)
+function advanceQuestProgress(prev: DailyQuest[], kind: DailyQuest["kind"], amount: number): DailyQuest[] {
+  return prev.map((q) => {
+    if (q.kind !== kind || q.done) return q;
+    const progress = Math.min(q.progress + amount, q.target);
+    return { ...q, progress, done: progress >= q.target };
+  });
+}
+
 function isSeedUnlocked(cropType: CropType, level: number): boolean {
   const required = SEED_LEVEL_REQUIREMENTS[cropType];
   return !required || level >= required;
@@ -2934,6 +2994,27 @@ export default function IsometricMap() {
         AsyncStorage.setItem(DAILY_TASKS_DATE_KEY, today).catch(() => {});
       }
     });
+    // Daily quests: load today's quests, refresh if it's a new day, and re-apply completed progress
+    AsyncStorage.getItem(DAILY_QUESTS_DATE_KEY).then((questDate) => {
+      if (questDate === today) {
+        AsyncStorage.getItem(DAILY_QUESTS_KEY).then((savedQuests) => {
+          let quests: DailyQuest[] | null = null;
+          if (savedQuests) {
+            try { quests = JSON.parse(savedQuests); } catch {}
+          }
+          if (!quests || !Array.isArray(quests) || quests.length < 3) {
+            quests = generateQuestsForDate(today);
+          }
+          setDailyQuests(quests);
+          AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(quests)).catch(() => {});
+        });
+      } else {
+        const fresh = generateQuestsForDate(today);
+        setDailyQuests(fresh);
+        AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(fresh)).catch(() => {});
+        AsyncStorage.setItem(DAILY_QUESTS_DATE_KEY, today).catch(() => {});
+      }
+    });
   }, []);
 
   // Save map on change (debounced via useEffect)
@@ -2956,6 +3037,11 @@ export default function IsometricMap() {
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>(generateTasksForDate(new Date().toISOString().slice(0, 10)));
   const [showTasks, setShowTasks] = useState(false);
   const [showTaskReward, setShowTaskReward] = useState(false);
+  // ---------- Daily Quests ----------
+  const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>(generateQuestsForDate(new Date().toISOString().slice(0, 10)));
+  const [showQuests, setShowQuests] = useState(false);
+  const [questRewardBanner, setQuestRewardBanner] = useState<string | null>(null);
+  const questRewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showBackpack, setShowBackpack] = useState(false);
   const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
   // ---------- Level progression ----------
@@ -3097,6 +3183,8 @@ export default function IsometricMap() {
       saveBackpack(updated);
       setCoins((c) => c + order.rewardCoins);
       grantXp(XP_ORDER_DELIVERY, "Order");
+      trackQuestProgress("coins", order.rewardCoins);
+      trackQuestProgress("deliver", 1);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       const npc = getOrderNpcs()[order.npcIndex];
       setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
@@ -5044,6 +5132,7 @@ export default function IsometricMap() {
                 // Celebration pop + subtle sound on successful new placement
                 triggerPlacePopAnimation(col, row);
                 grantXp(XP_ITEM_PLACE);
+                trackQuestProgress("place", 1);
               } else if (removedItem) {
                 // Dust cloud + distinct whoosh sound on free removal (toggle off)
                 triggerRemovalDustAnimation(col, row);
@@ -5085,6 +5174,42 @@ export default function IsometricMap() {
       return g; // no grid change, just trigger task refresh
     });
   }, []);
+
+  // Daily quests: increment progress for a completed action kind; shows banner + pop on newly done quests
+  const trackQuestProgress = useCallback((kind: DailyQuest["kind"], amount: number) => {
+    setDailyQuests((prev) => {
+      const next = advanceQuestProgress(prev, kind, amount);
+      AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(next)).catch(() => {});
+      const newlyDone = next.filter((q, i) => q.done && !prev[i].done && !q.claimed);
+      if (newlyDone.length > 0) {
+        const q = newlyDone[0];
+        setQuestRewardBanner(`⚡ Quest Complete! ${q.emoji} ${q.title} — Claim for +${QUEST_REWARD_COINS} 🪙 +${QUEST_XP_BOOST} ⭐`);
+        if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
+        questRewardTimer.current = setTimeout(() => setQuestRewardBanner(null), 3500);
+        playClaimPopEffect();
+        triggerClaimPopAnimation();
+      }
+      return next;
+    });
+  }, [playClaimPopEffect, triggerClaimPopAnimation]);
+
+  // Claim reward for a completed quest: +150 coins and a massive +100 XP boost
+  const claimQuestReward = useCallback((questId: number) => {
+    setDailyQuests((prev) => {
+      const idx = prev.findIndex((q) => q.id === questId);
+      if (idx < 0 || !prev[idx].done || prev[idx].claimed) return prev;
+      const updated = prev.map((q) => (q.id === questId ? { ...q, claimed: true } : q));
+      AsyncStorage.setItem(DAILY_QUESTS_KEY, JSON.stringify(updated)).catch(() => {});
+      setCoins((c) => c + QUEST_REWARD_COINS);
+      grantXp(QUEST_XP_BOOST, "Daily Quest");
+      setQuestRewardBanner(`⚡ Claimed! +${QUEST_REWARD_COINS} 🪙 +${QUEST_XP_BOOST} ⭐`);
+      if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
+      questRewardTimer.current = setTimeout(() => setQuestRewardBanner(null), 3000);
+      playClaimPopEffect();
+      triggerClaimPopAnimation();
+      return updated;
+    });
+  }, [grantXp, playClaimPopEffect, triggerClaimPopAnimation]);
 
   const [taskRewardMessage, setTaskRewardMessage] = useState("");
 
@@ -5707,6 +5832,8 @@ export default function IsometricMap() {
                         setCoins((c) => c + price);
                         grantXp(XP_SELL, "Sell");
                         saveBackpack(updated);
+                        trackQuestProgress("coins", price);
+                        trackQuestProgress("sell", 1);
                         if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       }}
                       activeOpacity={0.6}
@@ -5722,6 +5849,8 @@ export default function IsometricMap() {
                         setCoins((c) => c + sellCoins);
                         grantXp(XP_SELL * count, "Sell");
                         saveBackpack(updated);
+                        trackQuestProgress("coins", sellCoins);
+                        trackQuestProgress("sell", count);
                         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                       }}
                       activeOpacity={0.6}
@@ -5752,10 +5881,12 @@ export default function IsometricMap() {
                           const updated = { ...harvestedItems };
                           const next = (updated[key] || 0) - 1;
                           if (next <= 0) delete updated[key]; else updated[key] = next;
-                          setCoins((c) => c + meta.price);
-                          grantXp(XP_SELL, "Sell");
-                          saveBackpack(updated);
-                          if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        setCoins((c) => c + meta.price);
+                        grantXp(XP_SELL, "Sell");
+                        saveBackpack(updated);
+                        trackQuestProgress("coins", meta.price);
+                        trackQuestProgress("sell", 1);
+                        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                         }}
                         activeOpacity={0.6}
                       >
@@ -5767,10 +5898,12 @@ export default function IsometricMap() {
                           const sellAllCoins = count * meta.price;
                           const updated = { ...harvestedItems };
                           delete updated[key];
-                          setCoins((c) => c + sellAllCoins);
-                          grantXp(XP_SELL * count, "Sell");
-                          saveBackpack(updated);
-                          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                        setCoins((c) => c + sellAllCoins);
+                        grantXp(XP_SELL * count, "Sell");
+                        saveBackpack(updated);
+                        trackQuestProgress("coins", sellAllCoins);
+                        trackQuestProgress("sell", count);
+                        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                         }}
                         activeOpacity={0.6}
                       >
@@ -5905,6 +6038,50 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Daily Quests panel (shown when 🎯 Quests button is tapped) — big goals with massive XP boosts */}
+      {showQuests && (
+        <View style={styles.profilePanel}>
+          <View style={styles.itemsPanelHeader}>
+            <Text style={styles.itemsPanelTitle}>🎯 Daily Quests</Text>
+            <TouchableOpacity onPress={() => setShowQuests(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
+              <Text style={styles.itemsPanelCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.tasksSubtitle}>Big goals — each quest pays +{QUEST_REWARD_COINS} 🪙 and a massive +{QUEST_XP_BOOST} ⭐ XP boost! Refreshes tomorrow.</Text>
+          {dailyQuests.map((q, i) => {
+            const ratio = Math.min(q.progress / Math.max(q.target, 1), 1);
+            return (
+              <View key={i} style={styles.taskCard}>
+                <View style={styles.taskRow}>
+                  <Text style={styles.taskLabel}>{q.emoji} {q.title}</Text>
+                  <Text style={q.done ? styles.taskDoneText : styles.taskCountText}>
+                    {q.done ? "✅ Done!" : `${q.progress}/${q.target}`}
+                  </Text>
+                </View>
+                <View style={styles.taskBarBg}>
+                  <View style={[styles.taskBarFill, { width: `${ratio * 100}%` }]} />
+                </View>
+                <View style={styles.taskRewardRow}>
+                  <Text style={styles.taskRewardText}>
+                    {q.done ? (q.claimed ? "✅ Reward Claimed" : `Reward ready: +${QUEST_REWARD_COINS} 🪙 +${QUEST_XP_BOOST} ⭐`) : `Reward: +${QUEST_REWARD_COINS} 🪙 +${QUEST_XP_BOOST} ⭐`}
+                  </Text>
+                  {q.done && !q.claimed ? (
+                    <TouchableOpacity
+                      onPress={() => claimQuestReward(q.id)}
+                      style={styles.questClaimBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.questClaimBtnText}>⚡ Claim</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.tasksHint}>⚡ Quests track earning coins, harvesting, selling, placing &amp; delivering — play naturally and complete them!</Text>
+        </View>
+      )}
+
       {/* Orders Board panel (shown when 📌 Orders button is tapped) */}
       {showOrders && (
         <View style={styles.profilePanel}>
@@ -6024,6 +6201,13 @@ export default function IsometricMap() {
       {orderRewardBanner && (
         <View style={styles.taskRewardMsg}>
           <Text style={styles.taskRewardMsgText}>{orderRewardBanner}</Text>
+        </View>
+      )}
+
+      {/* Daily Quest reward banner: brief flash when a quest completes or is claimed */}
+      {questRewardBanner && (
+        <View style={styles.taskRewardMsg}>
+          <Text style={styles.taskRewardMsgText}>{questRewardBanner}</Text>
         </View>
       )}
 
@@ -6230,6 +6414,15 @@ export default function IsometricMap() {
           <Text style={[styles.profileButtonIcon, showTasks && styles.profileButtonIconActive]}>📋</Text>
           <Text style={styles.profileCoinText}>Tasks</Text>
         </TouchableOpacity>
+        {/* Daily Quests button */}
+        <TouchableOpacity
+          style={[styles.profileButton, showQuests && styles.profileButtonActive]}
+          onPress={() => { setShowQuests(!showQuests); setShowProfile(false); setShowBackpack(false); setShowTasks(false); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.profileButtonIcon, showQuests && styles.profileButtonIconActive]}>🎯</Text>
+          <Text style={styles.profileCoinText}>Quests</Text>
+        </TouchableOpacity>
         {/* Backpack button */}
         <TouchableOpacity
           style={[styles.profileButton, showBackpack && styles.profileButtonActive]}
@@ -6274,6 +6467,7 @@ export default function IsometricMap() {
                 setCoins((c) => c + totalHarvested * 25);
                 saveBackpack(newBackpack);
                 grantXp(XP_HARVEST * totalHarvested, "Harvest");
+                trackQuestProgress("harvest", totalHarvested);
                 if (Platform.OS !== "web") {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -6521,6 +6715,8 @@ export default function IsometricMap() {
                             cell.cropGrowthStage = 0;
                             setCoins((c) => c + 25);
                             grantXp(XP_HARVEST);
+                            trackQuestProgress("harvest", 1);
+                            trackQuestProgress("coins", 25);
                             playHarvestChime(cropType);
                             triggerHarvestSparkles(col, row);
                             if (Platform.OS !== "web") {
@@ -7560,6 +7756,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  questClaimBtn: {
+    backgroundColor: "#7C3AED",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  questClaimBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    lineHeight: 16,
   },
   taskClaimBtnText: {
     color: "#1F2937",
