@@ -436,3 +436,12 @@
 - [x] 🌱 Plant button per seed enters free-plant mode (plantedSeedCrop state): tapping any farmland tile plants that seed free (no ITEM_COST deduction) consuming 1 seed; mode persists for repeat planting until seeds run out, then falls back to the normal paid crop selector
 - [x] Sound (playPlaceSound) + haptic feedback on seed planting; insufficient-coins shows the existing low-coins flash
 - [x] Verified: tsc clean, 18 tests passing, render check OK
+
+## Level Progression System
+- [x] XP/level state: playerLevel + xp (progress to next level), persisted via AsyncStorage alongside coins/backpack
+- [x] XP gains wired in: harvest +5/unit, sell +2/unit, order delivery +10, task claim +15, item placement +3, seed buy +1
+- [x] XP curve: level N needs 50*N XP to reach N+1 (verified: 150 XP = level 3)
+- [x] Seed unlock gating: 🍓/🌶️ Lv2, 🍄 Lv3, 🥦 Lv4, 🍉 Lv5; locked seeds show 🔒 "Level X" red label and disabled buy/plant
+- [x] ⭐ Lv badge in toolbar + XP progress bar + unlock hint in profile panel
+- [x] Level-up celebration: gold-bordered banner + arpeggio sound (gated by settingsRef)
+- [x] 9 vitest tests (level math, multi-level splits, unlock gating, XP combos); tsc clean, 27 tests passing, render check OK

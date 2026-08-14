@@ -1073,6 +1073,80 @@ function seedInventoryKey(cropType: CropType): string {
   return `seed_${cropType}`;
 }
 
+// ---------- Level progression ----------
+const PROFILE_LEVEL_KEY = "profile_level";
+const PROFILE_XP_KEY = "profile_xp";
+
+// XP required to advance from level N to N+1: 50 * level
+function xpForNextLevel(level: number): number {
+  return 50 * level;
+}
+
+// Premium seed unlocks: cropType -> minimum player level to buy/plant
+const SEED_LEVEL_REQUIREMENTS: Partial<Record<CropType, number>> = {
+  crop_strawberry: 2,
+  crop_chili: 2,
+  crop_mushroom: 3,
+  crop_broccoli: 4,
+  crop_watermelon: 5,
+};
+
+// XP awards for player actions
+const XP_HARVEST = 5;
+const XP_SELL = 2;
+const XP_ORDER_DELIVERY = 10;
+const XP_TASK_COMPLETE = 15;
+const XP_ITEM_PLACE = 3;
+const XP_SEED_BUY = 1;
+
+function isSeedUnlocked(cropType: CropType, level: number): boolean {
+  const required = SEED_LEVEL_REQUIREMENTS[cropType];
+  return !required || level >= required;
+}
+
+// Level-up celebration sound: warm rising sweep with a bright peak
+function playLevelUpSound(settingsRef: { current: { sound: boolean; haptics: boolean } }) {
+  if (Platform.OS !== "web") {
+    try {
+      if (settingsRef.current.haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e) {
+      // haptics unavailable, ignore
+    }
+    return;
+  }
+  if (!settingsRef.current.sound) return;
+  try {
+    const ctx = (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext
+      ? new (window as unknown as { AudioContext: typeof AudioContext }).AudioContext()
+      : null;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Rising sweep: C4→E4→G4→C5 arpeggio, each 130ms, with a sustained triangle shimmer at the top
+    const notes: [number, number, OscillatorType][] = [
+      [262, 0, "sine"],
+      [330, 0.13, "sine"],
+      [392, 0.26, "sine"],
+      [523, 0.39, "triangle"],
+      [784, 0.52, "sine"],
+    ];
+    notes.forEach(([freq, start, type]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(0.14, now + start + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + 0.45);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + 0.5);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 1500);
+  } catch (e) {
+    // audio unavailable, ignore
+  }
+}
+
 // ---------- Orders Board (NPC customer orders) ----------
 type OrderGoods = { label: string; emoji: string; baseValue: number };
 // Pool of goods NPCs can request: crops (harvested vegetables) + farm products.
@@ -2816,6 +2890,17 @@ export default function IsometricMap() {
     AsyncStorage.getItem("profile_name").then((saved) => {
       if (saved) setProfileName(saved);
     });
+    // Level progression: load saved level + XP
+    Promise.all([AsyncStorage.getItem(PROFILE_LEVEL_KEY), AsyncStorage.getItem(PROFILE_XP_KEY)]).then(([lvl, savedXp]) => {
+      if (lvl) {
+        const parsed = parseInt(lvl, 10);
+        if (Number.isFinite(parsed) && parsed >= 1) setPlayerLevel(parsed);
+      }
+      if (savedXp) {
+        const parsed = parseInt(savedXp, 10);
+        if (Number.isFinite(parsed) && parsed >= 0) setXp(parsed);
+      }
+    });
     // Daily tasks: load today's tasks, refresh if it's a new day, and sync progress with the current map
     const today = new Date().toISOString().slice(0, 10);
     AsyncStorage.getItem(DAILY_TASKS_DATE_KEY).then((taskDate) => {
@@ -2873,6 +2958,10 @@ export default function IsometricMap() {
   const [showTaskReward, setShowTaskReward] = useState(false);
   const [showBackpack, setShowBackpack] = useState(false);
   const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
+  // ---------- Level progression ----------
+  const [playerLevel, setPlayerLevel] = useState(1);
+  const [xp, setXp] = useState(0);
+  const [levelUpBanner, setLevelUpBanner] = useState<string | null>(null);
   // Free-plant mode: crop chosen from inventory seeds; next farmland tap plants it free (consumes 1 seed)
   const [plantedSeedCrop, setPlantedSeedCrop] = useState<CropType | null>(null);
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
@@ -3007,6 +3096,7 @@ export default function IsometricMap() {
       }
       saveBackpack(updated);
       setCoins((c) => c + order.rewardCoins);
+      grantXp(XP_ORDER_DELIVERY, "Order");
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       const npc = getOrderNpcs()[order.npcIndex];
       setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
@@ -3037,6 +3127,31 @@ export default function IsometricMap() {
     forceBackpackRender((n) => n + 1);
     AsyncStorage.setItem(BACKPACK_KEY, JSON.stringify(items)).catch(() => {});
   }, []);
+
+  // Grant XP for a player action; handles level-ups with celebration feedback
+  const grantXp = useCallback((amount: number, reason?: string) => {
+    setXp((prev) => {
+      let remaining = amount;
+      let lvl = playerLevel;
+      const reached = lvl;
+      while (remaining > 0) {
+        const need = xpForNextLevel(lvl);
+        const nextXp = prev + remaining;
+        if (nextXp >= need) {
+          remaining = nextXp - need;
+          lvl += 1;
+          prev = 0;
+          setPlayerLevel(lvl);
+          setLevelUpBanner(`🎉 Level ${lvl}${reason ? ` — ${reason}` : ""}!`);
+          playLevelUpSound(settingsRef);
+          setTimeout(() => setLevelUpBanner(null), 2500);
+        } else {
+          return nextXp;
+        }
+      }
+      return prev + remaining;
+    });
+  }, [playerLevel]);
 
   // Flash a low-coins warning when the user places an item with little balance
   const flashLowCoins = useCallback(() => {
@@ -3093,6 +3208,18 @@ export default function IsometricMap() {
       AsyncStorage.setItem("profile_name", profileName).catch(() => {});
     }
   }, [profileName, loaded]);
+
+  // Level progression persistence
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem(PROFILE_LEVEL_KEY, String(playerLevel)).catch(() => {});
+    }
+  }, [playerLevel, loaded]);
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem(PROFILE_XP_KEY, String(xp)).catch(() => {});
+    }
+  }, [xp, loaded]);
 
   const [mode, setMode] = useState<PlaceMode>("tile");
   const [selectedTreeType, setSelectedTreeType] = useState<TreeType>("tree_png");
@@ -3171,6 +3298,7 @@ export default function IsometricMap() {
   const chatTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Settings preferences (sound/haptic toggles) — declared early so handlers can reference settings.haptics
+  const settingsRef = useRef<{ sound: boolean; haptics: boolean }>({ sound: true, haptics: true });
   const [settings, setSettings] = useState<{ sound: boolean; haptics: boolean }>({
     sound: true,
     haptics: true,
@@ -3380,9 +3508,10 @@ export default function IsometricMap() {
       .then((raw) => {
         if (raw) {
           const parsed = JSON.parse(raw) as { sound?: boolean; haptics?: boolean };
-          setSettings({
-            sound: parsed.sound !== false,
-            haptics: parsed.haptics !== false,
+          setSettings((prev) => {
+            const next = { sound: parsed.sound !== false, haptics: parsed.haptics !== false };
+            settingsRef.current = next;
+            return next;
           });
         }
       })
@@ -4914,6 +5043,7 @@ export default function IsometricMap() {
                 setCoins((c) => Math.max(0, c - ITEM_COST));
                 // Celebration pop + subtle sound on successful new placement
                 triggerPlacePopAnimation(col, row);
+                grantXp(XP_ITEM_PLACE);
               } else if (removedItem) {
                 // Dust cloud + distinct whoosh sound on free removal (toggle off)
                 triggerRemovalDustAnimation(col, row);
@@ -4966,6 +5096,7 @@ export default function IsometricMap() {
       const updated = prev.map((t) => (t.id === taskId ? { ...t, claimed: true } : t));
       AsyncStorage.setItem(DAILY_TASKS_KEY, JSON.stringify(updated)).catch(() => {});
       setCoins((c) => c + TASK_REWARD_COINS);
+      grantXp(XP_TASK_COMPLETE, "Task");
       setTaskRewardMessage(`Claimed +${TASK_REWARD_COINS} 🪙`);
       setShowTaskReward(true);
       setTimeout(() => setShowTaskReward(false), 3500);
@@ -5574,6 +5705,7 @@ export default function IsometricMap() {
                         const next = (updated[crop] || 0) - 1;
                         if (next <= 0) delete updated[crop]; else updated[crop] = next;
                         setCoins((c) => c + price);
+                        grantXp(XP_SELL, "Sell");
                         saveBackpack(updated);
                         if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       }}
@@ -5588,6 +5720,7 @@ export default function IsometricMap() {
                         const updated = { ...harvestedItems };
                         delete updated[crop];
                         setCoins((c) => c + sellCoins);
+                        grantXp(XP_SELL * count, "Sell");
                         saveBackpack(updated);
                         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                       }}
@@ -5620,6 +5753,7 @@ export default function IsometricMap() {
                           const next = (updated[key] || 0) - 1;
                           if (next <= 0) delete updated[key]; else updated[key] = next;
                           setCoins((c) => c + meta.price);
+                          grantXp(XP_SELL, "Sell");
                           saveBackpack(updated);
                           if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                         }}
@@ -5634,6 +5768,7 @@ export default function IsometricMap() {
                           const updated = { ...harvestedItems };
                           delete updated[key];
                           setCoins((c) => c + sellAllCoins);
+                          grantXp(XP_SELL * count, "Sell");
                           saveBackpack(updated);
                           if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                         }}
@@ -5655,6 +5790,8 @@ export default function IsometricMap() {
                 const seedKey = seedInventoryKey(cropType);
                 const owned = harvestedItems[seedKey] || 0;
                 const canBuy = coins >= seedPrice;
+                const unlocked = isSeedUnlocked(cropType, playerLevel);
+                const requiredLevel = SEED_LEVEL_REQUIREMENTS[cropType];
                 const isPlantedMode = plantedSeedCrop === cropType;
                 return (
                   <View
@@ -5671,9 +5808,18 @@ export default function IsometricMap() {
                         {owned > 0 ? `×${owned}` : ""}
                       </Text>
                     </View>
+                    {unlocked ? null : (
+                      <Text style={{ color: "#FF9E9E", fontSize: 9, fontWeight: "bold", lineHeight: 12 }}>
+                        🔒 Lv {requiredLevel}
+                      </Text>
+                    )}
                     <TouchableOpacity
-                      style={[styles.invBuyBtn, !canBuy && styles.invBuyBtnDisabled]}
+                      style={[styles.invBuyBtn, (!canBuy || !unlocked) && styles.invBuyBtnDisabled]}
                       onPress={() => {
+                        if (!unlocked) {
+                          flashLowCoins();
+                          return;
+                        }
                         if (!canBuy) {
                           flashLowCoins();
                           return;
@@ -5682,6 +5828,7 @@ export default function IsometricMap() {
                         const updated = { ...harvestedItems };
                         updated[seedKey] = (updated[seedKey] || 0) + 1;
                         saveBackpack(updated);
+                        grantXp(XP_SEED_BUY);
                         if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                       }}
                       activeOpacity={0.6}
@@ -5689,9 +5836,9 @@ export default function IsometricMap() {
                       <Text style={styles.invBuyBtnText}>🛒 {seedPrice}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.invPlantBtn, owned === 0 && styles.invBuyBtnDisabled]}
+                      style={[styles.invPlantBtn, (owned === 0 || !unlocked) && styles.invBuyBtnDisabled]}
                       onPress={() => {
-                        if (owned <= 0) return;
+                        if (owned <= 0 || !unlocked) return;
                         // Enter free-plant mode: next farmland tap plants this seed for free
                         setPlantedSeedCrop(cropType);
                         setTappedFarmlandPos(null);
@@ -5880,6 +6027,13 @@ export default function IsometricMap() {
         </View>
       )}
 
+      {/* Level-up celebration banner: shown for 2.5s when the player levels up */}
+      {levelUpBanner && (
+        <View style={styles.levelUpBannerMsg}>
+          <Text style={styles.levelUpBannerMsgText}>{levelUpBanner}</Text>
+        </View>
+      )}
+
       {/* NPC delivery animation: walks to collect goods, picks them up, and returns */}
       {delivery ? (
         <DeliveryNpcSprite key={`delivery-${delivery.startedAt}`} delivery={delivery} scale={currentScale} />
@@ -5907,6 +6061,15 @@ export default function IsometricMap() {
               <Text style={styles.profileCoinValue}>{coins.toLocaleString()}</Text>
             </View>
           </View>
+          {/* Level & XP progress */}
+          <View style={styles.profileLevelRow}>
+            <Text style={styles.profileLevelText}>⭐ Level {playerLevel}</Text>
+            <Text style={styles.profileXpText}>{xp} / {xpForNextLevel(playerLevel)} XP</Text>
+          </View>
+          <View style={styles.profileXpBarBg}>
+            <View style={[styles.profileXpBarFill, { width: `${Math.max(1, (xp / xpForNextLevel(playerLevel)) * 100)}%` }]} />
+          </View>
+          <Text style={styles.profileXpHint}>Harvest, sell, deliver orders & complete tasks to earn XP. Higher levels unlock premium seeds: 🍓 Lv2 · 🌶️ Lv2 · 🍄 Lv3 · 🥦 Lv4 · 🍉 Lv5</Text>
           {/* Editable profile name */}
           <TextInput
             style={styles.profileNameInput}
@@ -6053,6 +6216,11 @@ export default function IsometricMap() {
           <Text style={[styles.profileButtonIcon, showProfile && styles.profileButtonIconActive]}>🧑</Text>
           <Text style={styles.profileCoinText}>🪙 {coins.toLocaleString()}</Text>
         </TouchableOpacity>
+        {/* Player level badge */}
+        <View style={[styles.profileButton, { justifyContent: "center", backgroundColor: "rgba(255,215,0,0.18)", borderColor: "#FFD700" }]}>
+          <Text style={[styles.profileButtonIcon, { fontSize: 14 }]}>⭐</Text>
+          <Text style={[styles.profileCoinText, { color: "#FFD700", fontWeight: "bold" }]}>Lv {playerLevel}</Text>
+        </View>
         {/* Daily Tasks button */}
         <TouchableOpacity
           style={[styles.profileButton, showTasks && styles.profileButtonActive]}
@@ -6105,6 +6273,7 @@ export default function IsometricMap() {
               if (totalHarvested > 0) {
                 setCoins((c) => c + totalHarvested * 25);
                 saveBackpack(newBackpack);
+                grantXp(XP_HARVEST * totalHarvested, "Harvest");
                 if (Platform.OS !== "web") {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -6351,6 +6520,7 @@ export default function IsometricMap() {
                             cell.building = "none";
                             cell.cropGrowthStage = 0;
                             setCoins((c) => c + 25);
+                            grantXp(XP_HARVEST);
                             playHarvestChime(cropType);
                             triggerHarvestSparkles(col, row);
                             if (Platform.OS !== "web") {
@@ -7444,6 +7614,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     lineHeight: 22,
+  },
+  levelUpBannerMsg: {
+    position: "absolute",
+    bottom: 300,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(21,94,117,0.97)",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    zIndex: 100,
+    borderWidth: 2,
+    borderColor: "#FFD700",
+  },
+  levelUpBannerMsgText: {
+    color: "#FFD700",
+    fontSize: 18,
+    fontWeight: "bold",
+    lineHeight: 24,
+  },
+  profileLevelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
+  profileLevelText: {
+    color: "#FFD700",
+    fontSize: 15,
+    fontWeight: "bold",
+    lineHeight: 20,
+  },
+  profileXpText: {
+    color: "#aaa",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  profileXpBarBg: {
+    marginHorizontal: 14,
+    marginTop: 6,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
+  },
+  profileXpBarFill: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#FFD700",
+  },
+  profileXpHint: {
+    color: "#8f8",
+    fontSize: 10,
+    lineHeight: 13,
+    paddingHorizontal: 14,
+    marginTop: 6,
   },
   clipboardPreviewEmoji: {
     fontSize: 26,
