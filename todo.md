@@ -530,3 +530,9 @@
 - [x] Add 9 flowers to Decoration section (types, sources, emojis, BUILDING_TYPES, task categories)
 - [x] Place all 9 flowers on the map, one each (pre-placed around the farmstead, no coin cost; MAP_SAVE_VERSION bumped to 3)
 - [x] Verify render + tsc clean + 58 tests passing, checkpoint
+
+## Orders Board Flowers (user request: sell new flowers via orders)
+- [x] Review orders board logic (order types, rewards, delivery flow)
+- [x] Add 9 flowers as orderable goods (FLOWER_GOODS pool mixed into daily orders, baseValue 14-20 coins)
+- [x] Fulfillment: NPC requests for flowers are delivered by removing placed flowers from the map (setGrid, no sell refund) — same reward flow: coins, XP, quest/deliver stats, NPC delivery walk animation + chime
+- [x] 6 new vitest tests for flower order pool + fulfillment (64 passing, tsc clean), checkpoint

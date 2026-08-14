@@ -1219,9 +1219,21 @@ function playLevelUpSound(settingsRef: { current: { sound: boolean; haptics: boo
 }
 
 // ---------- Orders Board (NPC customer orders) ----------
-type OrderGoods = { label: string; emoji: string; baseValue: number };
-// Pool of goods NPCs can request: crops (harvested vegetables) + farm products.
+type OrderGoods = { label: string; emoji: string; baseValue: number; flower?: boolean };
+// Pool of goods NPCs can request: crops (harvested vegetables) + farm products + flowers.
 // baseValue is the coins a single unit is worth when sold by NPC (premium over sell price).
+// flower:true goods are consumed by removing placed flower decorations from the map.
+const FLOWER_GOODS: OrderGoods[] = [
+  { label: "🌷 Tulips", emoji: "🌷", baseValue: 15, flower: true },
+  { label: "🌼 Daisies", emoji: "🌼", baseValue: 14, flower: true },
+  { label: "💐 Hydrangea", emoji: "💐", baseValue: 18, flower: true },
+  { label: "🪻 Lavender", emoji: "🪻", baseValue: 16, flower: true },
+  { label: "🌹 Roses", emoji: "🌹", baseValue: 20, flower: true },
+  { label: "🌻 Sunflowers", emoji: "🌻", baseValue: 17, flower: true },
+  { label: "🤍 Lily of the Valley", emoji: "🤍", baseValue: 19, flower: true },
+  { label: "🌈 Pansies", emoji: "🌈", baseValue: 15, flower: true },
+  { label: "🩷 Lilies", emoji: "🩷", baseValue: 20, flower: true },
+];
 const ORDER_GOODS: OrderGoods[] = [
   { label: "🍅 Tomato", emoji: "🍅", baseValue: 12 },
   { label: "🥕 Carrot", emoji: "🥕", baseValue: 8 },
@@ -1295,6 +1307,16 @@ function orderShuffle<T>(arr: T[], salt: string): T[] {
   }
   return indices.map((idx) => arr[idx]);
 }
+// Map a flower order label to its decoration building type (e.g. "🌷 Tulips" → "flower_tulips")
+function flowerOrderToDecorationType(label: string): string | null {
+  const name = orderLabelToBackpackKey(label).toLowerCase();
+  const map: Record<string, string> = {
+    tulips: "flower_tulips", daisies: "flower_daisies", hydrangea: "flower_hydrangea",
+    lavender: "flower_lavender", roses: "flower_roses", sunflowers: "flower_sunflowers",
+    "lily of the valley": "flower_lily_valley", pansies: "flower_pansies", lilies: "flower_lilies",
+  };
+  return map[name] ?? null;
+}
 const ORDERS_KEY = "orders_v1";
 const ORDERS_DATE_KEY = "orders_date";
 function getTodayStr(): string {
@@ -1306,10 +1328,11 @@ function generateDailyOrders(claimState: Record<string, boolean> = {}): OrderBoa
   const today = getTodayStr();
   const orders: OrderBoardItem[] = [];
   const shuffledNpcs = orderShuffle(getOrderNpcs(), today + ":npc");
-  const shuffledGoods = orderShuffle(ORDER_GOODS, today + ":goods");
+  // Mix flowers into the goods pool so NPCs occasionally request flowers from the map.
+  const mixedGoods = orderShuffle([...ORDER_GOODS, ...FLOWER_GOODS], today + ":goods");
   const count = Math.min(3, ORDER_GOODS.length);
   for (let i = 0; i < count; i += 1) {
-    const goods = shuffledGoods[i];
+    const goods = mixedGoods[i];
     const qty = 1 + (simpleHash(today + ":qty" + i) % 3); // 1-3 units
     orders.push({
       id: i,
@@ -3510,37 +3533,77 @@ export default function IsometricMap() {
       // ("crop_tomato"). Resolve which key to consume.
       const requestedName = orderLabelToBackpackKey(order.goodsLabel);
       const cropKey = (CROP_TYPES as readonly string[]).find((ct) => CROP_EMOJIS[ct] === goods.emoji);
-      const haveFromFarm = harvestedItems[requestedName] || 0;
-      const haveFromCrop = cropKey ? harvestedItems[cropKey] || 0 : 0;
-      const haveTotal = haveFromFarm + haveFromCrop;
-      if (haveTotal < order.quantity) return prev; // not enough goods yet
-      const updated = { ...harvestedItems };
-      let remaining = order.quantity;
-      if (cropKey && updated[cropKey]) {
-        const take = Math.min(remaining, updated[cropKey]);
-        updated[cropKey] -= take;
-        if (updated[cropKey] <= 0) delete updated[cropKey];
-        remaining -= take;
+      // Flower orders are fulfilled by removing placed flower decorations from the map.
+      const flowerType = goods.flower ? flowerOrderToDecorationType(order.goodsLabel) : null;
+      let placedFlowers = 0;
+      if (flowerType) {
+        for (let row = 0; row < GRID_SIZE; row += 1) {
+          for (let col = 0; col < GRID_SIZE; col += 1) {
+            if ((grid[row]?.[col] as GridCell | undefined)?.building === flowerType) placedFlowers += 1;
+          }
+        }
       }
-      if (remaining > 0 && updated[requestedName]) {
-        updated[requestedName] -= remaining;
-        if (updated[requestedName] <= 0) delete updated[requestedName];
+      if (flowerType && placedFlowers < order.quantity) return prev; // not enough flowers placed on the map
+      if (flowerType) {
+        // Remove `quantity` placed flowers of this type from the map (delivered to the NPC).
+        setGrid((g) => {
+          const newGrid = g.map((r) => r.map((c) => ({ ...c })));
+          let toRemove = order.quantity;
+          outer: for (let row = 0; row < GRID_SIZE; row += 1) {
+            for (let col = 0; col < GRID_SIZE; col += 1) {
+              if (newGrid[row][col].building === flowerType) {
+                newGrid[row][col].building = "none";
+                toRemove -= 1;
+                if (toRemove <= 0) break outer;
+              }
+            }
+          }
+          return newGrid;
+        });
+        // No sell refund for delivered flowers — they were sold to the NPC.
+        setCoins((c) => c + order.rewardCoins);
+        recordLifetimeStat("coins", order.rewardCoins);
+        recordLifetimeStat("deliver", 1);
+        grantXp(XP_ORDER_DELIVERY, "Order");
+        trackQuestProgress("coins", order.rewardCoins);
+        trackQuestProgress("deliver", 1);
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        const npc = getOrderNpcs()[order.npcIndex];
+        setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
+        if (orderRewardTimer.current) clearTimeout(orderRewardTimer.current);
+        orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
+        // Start delivery walk animation: NPC walks from a building spot to a
+        // delivery point near their community building, picks up the goods, and returns
+        startNpcDelivery(npc, order.rewardCoins, order.goodsLabel);
+      } else {
+        const updated = { ...harvestedItems };
+        let remaining = order.quantity;
+        if (cropKey && updated[cropKey]) {
+          const take = Math.min(remaining, updated[cropKey]);
+          updated[cropKey] -= take;
+          if (updated[cropKey] <= 0) delete updated[cropKey];
+          remaining -= take;
+        }
+        if (remaining > 0 && updated[requestedName]) {
+          updated[requestedName] -= remaining;
+          if (updated[requestedName] <= 0) delete updated[requestedName];
+        }
+        saveBackpack(updated);
+        setCoins((c) => c + order.rewardCoins);
+        recordLifetimeStat("coins", order.rewardCoins);
+        recordLifetimeStat("deliver", 1);
+        grantXp(XP_ORDER_DELIVERY, "Order");
+        trackQuestProgress("coins", order.rewardCoins);
+        trackQuestProgress("deliver", 1);
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        const npc = getOrderNpcs()[order.npcIndex];
+        setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
+        if (orderRewardTimer.current) clearTimeout(orderRewardTimer.current);
+        orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
+        // Start delivery walk animation: NPC walks from a building spot to a
+        // delivery point near their community building, picks up the goods, and returns
+        startNpcDelivery(npc, order.rewardCoins, order.goodsLabel);
       }
-      saveBackpack(updated);
-      setCoins((c) => c + order.rewardCoins);
-      recordLifetimeStat("coins", order.rewardCoins);
-      recordLifetimeStat("deliver", 1);
-      grantXp(XP_ORDER_DELIVERY, "Order");
-      trackQuestProgress("coins", order.rewardCoins);
-      trackQuestProgress("deliver", 1);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      const npc = getOrderNpcs()[order.npcIndex];
-      setOrderRewardBanner(`✅ ${npc.name}: Thank you! +${order.rewardCoins} 🪙`);
-      if (orderRewardTimer.current) clearTimeout(orderRewardTimer.current);
-      orderRewardTimer.current = setTimeout(() => setOrderRewardBanner(null), 2500);
-      // Start delivery walk animation: NPC walks from a building spot to a
-      // delivery point near their community building, picks up the goods, and returns
-      startNpcDelivery(npc, order.rewardCoins, order.goodsLabel);
       return prev.map((o) => (o.id === orderId ? { ...o, claimed: true } : o));
     });
   }, [harvestedItems]);
