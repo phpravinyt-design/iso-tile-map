@@ -1993,6 +1993,9 @@ export default function IsometricMap() {
   const [showDecorationSelector, setShowDecorationSelector] = useState(false);
   const [selectedIndustryType, setSelectedIndustryType] = useState<IndustryType>("steel_factory");
   const [selectedFarmType, setSelectedFarmType] = useState<FarmType>("farm_sheep_barn");
+
+  // Mirror (flip) toggle for item selection: when ON, previews and placed items render mirrored
+  const [mirrorMode, setMirrorMode] = useState(false);
   const [showIndustrySelector, setShowIndustrySelector] = useState(false);
   const [showItemsMenu, setShowItemsMenu] = useState(false);
 
@@ -2887,6 +2890,7 @@ export default function IsometricMap() {
             } else {
               newGrid[row][col].roadOverlay = roadToPlace;
               newGrid[row][col].roadRotation = 0;
+              newGrid[row][col].flipped = mirrorMode;
               if (coins < ITEM_COST) flashLowCoins();
               setCoins((c) => Math.max(0, c - ITEM_COST));
             }
@@ -2947,6 +2951,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "town_market") {
@@ -2954,6 +2959,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = "town_market";
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "temple") {
@@ -2963,6 +2969,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "decoration") {
@@ -2972,6 +2979,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "industry") {
@@ -2981,6 +2989,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "farm") {
@@ -2990,6 +2999,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else if (mode === "tree") {
@@ -2998,6 +3008,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = selectedTreeType;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               } else {
@@ -3007,6 +3018,7 @@ export default function IsometricMap() {
                   newGrid[row][col].building = "none";
                 } else {
                   newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
                   placedNewBuilding = true;
                 }
               }
@@ -3023,7 +3035,7 @@ export default function IsometricMap() {
       // Daily tasks: refresh progress against the new grid (after placement)
       advanceDailyTasks();
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, moveClipboard]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode]
   );
 
   // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
@@ -3935,6 +3947,16 @@ export default function IsometricMap() {
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a building to select it</Text>
           </View>
+          {/* Mirror toggle: place the selected item mirrored */}
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -3966,6 +3988,15 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a road to select it</Text>
+          </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -3999,6 +4030,15 @@ export default function IsometricMap() {
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a house to select it</Text>
           </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -4030,6 +4070,15 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a tile texture to select it</Text>
+          </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -4146,6 +4195,15 @@ export default function IsometricMap() {
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a temple to select it</Text>
           </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -4177,6 +4235,15 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap an item to select it</Text>
+          </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -4213,6 +4280,15 @@ export default function IsometricMap() {
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a factory to select it</Text>
           </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -4248,6 +4324,15 @@ export default function IsometricMap() {
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a farm building to select it</Text>
           </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -4279,6 +4364,15 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap a tree to select it</Text>
+          </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -4965,6 +5059,32 @@ const styles = StyleSheet.create({
   },
   clipboardRemoveBtnText: {
     fontSize: 20,
+  },
+  mirrorRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingBottom: 6,
+  },
+  mirrorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(17,24,28,0.2)",
+  },
+  mirrorBtnActive: {
+    backgroundColor: "#fde68a",
+    borderColor: "#f59e0b",
+  },
+  mirrorBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#11181c",
+    lineHeight: 17,
   },
 });
 

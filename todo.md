@@ -275,3 +275,9 @@
 - [x] Tooltip positioned above the tapped building, auto-dismisses after 1.8s
 - [x] Tooltip does not interfere with placement mode or chat tap behavior
 - [x] Verify TypeScript clean, 6 tests passing, app renders
+
+## Mirror Placement Button in Sub-selectors
+- [x] Add a mirror (🪞 flip) toggle button inside every item sub-selector (trees, homes, community, tiles, temple, decoration, industry, roads, farm)
+- [x] When mirror toggle is ON, the placed item renders mirrored (flipped stored in grid cell)
+- [x] Mirror state applies to all placement modes (community, temple, decoration, industry, farm, tree, house, town market, roads)
+- [x] Verify TypeScript clean, 6 tests passing, app renders
