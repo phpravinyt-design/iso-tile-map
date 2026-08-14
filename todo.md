@@ -429,3 +429,10 @@
 - [x] Replaced backpack panel with grouped Inventory & Sell UI: 🌱 Harvested Crops (CROP_SELL_PRICES) + 🏭 Farm & Factory Goods sections; each row shows emoji, name, price each, subtotal (×count), "Sell 1" stepper and orange "All (+coins)" buttons
 - [x] Sell deducts counts, adds coins (setCoins), persists via saveBackpack; Light haptic for Sell 1 / Success haptic for Sell All; sound toggle path available
 - [x] Verified: tsc clean, 18 tests passing, render check OK
+
+## Inventory Buy Section (Seeds)
+- [x] Added SEED_BUY_CATALOG (14 crops, prices 3-14: carrot 3, potato/garlic/wheat 4, corn/peanut 5, tomato/eggplant/cucumber 6, strawberry/chili 7, mushroom 8, broccoli 10, watermelon 14) + seedInventoryKey("seed_<crop>") stored in the same backpack record
+- [x] Added 🛒 Buy Seeds section to inventory panel: grid of seed cards with emoji, owned count (×n), green "🛒 price" buy button; balance check via flashLowCoins + disabled state when coins insufficient; buy deducts coins, increments count, persists via saveBackpack, Light haptic
+- [x] 🌱 Plant button per seed enters free-plant mode (plantedSeedCrop state): tapping any farmland tile plants that seed free (no ITEM_COST deduction) consuming 1 seed; mode persists for repeat planting until seeds run out, then falls back to the normal paid crop selector
+- [x] Sound (playPlaceSound) + haptic feedback on seed planting; insufficient-coins shows the existing low-coins flash
+- [x] Verified: tsc clean, 18 tests passing, render check OK

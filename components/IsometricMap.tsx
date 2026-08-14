@@ -1050,6 +1050,29 @@ function isCropKey(key: string): boolean {
   return key.startsWith("crop_");
 }
 
+// ---------- Inventory Buy: seed catalog ----------
+// Seeds the player can buy from the inventory and plant on farmland for free afterwards.
+const SEED_BUY_CATALOG: { cropType: CropType; seedPrice: number }[] = [
+  { cropType: "crop_carrot", seedPrice: 3 },
+  { cropType: "crop_potato", seedPrice: 4 },
+  { cropType: "crop_garlic", seedPrice: 4 },
+  { cropType: "crop_wheat", seedPrice: 4 },
+  { cropType: "crop_corn", seedPrice: 5 },
+  { cropType: "crop_peanut", seedPrice: 5 },
+  { cropType: "crop_tomato", seedPrice: 6 },
+  { cropType: "crop_eggplant", seedPrice: 6 },
+  { cropType: "crop_cucumber", seedPrice: 6 },
+  { cropType: "crop_strawberry", seedPrice: 7 },
+  { cropType: "crop_chili", seedPrice: 7 },
+  { cropType: "crop_mushroom", seedPrice: 8 },
+  { cropType: "crop_broccoli", seedPrice: 10 },
+  { cropType: "crop_watermelon", seedPrice: 14 },
+];
+
+function seedInventoryKey(cropType: CropType): string {
+  return `seed_${cropType}`;
+}
+
 // ---------- Orders Board (NPC customer orders) ----------
 type OrderGoods = { label: string; emoji: string; baseValue: number };
 // Pool of goods NPCs can request: crops (harvested vegetables) + farm products.
@@ -2850,6 +2873,8 @@ export default function IsometricMap() {
   const [showTaskReward, setShowTaskReward] = useState(false);
   const [showBackpack, setShowBackpack] = useState(false);
   const [harvestedItems, setHarvestedItems] = useState<Record<string, number>>({});
+  // Free-plant mode: crop chosen from inventory seeds; next farmland tap plants it free (consumes 1 seed)
+  const [plantedSeedCrop, setPlantedSeedCrop] = useState<CropType | null>(null);
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
 
   // --- Orders Board: NPC customers request goods for premium coin rewards ---
@@ -4548,14 +4573,75 @@ export default function IsometricMap() {
     }, 550);
   }, [claimPopOpacity, claimPopScale]);
 
+  // Handle crop selection from farmland tap (places crop on the tapped tile)
+  // Plant a seed bought from the inventory for free (consumes 1 seed from backpack)
+  const plantBoughtSeed = useCallback((crop: CropType) => {
+    setPlantedSeedCrop(null);
+    const seedKey = seedInventoryKey(crop);
+    setHarvestedItems((prev) => {
+      const owned = prev[seedKey] || 0;
+      if (owned <= 0) {
+        // Out of seeds — show hint and fall back to normal paid planting
+        if (coins < ITEM_COST) flashLowCoins();
+        setCoins((c) => Math.max(0, c - ITEM_COST));
+        return prev;
+      }
+      const updated = { ...prev };
+      const next = owned - 1;
+      if (next <= 0) delete updated[seedKey]; else updated[seedKey] = next;
+      saveBackpack(updated);
+      return updated;
+    });
+    setSelectedCropType(crop);
+    if (!tappedFarmlandPos) return;
+    setGrid((prev) => {
+      const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+      const { col, row } = tappedFarmlandPos;
+      if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+        const cropAsBuilding = crop as BuildingType;
+        if (newGrid[row][col].building !== cropAsBuilding) {
+          newGrid[row][col].building = cropAsBuilding;
+          newGrid[row][col].roadOverlay = null;
+          newGrid[row][col].cropGrowthStage = 0;
+          playPlaceSound();
+          if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+      }
+      return newGrid;
+    });
+    setTappedFarmlandPos(null);
+  }, [tappedFarmlandPos, coins, flashLowCoins]);
   // Handle farmland tile tap: opens crop selector for placing emoji crops on farmland
+  // If the user has selected a bought seed (🌱 Plant from inventory), it plants free here
   const handleFarmlandTap = useCallback((col: number, row: number) => {
     if (Platform.OS !== "web" && panMoved.current) return;
+    if (plantedSeedCrop) {
+      // Plant the selected bought seed free and keep mode for the next tile
+      const seedKey = seedInventoryKey(plantedSeedCrop);
+      let remaining: number | null = null;
+      setHarvestedItems((prev) => {
+        const owned = prev[seedKey] || 0;
+        remaining = owned;
+        return prev;
+      });
+      // Defer plant if we still have seeds; otherwise fall through to paid selector
+      if (remaining && remaining > 0) {
+        plantBoughtSeed(plantedSeedCrop);
+        return;
+      }
+      setPlantedSeedCrop(null);
+    }
     setTappedFarmlandPos({ col, row });
-  }, []);
+  }, [plantedSeedCrop, plantBoughtSeed]);
 
-  // Handle crop selection from farmland tap (places crop on the tapped tile)
+
   const handleCropSelectFromTap = useCallback((crop: CropType) => {
+    // If the user has bought seeds for this crop and is in free-plant mode, plant free
+    const seedKey = seedInventoryKey(crop);
+    if ((harvestedItems[seedKey] || 0) > 0) {
+      plantBoughtSeed(crop);
+      return;
+    }
     setSelectedCropType(crop);
     if (!tappedFarmlandPos) return;
     setGrid((prev) => {
@@ -4574,7 +4660,7 @@ export default function IsometricMap() {
       return newGrid;
     });
     setTappedFarmlandPos(null);
-  }, [tappedFarmlandPos, coins, flashLowCoins]);
+  }, [tappedFarmlandPos, coins, flashLowCoins, harvestedItems, plantBoughtSeed]);
 
   // Handle tile/building placement
   const handleTilePress = useCallback(
@@ -5559,6 +5645,67 @@ export default function IsometricMap() {
                   </View>
                 );
               })}
+            {/* ---------- Buy Seeds section ---------- */}
+            <Text style={{ color: "#FFD54F", fontSize: 13, fontWeight: "bold", marginTop: 10, marginBottom: 4 }}>🛒 Buy Seeds</Text>
+            <Text style={{ color: "#999", fontSize: 11, marginBottom: 6, lineHeight: 14 }}>
+              Buy seeds, then tap a farmland tile to plant them free!
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 8 }}>
+              {SEED_BUY_CATALOG.map(({ cropType, seedPrice }) => {
+                const seedKey = seedInventoryKey(cropType);
+                const owned = harvestedItems[seedKey] || 0;
+                const canBuy = coins >= seedPrice;
+                const isPlantedMode = plantedSeedCrop === cropType;
+                return (
+                  <View
+                    key={seedKey}
+                    style={[
+                      styles.invRow,
+                      { width: "47%", alignItems: "center", flexDirection: "column", gap: 4, paddingVertical: 6 },
+                      isPlantedMode && { borderWidth: 1.5, borderColor: "#FFD54F" },
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Text style={{ fontSize: 22 }}>{CROP_EMOJIS[cropType] || "🌱"}</Text>
+                      <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold", lineHeight: 16 }}>
+                        {owned > 0 ? `×${owned}` : ""}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.invBuyBtn, !canBuy && styles.invBuyBtnDisabled]}
+                      onPress={() => {
+                        if (!canBuy) {
+                          flashLowCoins();
+                          return;
+                        }
+                        setCoins((c) => c - seedPrice);
+                        const updated = { ...harvestedItems };
+                        updated[seedKey] = (updated[seedKey] || 0) + 1;
+                        saveBackpack(updated);
+                        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      }}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={styles.invBuyBtnText}>🛒 {seedPrice}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.invPlantBtn, owned === 0 && styles.invBuyBtnDisabled]}
+                      onPress={() => {
+                        if (owned <= 0) return;
+                        // Enter free-plant mode: next farmland tap plants this seed for free
+                        setPlantedSeedCrop(cropType);
+                        setTappedFarmlandPos(null);
+                        setShowBackpack(false);
+                        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      }}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={styles.invPlantBtnText}>🌱 Plant</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
             <Text style={{ color: "#888", fontSize: 12, textAlign: "center", marginTop: 6 }}>
               Total: {Object.values(harvestedItems).reduce((a, b) => a + b, 0)} items
             </Text>
@@ -6903,6 +7050,34 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   invSellAllBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    lineHeight: 14,
+  },
+  invBuyBtn: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  invBuyBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    lineHeight: 14,
+  },
+  invBuyBtnDisabled: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    opacity: 0.55,
+  },
+  invPlantBtn: {
+    backgroundColor: "#FF9800",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  invPlantBtnText: {
     color: "#fff",
     fontSize: 11,
     fontWeight: "bold",
