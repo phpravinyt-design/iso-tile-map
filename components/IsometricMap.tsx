@@ -1019,6 +1019,37 @@ function getCropSellPrice(cropType: CropType): number {
   return CROP_SELL_PRICES[cropType] || 10;
 }
 
+// ---------- Inventory / Sell: per-goods sell values for farm & factory products ----------
+// Backpack stores farm goods by collectLabel ("Wool", "Eggs", "Bread"...). Crops use crop keys.
+const INVENTORY_SELL_VALUES: Record<string, { price: number; emoji: string; label: string }> = {
+  Wool: { price: 10, emoji: "🐑", label: "Wool" },
+  Eggs: { price: 8, emoji: "🥚", label: "Eggs" },
+  Goats: { price: 15, emoji: "🐐", label: "Goats" },
+  Milk: { price: 12, emoji: "🥛", label: "Milk" },
+  Cheese: { price: 18, emoji: "🧀", label: "Cheese" },
+  Fish: { price: 10, emoji: "🐟", label: "Fish" },
+  "Llama Wool": { price: 14, emoji: "🦙", label: "Llama Wool" },
+  Feathers: { price: 9, emoji: "🪶", label: "Feathers" },
+  Honey: { price: 16, emoji: "🍯", label: "Honey" },
+  Steel: { price: 22, emoji: "\u2699\uFE0F", label: "Steel" },
+  Oil: { price: 26, emoji: "\uD83D\uDEE2\uFE0F", label: "Oil" },
+  Bread: { price: 16, emoji: "\uD83C\uDF5E", label: "Bread" },
+  "Recycled Goods": { price: 19, emoji: "\u267B\uFE0F", label: "Recycled Goods" },
+  Butter: { price: 19, emoji: "\uD83E\uDDC8", label: "Butter" },
+  Yarn: { price: 19, emoji: "\uD83E\uDDF6", label: "Yarn" },
+  Chemicals: { price: 22, emoji: "\uD83E\uDDEA", label: "Chemicals" },
+  Wood: { price: 16, emoji: "\uD83E\uDEB5", label: "Wood" },
+  Gadgets: { price: 26, emoji: "\uD83D\uDDA5\uFE0F", label: "Gadgets" },
+};
+
+function getInventorySellValue(key: string): { price: number; emoji: string; label: string } {
+  return INVENTORY_SELL_VALUES[key] || { price: 5, emoji: "📦", label: key };
+}
+
+function isCropKey(key: string): boolean {
+  return key.startsWith("crop_");
+}
+
 // ---------- Orders Board (NPC customer orders) ----------
 type OrderGoods = { label: string; emoji: string; baseValue: number };
 // Pool of goods NPCs can request: crops (harvested vegetables) + farm products.
@@ -5423,70 +5454,115 @@ export default function IsometricMap() {
       )}
 
       {/* Backpack panel (shown when 🎒 button is tapped) */}
+      {/* Inventory & Sell panel: grouped crops + farm/factory goods with quantity steppers */}
       {showBackpack && (
         <View style={styles.itemsPanel}>
           <View style={styles.itemsPanelHeader}>
-            <Text style={styles.itemsPanelTitle}>🎒 Harvested Vegetables</Text>
+            <Text style={styles.itemsPanelTitle}>🎒 Inventory & Sell</Text>
             <TouchableOpacity onPress={() => setShowBackpack(false)} style={styles.itemsPanelClose} activeOpacity={0.7}>
               <Text style={styles.itemsPanelCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingVertical: 8, gap: 8, paddingHorizontal: 4 }}
+            style={{ maxHeight: 360 }}
+            contentContainerStyle={{ paddingVertical: 8, gap: 6, paddingHorizontal: 10 }}
           >
+            {/* Group 1: Harvested crops */}
+            <Text style={{ color: "#8FD08F", fontSize: 13, fontWeight: "bold", marginTop: 2 }}>🌱 Harvested Crops</Text>
             {CROP_TYPES.map((crop) => {
               const count = harvestedItems[crop] || 0;
+              if (count === 0) return null;
+              const price = getCropSellPrice(crop as CropType);
               return (
-                <View
-                  key={crop}
-                  style={{
-                    alignItems: "center",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    borderRadius: 12,
-                    padding: 10,
-                    minWidth: 70,
-                  }}
-                >
-                  <Text style={{ fontSize: 32 }}>{CROP_EMOJIS[crop] || "🌱"}</Text>
-                  <Text style={{ color: count > 0 ? "#4CAF50" : "#666", fontSize: 16, fontWeight: "bold", marginTop: 4 }}>
-                    {count}
-                  </Text>
-                  {count > 0 && (
+                <View key={crop} style={styles.invRow}>
+                  <Text style={{ fontSize: 26 }}>{CROP_EMOJIS[crop] || "🌱"}</Text>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>{(crop.split("_")[1] || crop).replace(/_/g, " ")}</Text>
+                    <Text style={{ color: "#aaa", fontSize: 11, lineHeight: 14 }}>🪙 {price} each • ×{count} = {count * price}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <TouchableOpacity
-                      style={{
-                        backgroundColor: "#FF9800",
-                        borderRadius: 8,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        marginTop: 4,
-                      }}
+                      style={styles.invStepBtn}
                       onPress={() => {
-                        // Sell all of this crop type at crop-specific price
-                        const sellCoins = count * getCropSellPrice(crop as CropType);
-                        setCoins((c) => c + sellCoins);
+                        const updated = { ...harvestedItems };
+                        const next = (updated[crop] || 0) - 1;
+                        if (next <= 0) delete updated[crop]; else updated[crop] = next;
+                        setCoins((c) => c + price);
+                        saveBackpack(updated);
+                        if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      }}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={styles.invStepBtnText}>Sell 1</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.invSellAllBtn}
+                      onPress={() => {
+                        const sellCoins = count * price;
                         const updated = { ...harvestedItems };
                         delete updated[crop];
+                        setCoins((c) => c + sellCoins);
                         saveBackpack(updated);
-                        if (Platform.OS !== "web") {
-                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        }
+                        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                       }}
-                      activeOpacity={0.7}
+                      activeOpacity={0.6}
                     >
-                      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>
-                        Sell All ({count * getCropSellPrice(crop as CropType)})
-                      </Text>
+                      <Text style={styles.invSellAllBtnText}>All (+{count * price})</Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
               );
             })}
+            {/* Group 2: Farm & factory goods */}
+            <Text style={{ color: "#FFD166", fontSize: 13, fontWeight: "bold", marginTop: 8 }}>🏭 Farm & Factory Goods</Text>
+            {Object.entries(harvestedItems)
+              .filter(([k, v]) => v > 0 && !isCropKey(k))
+              .map(([key, count]) => {
+                const meta = getInventorySellValue(key);
+                return (
+                  <View key={key} style={styles.invRow}>
+                    <Text style={{ fontSize: 26 }}>{meta.emoji}</Text>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={{ color: "#fff", fontSize: 14, fontWeight: "bold", lineHeight: 18 }}>{meta.label}</Text>
+                      <Text style={{ color: "#aaa", fontSize: 11, lineHeight: 14 }}>🪙 {meta.price} each • ×{count} = {count * meta.price}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <TouchableOpacity
+                        style={styles.invStepBtn}
+                        onPress={() => {
+                          const updated = { ...harvestedItems };
+                          const next = (updated[key] || 0) - 1;
+                          if (next <= 0) delete updated[key]; else updated[key] = next;
+                          setCoins((c) => c + meta.price);
+                          saveBackpack(updated);
+                          if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={styles.invStepBtnText}>Sell 1</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.invSellAllBtn}
+                        onPress={() => {
+                          const sellAllCoins = count * meta.price;
+                          const updated = { ...harvestedItems };
+                          delete updated[key];
+                          setCoins((c) => c + sellAllCoins);
+                          saveBackpack(updated);
+                          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={styles.invSellAllBtnText}>All (+{count * meta.price})</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            <Text style={{ color: "#888", fontSize: 12, textAlign: "center", marginTop: 6 }}>
+              Total: {Object.values(harvestedItems).reduce((a, b) => a + b, 0)} items
+            </Text>
           </ScrollView>
-          <Text style={{ color: "#888", fontSize: 12, textAlign: "center", marginTop: 4 }}>
-            Total: {Object.values(harvestedItems).reduce((a, b) => a + b, 0)} vegetables
-          </Text>
         </View>
       )}
 
@@ -6798,6 +6874,39 @@ const styles = StyleSheet.create({
     zIndex: 102,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
+  },
+  invRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 12,
+    padding: 8,
+  },
+  invStepBtn: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  invStepBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    lineHeight: 14,
+  },
+  invSellAllBtn: {
+    backgroundColor: "#FF9800",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  invSellAllBtnText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    lineHeight: 14,
   },
   itemsPanelHeader: {
     flexDirection: "row",

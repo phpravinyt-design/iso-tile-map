@@ -423,3 +423,9 @@
 - [x] Added HARVEST_PITCH table: per-crop pitch profiles for 20 crops (🍉 bass 330-480Hz thud-tink → 🌶️ spicy 940-1290Hz sizzle-high); ding + shimmer oscillators both vary per crop, unknown crops fall back to default (720-1180Hz)
 - [x] playHarvestChime(cropType) wired into single-crop harvest and Harvest All (each cell plays its own crop's chime now, no generic summary chime)
 - [x] Verified: tsc clean, 18 tests passing, render check OK
+
+## Inventory / Sell UI
+- [x] Added INVENTORY_SELL_VALUES (18 farm/factory goods: Wool 10…Gadgets 26) + getInventorySellValue/isCropKey helpers
+- [x] Replaced backpack panel with grouped Inventory & Sell UI: 🌱 Harvested Crops (CROP_SELL_PRICES) + 🏭 Farm & Factory Goods sections; each row shows emoji, name, price each, subtotal (×count), "Sell 1" stepper and orange "All (+coins)" buttons
+- [x] Sell deducts counts, adds coins (setCoins), persists via saveBackpack; Light haptic for Sell 1 / Success haptic for Sell All; sound toggle path available
+- [x] Verified: tsc clean, 18 tests passing, render check OK
