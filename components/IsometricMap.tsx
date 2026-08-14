@@ -1949,8 +1949,8 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
 }
 
 // Emoji crop renderer (renders emoji on farmland tiles) with growth animation
-function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0 }: {
-  col: number; row: number; scale: number; cropType: string; flipped?: boolean; growthStage?: number;
+function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0, isGolden = false }: {
+  col: number; row: number; scale: number; cropType: string; flipped?: boolean; growthStage?: number; isGolden?: boolean;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -1978,7 +1978,7 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
       justifyContent: "center",
     }}>
       {/* Pulsating golden glow ring behind fully grown crops */}
-      {isFullyGrown && <ReadyCropGlow col={col} row={row} scale={scale} seed={glowSeed} />}
+      {isFullyGrown && <ReadyCropGlow col={col} row={row} scale={scale} seed={glowSeed} isGolden={isGolden} />}
       <Text
         style={{
           fontSize: emojiSize * 0.7 * growthScale,
@@ -1992,7 +1992,7 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
           ...(isFullyGrown ? {
             textShadowColor: "#FFD700",
             textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 4,
+            textShadowRadius: isGolden ? 10 : 4,
           } : {}),
         }}
       >
@@ -2377,7 +2377,7 @@ function DustCloud({
 }
 
 // --- Golden Glow: pulsating golden ring under a harvest-ready crop to make it more visible ---
-function ReadyCropGlow({ col, row, scale, seed }: { col: number; row: number; scale: number; seed: number }) {
+function ReadyCropGlow({ col, row, scale, seed, isGolden }: { col: number; row: number; scale: number; seed: number; isGolden?: boolean }) {
   const [, setTick] = useState(0);
   const bornRef = useRef(Date.now() + seed * 400); // stagger each crop's pulse
   useEffect(() => {
@@ -2390,8 +2390,8 @@ function ReadyCropGlow({ col, row, scale, seed }: { col: number; row: number; sc
   // Pulsate between 0.85 and 1.15 scale, opacity 0.35-0.75, on a 1.2s loop
   const t = ((Date.now() - bornRef.current) % 1200) / 1200;
   const pulse = Math.sin(t * Math.PI * 2) * 0.5 + 0.5; // 0..1
-  const glowScale = 0.85 + pulse * 0.3;
-  const glowOpacity = 0.35 + pulse * 0.4;
+  const glowScale = 0.85 + pulse * (isGolden ? 0.4 : 0.3);
+  const glowOpacity = 0.35 + pulse * (isGolden ? 0.5 : 0.4);
 
   return (
     <View
@@ -2414,9 +2414,9 @@ function ReadyCropGlow({ col, row, scale, seed }: { col: number; row: number; sc
           width: ts * 0.92,
           height: ts * 0.62,
           borderRadius: ts * 0.31,
-          borderWidth: 2,
-          borderColor: "#FFD700",
-          backgroundColor: "rgba(255, 215, 0, 0.25)",
+          borderWidth: isGolden ? 3 : 2,
+          borderColor: isGolden ? "#FFE14D" : "#FFD700",
+          backgroundColor: isGolden ? "rgba(255, 225, 77, 0.4)" : "rgba(255, 215, 0, 0.25)",
           shadowColor: "#FFD700",
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: glowOpacity,
@@ -2830,8 +2830,8 @@ function TownMarket({ col, row, scale, flipped = false }: { col: number; row: nu
 }
 
 // --- Building Component Selector ---
-function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growthStage = -1 }: {
-  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean; growthStage?: number;
+function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growthStage = -1, goldenCropTags }: {
+  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean; growthStage?: number; goldenCropTags?: Record<string, boolean>;
 }) {
   // All tree types use the generic renderer
   if (buildingType in TREE_SOURCES) {
@@ -2867,7 +2867,9 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   }
   // All crop types render as emoji on farmland
   if (buildingType in CROP_EMOJIS) {
-    return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} growthStage={growthStage >= 0 ? growthStage : 0} />;
+    const cropSeedKey = seedInventoryKey(buildingType as CropType);
+    const isGoldenCrop = goldenCropTags?.[cropSeedKey] === true;
+    return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} growthStage={growthStage >= 0 ? growthStage : 0} isGolden={isGoldenCrop} />;
   }
   switch (buildingType) {
     case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
@@ -3050,6 +3052,9 @@ export default function IsometricMap() {
   const [levelUpBanner, setLevelUpBanner] = useState<string | null>(null);
   // Free-plant mode: crop chosen from inventory seeds; next farmland tap plants it free (consumes 1 seed)
   const [plantedSeedCrop, setPlantedSeedCrop] = useState<CropType | null>(null);
+  const [plantedSeedCropSuffix, setPlantedSeedCropSuffix] = useState<string | null>(null); // "golden" for mega-quest golden seeds
+  // Golden crop tag per seed-slot: tracks whether the next planted crop is a premium golden crop
+  const [goldenCropTags, setGoldenCropTags] = useState<Record<string, boolean>>({});
   const [showHarvestAllMsg, setShowHarvestAllMsg] = useState(false);
 
   // --- Orders Board: NPC customers request goods for premium coin rewards ---
@@ -4792,9 +4797,46 @@ export default function IsometricMap() {
 
   // Handle crop selection from farmland tap (places crop on the tapped tile)
   // Plant a seed bought from the inventory for free (consumes 1 seed from backpack)
-  const plantBoughtSeed = useCallback((crop: CropType) => {
-    setPlantedSeedCrop(null);
+  const plantBoughtSeed = useCallback((crop: CropType, suffix: string | null = null) => {
     const seedKey = seedInventoryKey(crop);
+    setPlantedSeedCrop(null);
+    setPlantedSeedCropSuffix(null);
+    if (suffix === "golden") {
+      // Golden seeds (mega-quest reward): consume the _golden inventory entry and
+      // plant with a golden tag so harvest pays premium coins
+      const goldenKey = seedKey + "_golden";
+      let hadGolden = false;
+      setHarvestedItems((prev: Record<string, number>) => {
+        const owned = prev[goldenKey] || 0;
+        hadGolden = owned > 0;
+        const updated = { ...prev };
+        const next = owned - 1;
+        if (next <= 0) delete updated[goldenKey]; else updated[goldenKey] = next;
+        saveBackpack(updated);
+        return updated;
+      });
+      if (!hadGolden) return; // seed consumed by race — nothing to plant
+      setGoldenCropTags((prev) => ({ ...prev, [seedKey]: true }));
+      setSelectedCropType(crop);
+      if (!tappedFarmlandPos) return;
+      setGrid((prev) => {
+        const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
+        const { col, row } = tappedFarmlandPos;
+        if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+          const cropAsBuilding = crop as BuildingType;
+          if (newGrid[row][col].building !== cropAsBuilding) {
+            newGrid[row][col].building = cropAsBuilding;
+            newGrid[row][col].roadOverlay = null;
+            newGrid[row][col].cropGrowthStage = 0;
+            playPlaceSound();
+            if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          }
+        }
+        return newGrid;
+      });
+      setTappedFarmlandPos(null);
+      return;
+    }
     setHarvestedItems((prev) => {
       const owned = prev[seedKey] || 0;
       if (owned <= 0) {
@@ -4809,6 +4851,7 @@ export default function IsometricMap() {
       saveBackpack(updated);
       return updated;
     });
+    setGoldenCropTags((prev) => ({ ...prev, [seedKey]: false }));
     setSelectedCropType(crop);
     if (!tappedFarmlandPos) return;
     setGrid((prev) => {
@@ -4849,7 +4892,7 @@ export default function IsometricMap() {
       setPlantedSeedCrop(null);
     }
     setTappedFarmlandPos({ col, row });
-  }, [plantedSeedCrop, plantBoughtSeed]);
+  }, [plantedSeedCrop, plantedSeedCropSuffix, plantBoughtSeed]);
 
 
   const handleCropSelectFromTap = useCallback((crop: CropType) => {
@@ -4858,6 +4901,15 @@ export default function IsometricMap() {
     if ((harvestedItems[seedKey] || 0) > 0) {
       plantBoughtSeed(crop);
       return;
+    }
+    // Golden seed (mega-quest reward) plants free as golden wheat with golden grow markers
+    if (crop === ("crop_wheat" as CropType) && plantedSeedCropSuffix === "golden") {
+      const goldenKey = seedKey + "_golden";
+      if ((harvestedItems[goldenKey] || 0) > 0) {
+        plantBoughtSeed(crop, "golden");
+        return;
+      }
+      setPlantedSeedCropSuffix(null);
     }
     setSelectedCropType(crop);
     if (!tappedFarmlandPos) return;
@@ -5193,6 +5245,94 @@ export default function IsometricMap() {
     });
   }, [playClaimPopEffect, triggerClaimPopAnimation]);
 
+  // ---------- Weekly Mega-Quest: complete daily quests 7 days → rare golden seed ----------
+  const WEEKLY_MEGA_KEY = "weekly_mega_progress";
+  const MEGA_REWARD_SEEDS = 5; // rare golden seeds awarded on mega-quest completion
+  const MEGA_REWARD_XP = 500; // massive XP for the weekly mega-quest
+  const MEGA_REWARD_COINS = 500;
+
+  // Week anchor: ISO week number keyed record of completed day dates
+  function getWeekAnchor(): string {
+    const now = new Date();
+    const onejan = new Date(now.getFullYear(), 0, 1);
+    const week = Math.ceil(((now.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) / 7);
+    return `${now.getFullYear()}-W${week}`;
+  }
+  function todayDateKey(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const [weeklyProgress, setWeeklyProgress] = useState<string[]>([]);
+
+  // Load weekly mega-quest progress (dates this ISO week on which all 3 daily quests were claimed)
+  useEffect(() => {
+    AsyncStorage.getItem(WEEKLY_MEGA_KEY)
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw) as { week: string; dates: string[] };
+          if (parsed && parsed.week === getWeekAnchor() && Array.isArray(parsed.dates)) {
+            setWeeklyProgress(parsed.dates);
+          } else {
+            setWeeklyProgress([]);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveWeeklyProgress = useCallback((dates: string[]) => {
+    setWeeklyProgress(dates);
+    AsyncStorage.setItem(WEEKLY_MEGA_KEY, JSON.stringify({ week: getWeekAnchor(), dates })).catch(() => {});
+  }, []);
+
+  // Has the rare golden seed reward already been awarded this week?
+  const [megaQuestAwarded, setMegaQuestAwarded] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem("weekly_mega_awarded")
+      .then((raw) => setMegaQuestAwarded(raw === getWeekAnchor()))
+      .catch(() => {});
+  }, []);
+
+  // Called after any quest claim: if all 3 quests of today are now claimed, mark today + streak bonus + mega check
+  const checkDailyQuestsComplete = useCallback(() => {
+    setDailyQuests((prev) => {
+      const allClaimed = prev.length > 0 && prev.every((q) => q.claimed);
+      if (!allClaimed) return prev;
+      const today = todayDateKey();
+      if (weeklyProgress.includes(today)) return prev;
+      const nextDates = [...weeklyProgress, today];
+      saveWeeklyProgress(nextDates);
+      setCoins((c) => c + 50); // all-quests-day streak bonus
+      grantXp(25, "Daily Streak");
+      setQuestRewardBanner(`🔥 All quests done today! +50 🪙 +25 ⭐ (Day ${nextDates.length}/7)`);
+      if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
+      questRewardTimer.current = setTimeout(() => setQuestRewardBanner(null), 3500);
+      playClaimPopEffect();
+      triggerClaimPopAnimation();
+      // Weekly mega-quest: all 7 days completed
+      if (nextDates.length >= 7 && !megaQuestAwarded) {
+        const awardedWeek = getWeekAnchor();
+        AsyncStorage.setItem("weekly_mega_awarded", awardedWeek).catch(() => {});
+        setMegaQuestAwarded(true);
+        // Grant rare golden seeds to the seed inventory
+        setHarvestedItems((count) => {
+          const key = seedInventoryKey("crop_wheat" as CropType) + "_golden";
+          const updated = { ...count, [key]: (count[key] || 0) + MEGA_REWARD_SEEDS };
+          AsyncStorage.setItem(BACKPACK_KEY, JSON.stringify(updated)).catch(() => {});
+          return updated;
+        });
+        setCoins((c) => c + MEGA_REWARD_COINS);
+        grantXp(MEGA_REWARD_XP, "Weekly Mega-Quest");
+        setQuestRewardBanner(`🌟 WEEKLY MEGA-QUEST COMPLETE! +${MEGA_REWARD_SEEDS} 🌟 Golden Seeds +${MEGA_REWARD_COINS} 🪙 +${MEGA_REWARD_XP} ⭐`);
+        if (questRewardTimer.current) clearTimeout(questRewardTimer.current);
+        questRewardTimer.current = setTimeout(() => setQuestRewardBanner(null), 5500);
+        playClaimPopEffect();
+        triggerClaimPopAnimation();
+      }
+      return prev;
+    });
+  }, [weeklyProgress, saveWeeklyProgress, grantXp, megaQuestAwarded, playClaimPopEffect, triggerClaimPopAnimation]);
+
   // Claim reward for a completed quest: +150 coins and a massive +100 XP boost
   const claimQuestReward = useCallback((questId: number) => {
     setDailyQuests((prev) => {
@@ -5209,7 +5349,9 @@ export default function IsometricMap() {
       triggerClaimPopAnimation();
       return updated;
     });
-  }, [grantXp, playClaimPopEffect, triggerClaimPopAnimation]);
+    // After claiming, check if all 3 of today's quests are now claimed (weekly streak tracking)
+    setTimeout(() => checkDailyQuestsComplete(), 150);
+  }, [grantXp, playClaimPopEffect, triggerClaimPopAnimation, checkDailyQuestsComplete]);
 
   const [taskRewardMessage, setTaskRewardMessage] = useState("");
 
@@ -5317,7 +5459,7 @@ export default function IsometricMap() {
         const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
           <View key={`bld-wrap-${row}-${col}`}>
-            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} growthStage={cell.cropGrowthStage ?? 0} />
+            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} growthStage={cell.cropGrowthStage ?? 0} goldenCropTags={goldenCropTags} />
             {/* Long-press hit area for item selection */}
             <TouchableOpacity
               activeOpacity={0.3}
@@ -5913,6 +6055,51 @@ export default function IsometricMap() {
                   </View>
                 );
               })}
+            {/* ---------- Golden Seed (rare mega-quest reward) ---------- */}
+            {(() => {
+              const goldenKey = seedInventoryKey("crop_wheat" as CropType) + "_golden";
+              const goldenOwned = harvestedItems[goldenKey] || 0;
+              if (goldenOwned === 0 && !megaQuestAwarded) return null;
+              const goldenPlantedMode = plantedSeedCrop === ("crop_wheat" as CropType) && plantedSeedCropSuffix === "golden";
+              return (
+                <View
+                  style={[
+                    styles.invRow,
+                    {
+                      width: "100%",
+                      alignItems: "center",
+                      flexDirection: "row",
+                      gap: 8,
+                      paddingVertical: 6,
+                      backgroundColor: "rgba(255,215,0,0.15)",
+                      borderWidth: 1.5,
+                      borderColor: goldenPlantedMode ? "#FFD700" : "#FFD700",
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 26 }}>🌟</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#FFD700", fontSize: 12, fontWeight: "bold", lineHeight: 16 }}>Golden Seed ×{goldenOwned}</Text>
+                    <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 10, lineHeight: 13 }}>Rare — grows Golden Wheat 🌾 sells for 100 🪙/unit</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.invPlantBtn, goldenOwned <= 0 && styles.invBuyBtnDisabled]}
+                    onPress={() => {
+                      if (goldenOwned <= 0) return;
+                      setPlantedSeedCrop("crop_wheat" as CropType);
+                      setPlantedSeedCropSuffix("golden");
+                      setTappedFarmlandPos(null);
+                      setShowBackpack(false);
+                      if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.invPlantBtnText}>🌱 Plant</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
             {/* ---------- Buy Seeds section ---------- */}
             <Text style={{ color: "#FFD54F", fontSize: 13, fontWeight: "bold", marginTop: 10, marginBottom: 4 }}>🛒 Buy Seeds</Text>
             <Text style={{ color: "#999", fontSize: 11, marginBottom: 6, lineHeight: 14 }}>
@@ -6079,6 +6266,53 @@ export default function IsometricMap() {
             );
           })}
           <Text style={styles.tasksHint}>⚡ Quests track earning coins, harvesting, selling, placing &amp; delivering — play naturally and complete them!</Text>
+
+          {/* Weekly Mega-Quest: complete all 3 quests 7 days → rare golden seed */}
+          <View style={[styles.taskCard, { borderColor: megaQuestAwarded ? "#FFD700" : "#9C27B0" }]}>
+            <View style={styles.taskRow}>
+              <Text style={[styles.taskLabel, { color: megaQuestAwarded ? "#FFD700" : "#E8C5FF" }]}>🌟 Weekly Mega-Quest</Text>
+              <Text style={{ color: megaQuestAwarded ? "#FFD700" : "#ddd", fontSize: 11, fontWeight: "700", lineHeight: 15 }}>
+                {megaQuestAwarded ? "✅ Awarded!" : `${weeklyProgress.length}/7 Days`}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 4, marginTop: 8, marginBottom: 6 }}>
+              {Array.from({ length: 7 }, (_, d) => (
+                <View
+                  key={d}
+                  style={{
+                    width: 30,
+                    height: 18,
+                    borderRadius: 9,
+                    backgroundColor: d < weeklyProgress.length ? "#FFD700" : "rgba(255,255,255,0.15)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 9, fontWeight: "bold", color: d < weeklyProgress.length ? "#5a4400" : "#888", lineHeight: 12 }}>
+                    {d < weeklyProgress.length ? "🔥" : "·"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 9, lineHeight: 12, marginBottom: 2 }}>
+              🔥 Days completed this week: {weeklyProgress.map((dt) => dt.slice(5)).join(" · ") || "—"}
+            </Text>
+            <View style={styles.taskRewardRow}>
+              <Text style={styles.taskRewardText}>
+                Reward: 🌟 ×{MEGA_REWARD_SEEDS} Golden Seeds +{MEGA_REWARD_COINS} 🪙 +{MEGA_REWARD_XP} ⭐ XP
+              </Text>
+              {megaQuestAwarded ? (
+                <Text style={{ color: "#FFD700", fontSize: 10, fontWeight: "700", lineHeight: 14 }}>✅ You earned it!</Text>
+              ) : (
+                <Text style={{ color: "rgba(255,255,255,0.55)", fontSize: 10, lineHeight: 14 }}>
+                  Complete all 3 quests for 7 days this week!
+                </Text>
+              )}
+            </View>
+            <Text style={{ color: "#9C27B0", fontSize: 10, lineHeight: 14, marginTop: 4, textAlign: "center" }}>
+              🔥 All 3 quests done in one day = Day complete (+50 🪙 +25 ⭐ bonus)
+            </Text>
+          </View>
         </View>
       )}
 
@@ -6447,6 +6681,8 @@ export default function IsometricMap() {
           onPress={() => {
             setGrid((prev) => {
               let totalHarvested = 0;
+              let totalCoins = 0;
+              const goldenTagsCleared: Record<string, boolean> = {};
               const newGrid = prev.map((r) => r.map((c) => ({ ...c })));
               const newBackpack = { ...harvestedItems };
               for (let row = 0; row < GRID_SIZE; row++) {
@@ -6454,20 +6690,35 @@ export default function IsometricMap() {
                   const cell = newGrid[row][col];
                   if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType] && cell.cropGrowthStage >= 100) {
                     const cropType = cell.building as CropType;
+                    const seedKey = seedInventoryKey(cropType);
+                    const isGolden = goldenCropTags[seedKey] === true;
+                    const backpackKey = isGolden ? seedKey + "_golden" : cropType;
                     cell.building = "none";
                     cell.cropGrowthStage = 0;
                     totalHarvested++;
-                    newBackpack[cropType] = (newBackpack[cropType] || 0) + 1;
+                    totalCoins += isGolden ? 100 : 25;
+                    newBackpack[backpackKey] = (newBackpack[backpackKey] || 0) + 1;
                     playHarvestChime(cropType);
                     triggerHarvestSparkles(col, row);
+                    // Clear the golden tag once this tagged crop has been harvested
+                    if (isGolden) {
+                      goldenTagsCleared[seedKey] = true;
+                    }
                   }
                 }
               }
               if (totalHarvested > 0) {
-                setCoins((c) => c + totalHarvested * 25);
+                setCoins((c) => c + totalCoins);
                 saveBackpack(newBackpack);
+                setGoldenCropTags((prev) => {
+                  if (Object.keys(goldenTagsCleared).length === 0) return prev;
+                  const next = { ...prev };
+                  Object.keys(goldenTagsCleared).forEach((k) => delete next[k]);
+                  return next;
+                });
                 grantXp(XP_HARVEST * totalHarvested, "Harvest");
                 trackQuestProgress("harvest", totalHarvested);
+                trackQuestProgress("coins", totalCoins);
                 if (Platform.OS !== "web") {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
@@ -6709,22 +6960,33 @@ export default function IsometricMap() {
                         if (cell.building !== "none" && CROP_EMOJIS[cell.building as CropType]) {
                           // Only harvest when fully grown (stage >= 100)
                           if (cell.cropGrowthStage >= 100) {
-                            // Harvest: remove crop and give +25 coins
+                            // Harvest: remove crop — golden crops (mega-quest reward) pay a premium
                             const cropType = cell.building as CropType;
+                            const seedKey = seedInventoryKey(cropType);
+                            const isGolden = goldenCropTags[seedKey] === true;
+                            const goldenReward = isGolden ? 100 : 25;
+                            const goldenBackpackKey = isGolden ? seedKey + "_golden" : cropType;
                             cell.building = "none";
                             cell.cropGrowthStage = 0;
-                            setCoins((c) => c + 25);
+                            setCoins((c) => c + goldenReward);
                             grantXp(XP_HARVEST);
                             trackQuestProgress("harvest", 1);
-                            trackQuestProgress("coins", 25);
+                            trackQuestProgress("coins", goldenReward);
                             playHarvestChime(cropType);
                             triggerHarvestSparkles(col, row);
                             if (Platform.OS !== "web") {
                               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             }
-                            // Add to backpack
+                            // Clear the golden tag once this tagged crop has been harvested
+                            setGoldenCropTags((prev) => {
+                              if (prev[seedKey] !== true) return prev;
+                              const next = { ...prev };
+                              delete next[seedKey];
+                              return next;
+                            });
+                            // Add to backpack (golden crops land under a separate golden key)
                             const updated = { ...harvestedItems };
-                            updated[cropType] = (updated[cropType] || 0) + 1;
+                            updated[goldenBackpackKey] = (updated[goldenBackpackKey] || 0) + 1;
                             saveBackpack(updated);
                           }
                         }
@@ -6735,7 +6997,7 @@ export default function IsometricMap() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.harvestButtonText}>🌾 Harvest (+25)</Text>
+                  <Text style={styles.harvestButtonText}>🌾 Harvest (+{goldenCropTags[seedInventoryKey((tappedFarmlandPos ? grid[tappedFarmlandPos.row]?.[tappedFarmlandPos.col]?.building : "none" as CropType) as CropType)] === true ? 100 : 25})</Text>
                 </TouchableOpacity>
               </View>
             ) : (

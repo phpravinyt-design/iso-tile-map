@@ -453,3 +453,13 @@
 - [x] claimQuestReward grants +150 coins + 100 XP (massive vs 15 XP normal task) with "⚡ Claimed! +150 🪙 +100 ⭐" banner; claim state persisted
 - [x] 🎯 Quests button in toolbar (next to Tasks) opens its own panel: progress bars, reward rows, purple ⚡ Claim button
 - [x] 9 vitest tests (bounds across 400 days, determinism, accumulation/capping, claim math, kind variety); tsc clean, 36 tests passing, render check OK (🎯 button visible in toolbar)
+
+## Weekly Mega-Quest (Rare Seed Reward)
+- [x] Weekly streak tracking: record dates when all 3 daily quests were completed; streak persists across the week (AsyncStorage, ISO-week anchored reset)
+- [x] All-quests-complete day detection: when the last quest of the day is claimed, mark that day as completed and grant a small streak bonus (+50 🪙 +25 ⭐, per-day only once)
+- [x] Week counter: after 7 completed days, mega-quest completes; reward = exclusive rare "Golden Seed" (🌟 ×5) +500 🪙 +500 ⭐ XP, awarded once per week
+- [x] Rare golden crop: golden seeds plant a golden-tagged crop on farmland (tag tracked in goldenCropTags state) — harvesting it pays 100 🪙/unit (vs 25 normal), lands in backpack as "golden wheat", and works for Harvest All too; no coin cost to plant (free, consumes 1 seed)
+- [x] Weekly Mega-Quest panel entry (in 🎯 Quests panel): shows days completed /7 with 🔥 progress chips, completed dates list, reward preview, and ✅ awarded state
+- [x] Mega-quest celebration: banner + claim-pop animation when rare seeds are awarded; golden seed row shows in 🎒 Buy Seeds as owned reward with a golden 🌟 Plant button
+- [x] Golden visuals: brighter/wider pulsing glow + golden shimmer text-shadow on golden crops, tagged through BuildingOnTile → EmojiCrop → ReadyCropGlow
+- [x] Verify: tsc clean, 44 tests passing (8 new mega-quest tests), render check
