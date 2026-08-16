@@ -583,3 +583,10 @@ EAS build logs are NOT directly accessible from sandbox (no eas-cli token/creden
 - [x] Versioning: removed `|| true` error-swallowing; remote versionCode handled by eas.json autoIncrement (appVersionSource remote) — no manual version:increment needed; clear notice log added
 - [x] app.json: added version 1.0.0, platforms, android.package; owner placeholder kept (must be replaced by user) with clear workflow error if missing
 - [x] Validated: YAML/JSON/expressions OK, tsc clean, 72 tests passing; checkpoint + full fix report (changed files, reasons, secrets, exact run steps)
+---
+- [ ] Validate user's Expo token and identify the Expo account owner
+- [ ] Replace TO_BE_REPLACED owner in app.json with the real Expo username
+- [ ] Link EAS project (eas projectId) in app.json
+- [ ] Store EXPO_TOKEN in project secrets (used by GitHub Actions release-apk workflow)
+- [ ] Trigger release-apk workflow (tag push or workflow_dispatch) and verify build starts/succeeds
+- [ ] Report root cause and fix to user
