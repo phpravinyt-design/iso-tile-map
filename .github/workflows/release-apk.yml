@@ -16,18 +16,16 @@
 #      then add it to this repo as a secret named EXPO_TOKEN:
 #        GitHub repo → Settings → Secrets and variables → Actions
 #        → New repository secret → name: EXPO_TOKEN
-#   2. Replace the owner placeholder in app.json:
-#        "owner": "TO_BE_REPLACED"  →  "owner": "<your-expo-username>"
-#      (must be a lowercase letter followed by letters/digits/
-#       underscores/hyphens; find it at expo.dev → your profile)
-#   3. Link the project once (any machine, terminal):
-#        npx eas login            (login with your expo account)
-#        npx eas build:configure  (writes expo.eas.projectId)
-#      and commit the resulting app.json change. Without this,
-#      `eas build` fails with a clear error telling you to run
-#      `eas init`/`eas build:configure`.
-# ============================================================
-name: Release APK
+      #   2. Set the owner in app.json (used by this workflow) and
+      #      link the project's EAS projectId (app.json or the
+      #      dynamic app.config.ts "extra.eas.projectId"):
+      #        npx eas login            (login with your expo account)
+      #        npx eas build:configure  (writes expo.eas.projectId)
+      #      and commit the change. Without this, `eas build`
+      #      fails with a clear error telling you to run
+      #      `eas init`/`eas build:configure`.
+      # ============================================================
+      name: Release APK
 
 on:
   push:
@@ -109,14 +107,28 @@ jobs:
       - name: Validate EAS project link
         run: |
           set -e
-          if [ -z "$(jq -r '.expo.eas.projectId // empty' app.json 2>/dev/null)" ]; then
-            echo "::error::EAS project is not linked. Run these once and commit app.json:"
+          PID=$(jq -r '.expo.eas.projectId // empty' app.json 2>/dev/null)
+          # dynamic app.config.ts also holds extra.eas.projectId
+          if [ -z "${PID}" ]; then
+            PID=$(node -e "const c=require('./app.config.ts'.replace(/\.ts$/,'.config.js'));" 2>/dev/null || echo '')
+          fi
+          CONFIG_PID=$(node -e "
+            require('dotenv').config();
+            try {
+              require('esbuild-register/dist/node').register();
+            } catch (e) { /* ignore */ }
+            const cfg = require('./app.config.ts').default;
+            console.log(cfg.extra && cfg.extra.eas && cfg.extra.eas.projectId || '');
+          " 2>/dev/null || echo '')
+          PID="${PID:-$CONFIG_PID}"
+          if [ -z "${PID}" ]; then
+            echo "::error::EAS project is not linked. Run these once and commit:"
             echo "::error::  npx eas login"
             echo "::error::  npx eas build:configure"
-            echo "::error::Also make sure app.json has \"owner\": \"<your-expo-username>\"."
+            echo "::error::(projectId can live in app.json or app.config.ts extra.eas.projectId)"
             exit 1
           fi
-          echo "EAS project linked: $(jq -r '.expo.eas.projectId' app.json)"
+          echo "EAS project linked: ${PID}"
 
       # ----------------------------------------------------------
       # 6. AUTO VERSION BUMP (dispatch or tag push)
@@ -181,12 +193,17 @@ jobs:
           echo "Build started: ${BUILD_ID}"
 
       # ----------------------------------------------------------
-      # 8. Poll build status via the Expo GraphQL public API
-      #    (custom polling is required because EAS CLI has no
-      #    "wait-for-one-build" command). Response format is
-      #    validated at each step with clear errors.
+      # 8. Poll build status with EAS CLI (its built-in GraphQL
+      #    client works with a Build-scope EXPO_TOKEN; the raw
+      #    Expo REST API does NOT authenticate Build-scope tokens
+      #    and returns 404 / "Not Found"). Polling loop:
+      #    `eas build:list --json --limit 20` → find our BUILD_ID
+      #    → parse status until FINISHED / ERRORED / CANCELLED.
+      #    On FINISHED, download the APK via the EAS Build API
+      #    build artifact URL with the same token (works for
+      #    Build-scope tokens).
       # ----------------------------------------------------------
-      - name: Wait for build & download APK
+      - name: Wait for build to finish
         id: eas_result
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -194,47 +211,52 @@ jobs:
           MAX_ATTEMPTS: "70"
         run: |
           set -e
-          OWNER=$(jq -r '.expo.owner' app.json)
-          SLUG=$(jq -r '.expo.slug' app.json)
-          if [ -z "${OWNER}" ] || [ "${OWNER}" = "TO_BE_REPLACED" ]; then
-            echo "::error::app.json \"owner\" is empty or still the placeholder. Set it to your Expo username and commit."
-            exit 1
-          fi
-          API="https://api.expo.dev/v2/accounts/${OWNER}/projects/${SLUG}/builds/${BUILD_ID}"
           ATTEMPT=0
           while [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; do
-            RESP=$(curl -sS -H "Authorization: Bearer ${EXPO_TOKEN}" "${API}")
-            if ! echo "${RESP}" | jq -e '.data' >/dev/null 2>&1; then
-              echo "::error::Unexpected Expo API response (no .data field):"
-              echo "${RESP}"
-              exit 1
+            LIST=$(eas build:list --platform android --json --limit 20 2>/dev/null)
+            MATCH=$(echo "${LIST}" | grep -A12 "\"${BUILD_ID}\"" || true)
+            if [ -z "${MATCH}" ]; then
+              echo "Attempt $((ATTEMPT+1))/${MAX_ATTEMPTS} — build ${BUILD_ID} not yet in list, waiting..."
+            else
+              STATUS=$(echo "${MATCH}" | grep -E "\"status\"" | head -1 | sed -E 's/.*\"status\"[^\"]*\"([^\"]+)\".*/\1/')
+              echo "Attempt $((ATTEMPT+1))/${MAX_ATTEMPTS} — build status: ${STATUS}"
+              case "${STATUS}" in
+                FINISHED) echo "BUILD_STATUS=FINISHED" >> "$GITHUB_OUTPUT"; break ;;
+                ERRORED)
+                  echo "::error::EAS build ERRORED. Open the log:"
+                  echo "::error::  https://expo.dev/accounts/pravinn3/projects/iso-tile-map/builds/${BUILD_ID}"
+                  exit 1 ;;
+                CANCELLED) echo "::error::EAS build was CANCELLED."; exit 1 ;;
+                IN_QUEUE|IN_PROGRESS|CREATED|UNKNOWN) sleep 30 ;;
+                *) echo "::warning::Unknown status '${STATUS}', waiting..."; sleep 30 ;;
+              esac
             fi
-            STATUS=$(jq -r '.data.status' "${RESP}")
-            echo "Attempt $((ATTEMPT+1))/${MAX_ATTEMPTS} — build status: ${STATUS}"
-            case "${STATUS}" in
-              FINISHED) echo "${RESP}" > /tmp/build-final.json; break ;;
-              ERRORED)
-                echo "::error::EAS build ERRORED. Details:"
-                jq -r '.data | {platform, status, error: (.completedWithErrorCode // .distributionUrl // "see Expo dashboard"), logsUrl: .logUrl // "https://expo.dev/dashboard" }' /tmp/build-final.json 2>/dev/null || echo "${RESP}"
-                exit 1 ;;
-              CANCELLED)
-                echo "::error::EAS build was CANCELLED."; exit 1 ;;
-              IN_QUEUE|IN_PROGRESS|CREATED) sleep 30 ;;
-              *)
-                echo "::warning::Unknown status '${STATUS}', waiting..."
-                sleep 30 ;;
-            esac
             ATTEMPT=$((ATTEMPT+1))
           done
           if [ "${ATTEMPT}" -ge "${MAX_ATTEMPTS}" ]; then
             echo "::error::Build did not finish within $((MAX_ATTEMPTS*30/60)) minutes. Check https://expo.dev/dashboard"
             exit 1
           fi
-          ARTIFACT_URL=$(jq -r '.data.artifacts.buildUrl // empty' /tmp/build-final.json)
+
+      # ----------------------------------------------------------
+      # 9. Download the finished APK: EAS Build API serves the
+      #    artifact with a Build-scope token (GET builds/<id>).
+      # ----------------------------------------------------------
+      - name: Download APK artifact
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ steps.eas_build.outputs.build_id }}
+        run: |
+          set -e
+          RESP=$(curl -sS -f "https://api.expo.dev/v2/builds/${BUILD_ID}" \
+            -H "Authorization: Bearer ${EXPO_TOKEN}") || {
+            echo "::error::Could not fetch build details from Expo API."
+            exit 1
+          }
+          ARTIFACT_URL=$(echo "${RESP}" | jq -r '.data.artifacts.buildUrl // empty')
           if [ -z "${ARTIFACT_URL}" ]; then
             echo "::error::Build finished but no APK artifact URL in response."
-            echo "::error::Final response:"
-            cat /tmp/build-final.json
+            echo "${RESP}"
             exit 1
           fi
           echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
@@ -248,8 +270,8 @@ jobs:
           file IsoTileFarm.apk || true
 
       # ----------------------------------------------------------
-      # 9. Attach the validated APK to a GitHub Release.
-      #    Tag collisions fail loudly (release stays unique).
+      # 10. Attach the validated APK to a GitHub Release.
+      #     Tag collisions fail loudly (release stays unique).
       # ----------------------------------------------------------
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
