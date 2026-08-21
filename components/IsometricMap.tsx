@@ -96,6 +96,12 @@ const DECORATION_WATERFALL_POND_PNG = require("@/assets/images/cropped_decoratio
 const DECORATION_FLOWER_BED_PNG = require("@/assets/images/cropped_decorations/flower_bed.png");
 const DECORATION_WATER_WELL_PNG = require("@/assets/images/water_well.png");
 
+// 4 Mountain PNGs (cropped from user's mountain sheet)
+const MOUNTAIN_GREEN_WATERFALL_PNG = require("@/assets/images/mountains/mountain_green_waterfall.png");
+const MOUNTAIN_RED_ROCKY_PNG = require("@/assets/images/mountains/mountain_red_rocky.png");
+const MOUNTAIN_SNOWY_PNG = require("@/assets/images/mountains/mountain_snowy.png");
+const MOUNTAIN_GREEN_VALLEY_PNG = require("@/assets/images/mountains/mountain_green_valley.png");
+
 // 9 Flower decoration PNGs (cropped from user's flower sheet)
 const FLOWER_TULIPS_PNG = require("@/assets/images/flowers/flower_tulips_pink.png");
 const FLOWER_DAISIES_PNG = require("@/assets/images/flowers/flower_daisies_white.png");
@@ -929,6 +935,7 @@ const TASK_ITEM_CATEGORIES: { category: string; types: string[]; label: string }
   { category: "temples", types: ["temple_pink", "temple_gold_tower", "temple_brown_complex", "temple_white_marble", "temple_dark_bronze", "temple_gold_small", "temple_dark_stone", "temple_gold_pool", "temple_brown_gopuram"], label: "Temple" },
   { category: "community", types: ["town_hall", "hospital", "school", "fire_station", "police_station", "market", "library", "train_station", "park"], label: "Community Building" },
   { category: "decorations", types: ["flower_arch", "fountain", "bench", "topiary", "gazebo", "flower_pot", "swing", "waterfall_pond", "flower_bed", "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender", "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies"], label: "Decoration" },
+  { category: "mountains", types: ["mountain_green_waterfall", "mountain_red_rocky", "mountain_snowy", "mountain_green_valley"], label: "Mountain" },
   { category: "roads", types: ["road_straight", "road_corner", "road_intersection"], label: "Road" },
 ];
 
@@ -1421,6 +1428,9 @@ const BUILDING_TYPES = [
   "flower_pot", "swing", "waterfall_pond", "flower_bed", "water_well",
   "flower_tulips", "flower_daisies", "flower_hydrangea", "flower_lavender",
   "flower_roses", "flower_sunflowers", "flower_lily_valley", "flower_pansies", "flower_lilies",
+  // 4 mountain types
+  "mountain_green_waterfall", "mountain_red_rocky",
+  "mountain_snowy", "mountain_green_valley",
   // 9 industry/factory types
   "steel_factory", "oil_refinery", "food_factory",
   "recycling_plant", "dairy_factory", "yarn_factory",
@@ -1466,6 +1476,30 @@ const TEMPLE_SOURCES: Record<string, any> = {
   temple_gold_pool: TEMPLE_GOLD_POOL_PNG,
   temple_brown_gopuram: TEMPLE_BROWN_GOPURAM_PNG,
 };
+
+// Mountain types for selection (4 mountains)
+const MOUNTAIN_TYPES = [
+  "mountain_green_waterfall", "mountain_red_rocky",
+  "mountain_snowy", "mountain_green_valley",
+] as const;
+type MountainType = (typeof MOUNTAIN_TYPES)[number];
+
+// Mountain PNG sources
+const MOUNTAIN_SOURCES: Record<string, any> = {
+  mountain_green_waterfall: MOUNTAIN_GREEN_WATERFALL_PNG,
+  mountain_red_rocky: MOUNTAIN_RED_ROCKY_PNG,
+  mountain_snowy: MOUNTAIN_SNOWY_PNG,
+  mountain_green_valley: MOUNTAIN_GREEN_VALLEY_PNG,
+};
+
+// Mountain emoji labels
+const MOUNTAIN_EMOJIS: Record<string, string> = {
+  mountain_green_waterfall: "🏔️",
+  mountain_red_rocky: "🏜️",
+  mountain_snowy: "❄️",
+  mountain_green_valley: "⛰️",
+};
+const MOUNTAIN_TYPE_VALUES: string[] = [...MOUNTAIN_TYPES];
 
 // Decoration types for selection (9 decorations)
 const DECORATION_TYPES = [
@@ -2131,7 +2165,7 @@ function EmojiCrop({ col, row, scale, cropType, flipped = false, growthStage = 0
   );
 }
 // Placement modes
-const MODES = ["tile", "tiles", "community", "temple", "decoration", "industry", "farm", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
+const MODES = ["tile", "tiles", "community", "temple", "decoration", "mountain", "industry", "farm", "road", "house_small", "house_big", "town_market", "tree", "grass_plant"] as const;
 type PlaceMode = (typeof MODES)[number];
 
 // Tree emoji labels
@@ -2172,6 +2206,7 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   tiles: "🧱",
   temple: "🛕",
   decoration: "🌸",
+  mountain: "⛰️",
   farm: "🐑",
   industry: "🏭",
   community: "🏛️",
@@ -3093,6 +3128,10 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   if (buildingType in DECORATION_SOURCES) {
     return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
   }
+  // All mountain types use the generic decoration renderer (static PNG sprites)
+  if (buildingType in MOUNTAIN_SOURCES) {
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
+  }
   // All industry/factory types use the dedicated generic renderer
   if (buildingType in INDUSTRY_SOURCES) {
     return <PngIndustryGeneric col={col} row={row} scale={scale} industryType={buildingType} flipped={flipped} />;
@@ -3802,6 +3841,7 @@ export default function IsometricMap() {
     let roads = 0;
     let grassPlants = 0;
     let decorations = 0;
+    let mountains = 0;
     let temples = 0;
     let communities = 0;
     let houses = 0;
@@ -3813,6 +3853,8 @@ export default function IsometricMap() {
             trees += 1;
           } else if (DECORATION_TYPE_VALUES.includes(cell.building)) {
             decorations += 1;
+          } else if (MOUNTAIN_TYPE_VALUES.includes(cell.building)) {
+            mountains += 1;
           } else if (TEMPLE_TYPE_VALUES.includes(cell.building)) {
             temples += 1;
           } else if (COMMUNITY_TYPE_VALUES.includes(cell.building)) {
@@ -3827,7 +3869,7 @@ export default function IsometricMap() {
       }
     }
     const totalItems = buildings + roads + grassPlants;
-    return { buildings, trees, roads, grassPlants, decorations, temples, communities, houses, totalItems };
+    return { buildings, trees, roads, grassPlants, decorations, mountains, temples, communities, houses, totalItems };
   }, [grid]);
 
   // Persist coin balance whenever it changes
@@ -3875,6 +3917,8 @@ export default function IsometricMap() {
   const [showDecorationSelector, setShowDecorationSelector] = useState(false);
   const [selectedIndustryType, setSelectedIndustryType] = useState<IndustryType>("steel_factory");
   const [selectedFarmType, setSelectedFarmType] = useState<FarmType>("farm_sheep_barn");
+  const [selectedMountainType, setSelectedMountainType] = useState<MountainType>("mountain_green_waterfall");
+  const [showMountainSelector, setShowMountainSelector] = useState(false);
 
   // Mirror (flip) toggle for item selection: when ON, previews and placed items render mirrored
   const [mirrorMode, setMirrorMode] = useState(false);
@@ -5656,7 +5700,7 @@ export default function IsometricMap() {
                 newGrid[row][col].tileTexture = textureToPlace;
               }
             }
-          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "industry" || mode === "farm" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
+          } else if (mode === "community" || mode === "temple" || mode === "decoration" || mode === "mountain" || mode === "industry" || mode === "farm" || mode === "house_small" || mode === "house_big" || mode === "town_market" || mode === "tree") {
             // If we have a picked-up object, place it here first
             if (moveClipboard) {
               if (newGrid[row][col].tile === "grass" || newGrid[row][col].tile === "dirt") {
@@ -5716,6 +5760,17 @@ export default function IsometricMap() {
               } else if (mode === "decoration") {
                 // Decoration mode: place the user's selected decoration type
                 const buildingToPlace = selectedDecorationType as BuildingType;
+                if (currentBuilding === buildingToPlace) {
+                  newGrid[row][col].building = "none";
+                  removedItem = true;
+                } else {
+                  newGrid[row][col].building = buildingToPlace;
+                  newGrid[row][col].flipped = mirrorMode;
+                  placedNewBuilding = true;
+                }
+              } else if (mode === "mountain") {
+                // Mountain mode: place the user's selected mountain type
+                const buildingToPlace = selectedMountainType as BuildingType;
                 if (currentBuilding === buildingToPlace) {
                   newGrid[row][col].building = "none";
                   removedItem = true;
@@ -5788,7 +5843,7 @@ export default function IsometricMap() {
       // Daily tasks: refresh progress against the new grid (after placement)
       advanceDailyTasks();
     },
-    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode, triggerPlacePopAnimation, triggerRemovalDustAnimation]
+    [mode, selectedTreeType, selectedHouseType, selectedCommunityType, selectedRoadType, selectedTileType, selectedTempleType, selectedDecorationType, selectedMountainType, selectedIndustryType, selectedFarmType, moveClipboard, mirrorMode, triggerPlacePopAnimation, triggerRemovalDustAnimation]
   );
 
   // Daily tasks: count placed items and complete tasks (award TASK_REWARD_COINS per completed task)
@@ -6337,11 +6392,12 @@ export default function IsometricMap() {
               {/* Mirrored cursor preview (web): semi-transparent flipped item following the pointer */}
               {cursorPos && mirrorMode && mode !== "tile" && mode !== "grass_plant" && !moveClipboard && (() => {
                 let previewSrc: number | null = null;
-                const placementModes: string[] = ["community", "temple", "decoration", "industry", "farm", "tree", "house_small", "house_big", "town_market", "road", "tiles"];
+                const placementModes: string[] = ["community", "temple", "decoration", "mountain", "industry", "farm", "tree", "house_small", "house_big", "town_market", "road", "tiles"];
                 if (placementModes.includes(mode)) {
                   if (mode === "community") previewSrc = selectedCommunityType ? (COMMUNITY_SOURCES as any)[selectedCommunityType] ?? null : null;
                   else if (mode === "temple") previewSrc = selectedTempleType ? (TEMPLE_SOURCES as any)[selectedTempleType] ?? null : null;
                   else if (mode === "decoration") previewSrc = selectedDecorationType ? (DECORATION_SOURCES as any)[selectedDecorationType] ?? null : null;
+                  else if (mode === "mountain") previewSrc = selectedMountainType ? (MOUNTAIN_SOURCES as any)[selectedMountainType] ?? null : null;
                   else if (mode === "industry") previewSrc = selectedIndustryType ? (INDUSTRY_SOURCES as any)[selectedIndustryType] ?? null : null;
                   else if (mode === "farm") previewSrc = selectedFarmType ? (FARM_SOURCES as any)[selectedFarmType] ?? null : null;
                   else if (mode === "tree") previewSrc = selectedTreeType ? (TREE_SOURCES as any)[selectedTreeType] ?? TREE_PNG : null;
@@ -6877,7 +6933,7 @@ export default function IsometricMap() {
           <Text style={styles.tasksSubtitle}>Complete tasks to earn +{TASK_REWARD_COINS} 🪙 each. Refreshes tomorrow!</Text>
           {dailyTasks.map((t, i) => {
             const ratio = Math.min(t.progress / Math.max(t.required, 1), 1);
-            const catEmoji = t.category === "houses" ? "🏠" : t.category === "trees" ? "🌳" : t.category === "temples" ? "🛕" : t.category === "community" ? "🏛️" : t.category === "decorations" ? "🌸" : "🛣️";
+            const catEmoji = t.category === "houses" ? "🏠" : t.category === "trees" ? "🌳" : t.category === "temples" ? "🛕" : t.category === "community" ? "🏛️" : t.category === "decorations" ? "🌸" : t.category === "mountains" ? "⛰️" : "🛣️";
             return (
               <View key={i} style={styles.taskCard}>
                 <View style={styles.taskRow}>
@@ -7215,6 +7271,10 @@ export default function IsometricMap() {
               <Text style={styles.profileStatLabel}>🌸 Decor</Text>
             </View>
             <View style={styles.profileStat}>
+              <Text style={styles.profileStatValue}>{itemStats.mountains}</Text>
+              <Text style={styles.profileStatLabel}>⛰️ Mountains</Text>
+            </View>
+            <View style={styles.profileStat}>
               <Text style={styles.profileStatValue}>{itemStats.roads}</Text>
               <Text style={styles.profileStatLabel}>🛣️ Roads</Text>
             </View>
@@ -7507,6 +7567,11 @@ export default function IsometricMap() {
                     setShowDecorationSelector(!showDecorationSelector);
                   } else {
                     setShowDecorationSelector(false);
+                  }
+                  if (m === "mountain") {
+                    setShowMountainSelector(!showMountainSelector);
+                  } else {
+                    setShowMountainSelector(false);
                   }
                   if (m === "industry") {
                     setShowIndustrySelector(!showIndustrySelector);
@@ -7975,6 +8040,48 @@ export default function IsometricMap() {
           </ScrollView>
           <View style={styles.treeSelectedLabel}>
             <Text style={styles.treeSelectedText}>Tap an item to select it</Text>
+          </View>
+          <View style={styles.mirrorRow}>
+            <TouchableOpacity
+              style={[styles.mirrorBtn, mirrorMode && styles.mirrorBtnActive]}
+              onPress={() => setMirrorMode((m) => !m)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.mirrorBtnText}>🪞 Mirror</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Mountain Sub-Selector (shown when mountain mode is active) */}
+      {mode === "mountain" && (
+        <View style={[styles.treeSelectorWrapper, { bottom: 140 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treeSelector}
+          >
+            {MOUNTAIN_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.treeOption, selectedMountainType === t && styles.treeOptionActive]}
+                onPress={() => {
+                  setSelectedMountainType(t);
+                  if (Platform.OS !== "web" && settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={MOUNTAIN_SOURCES[t] || MOUNTAIN_GREEN_WATERFALL_PNG}
+                  style={styles.treeOptionImage}
+                  contentFit="contain"
+                  cachePolicy="memory"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.treeSelectedLabel}>
+            <Text style={styles.treeSelectedText}>Tap a mountain to select it</Text>
           </View>
           <View style={styles.mirrorRow}>
             <TouchableOpacity

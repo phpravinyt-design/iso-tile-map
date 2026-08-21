@@ -39,3 +39,23 @@
 - Project checkpoint 8b5ba918 saved with EAS fixes (commit pushed: 4b812fe)
 - Workflow trigger: tag push "v*" or workflow_dispatch with bump_type input
 - eas.json cli.version should be set (eas-cli recommends); cli.version: ">= 22.0.0"
+- [x] Crop 4 mountains (green waterfall, red rocky, snowy, green valley waterfall) from user's image into transparent PNGs (verified clean, ~768x512)
+- [x] Add "Mountains" section button in Items toolbar with 4 mountain items (100 coins each)
+- [x] Map placement works for mountains (flip, long-press move, remove, sound/pop animation like other items) — all code changes integrated in IsometricMap.tsx, tsc clean, 72 tests passing, profile stats + task category updated
+
+## Implementation plan for mountains (details)
+- Assets created (4 transparent PNGs, verified clean): assets/images/mountains/{mountain_green_waterfall,mountain_red_rocky,mountain_snowy,mountain_green_valley}.png (each ~768x512)
+- Integration points in components/IsometricMap.tsx:
+  1. require() PNG constants near line 86-97 (after DECORATION_*_PNG requires)
+  2. TASK_ITEM_CATEGORIES add category "mountains" types: [...4 mountain types] (line ~926)
+  3. BUILDING_TYPE list/sections near line 930 — add { category: "mountains", types: [...], label: "Mountain" }
+  4. MOUNTAIN_TYPES const + type + MOUNTAIN_SOURCES + MOUNTAIN_EMOJIS (after DECORATION_EMOJIS ~1659) + MOUNTAIN_TYPE_VALUES
+  5. MODES array add "mountain" (~2134), MODE_EMOJIS add mountain: "⛰️"
+  6. handleTilePress: add mode === "mountain" placement logic (like decoration branch ~5716)
+  7. renderBuildingAt: add MOUNTAIN_SOURCES check (~3093)
+  8. preview source ~6344 else if (mode === "mountain")
+  9. Toolbar switch ~7506: if (m === "mountain") setShowMountainSelector etc.
+  10. Mountain sub-selector UI (~7949 decoration selector)
+  11. countCategoryItems/profile stats categories add mountains ("⛰️ Mountains")
+  12. itemStats computation ~3803-3830 add mountains count
+- Existing selector state pattern: selectedDecorationType/setShowDecorationSelector — mirror for mountains: selectedMountainType, showMountainSelector
