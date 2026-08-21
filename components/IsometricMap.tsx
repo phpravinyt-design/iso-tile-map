@@ -1955,8 +1955,8 @@ function PngRoadGeneric({ col, row, scale, roadType, rotation = 0, flipped = fal
 }
 
 // Generic Community Building renderer
-function PngCommunityGeneric({ col, row, scale, communityType, flipped = false }: {
-  col: number; row: number; scale: number; communityType: string; flipped?: boolean;
+function PngCommunityGeneric({ col, row, scale, communityType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; communityType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -1974,7 +1974,7 @@ function PngCommunityGeneric({ col, row, scale, communityType, flipped = false }
     }}>
       <Image
         source={COMMUNITY_SOURCES[communityType] || TEMPLE_SOURCES[communityType] || DECORATION_SOURCES[communityType] || TOWN_HALL_PNG}
-        style={{ width: bldSize, height: bldSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: bldSize, height: bldSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -1983,8 +1983,8 @@ function PngCommunityGeneric({ col, row, scale, communityType, flipped = false }
 }
 
 // Generic PNG Factory/Industry Building renderer
-function PngIndustryGeneric({ col, row, scale, industryType, flipped = false }: {
-  col: number; row: number; scale: number; industryType: string; flipped?: boolean;
+function PngIndustryGeneric({ col, row, scale, industryType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; industryType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -2001,7 +2001,7 @@ function PngIndustryGeneric({ col, row, scale, industryType, flipped = false }: 
     }}>
       <Image
         source={INDUSTRY_SOURCES[industryType] || INDUSTRY_STEEL_PNG}
-        style={{ width: bldSize, height: bldSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: bldSize, height: bldSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -2009,8 +2009,8 @@ function PngIndustryGeneric({ col, row, scale, industryType, flipped = false }: 
   );
 }
 // Generic PNG Farm Building renderer
-function PngFarmGeneric({ col, row, scale, farmType, flipped = false }: {
-  col: number; row: number; scale: number; farmType: string; flipped?: boolean;
+function PngFarmGeneric({ col, row, scale, farmType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; farmType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -2028,7 +2028,7 @@ function PngFarmGeneric({ col, row, scale, farmType, flipped = false }: {
     }}>
       <Image
         source={FARM_SOURCES[farmType] || TOWN_HALL_PNG}
-        style={{ width: bldSize, height: bldSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: bldSize, height: bldSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -2037,8 +2037,8 @@ function PngFarmGeneric({ col, row, scale, farmType, flipped = false }: {
 }
 
 // Generic PNG House renderer
-function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
-  col: number; row: number; scale: number; houseType: string; flipped?: boolean;
+function PngHouseGeneric({ col, row, scale, houseType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; houseType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -2056,7 +2056,7 @@ function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
     }}>
       <Image
         source={HOUSE_SOURCES[houseType] || HOUSE_PNG}
-        style={{ width: houseSize, height: houseSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: houseSize, height: houseSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
                 contentFit="contain"
         cachePolicy="memory"
       />
@@ -2065,8 +2065,8 @@ function PngHouseGeneric({ col, row, scale, houseType, flipped = false }: {
 }
 
 // Generic decoration renderer (all 9 decoration PNGs)
-function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false }: {
-  col: number; row: number; scale: number; decorationType: string; flipped?: boolean;
+function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; decorationType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -2083,7 +2083,7 @@ function PngDecorationGeneric({ col, row, scale, decorationType, flipped = false
     }}>
       <Image
         source={DECORATION_SOURCES[decorationType] || DECORATION_FLOWER_ARCH_PNG}
-        style={{ width: size, height: size, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: size, height: size, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -2218,9 +2218,24 @@ const MODE_LABELS: Record<PlaceMode, string> = {
   grass_plant: "🌿",
 };
 
-type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: string; flipped: boolean; cropGrowthStage: number };
+type GridCell = { tile: TileType; building: BuildingType; grassOverlay: boolean; roadOverlay: string | null; roadRotation: number; tileTexture: string; flipped: boolean; cropGrowthStage: number; flipRotation: number; itemScale: number };
 
 // Simple grid positioning (flat top-down, square tiles)
+// Rotation is stored as 0/90/180/270 degree steps; item scale as discrete levels 0.6-1.4
+const ITEM_SCALE_LEVELS: number[] = [0.6, 0.8, 1, 1.2, 1.4];
+
+function normalizeRotation(raw: number | undefined): number {
+  if (typeof raw !== "number") return 0;
+  return Math.round(raw / 90) % 4 * 90;
+}
+
+function normalizeScale(raw: number | undefined): number {
+  if (typeof raw !== "number") return 1;
+  const clamped = Math.min(1.4, Math.max(0.6, raw));
+  // Snap to the nearest allowed level
+  return ITEM_SCALE_LEVELS.reduce((best, lvl) => (Math.abs(lvl - clamped) < Math.abs(best - clamped) ? lvl : best), 1);
+}
+
 function gridToScreen(col: number, row: number, scale: number) {
   const cx = GRID_SIZE / 2 - 0.5;
   const cy = GRID_SIZE / 2 - 0.5;
@@ -2231,7 +2246,7 @@ function gridToScreen(col: number, row: number, scale: number) {
 
 // Map save version - bumped when the saved map schema/format changes.
 // Old saves with a different version are ignored so the map always starts fresh.
-const MAP_SAVE_VERSION = 3; // bumped: default map now includes 9 starter flowers
+const MAP_SAVE_VERSION = 4; // bumped: per-item flipRotation + itemScale fields
 const MAP_SAVE_KEY = `map_grid_v${MAP_SAVE_VERSION}`;
 
 // Clean start map: everything empty except ONE tree, ONE house, and 9 starter flowers
@@ -2268,7 +2283,7 @@ function createDefaultGrid(): GridCell[][] {
       if (starter) {
         building = starter.flower as BuildingType;
       }
-      rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass", flipped: false, cropGrowthStage: 0 });
+      rowArr.push({ tile: "grass", building, grassOverlay: false, roadOverlay: null, roadRotation: 0, tileTexture: "lush_grass", flipped: false, cropGrowthStage: 0, flipRotation: 0, itemScale: 1 });
     }
     grid.push(rowArr);
   }
@@ -2872,7 +2887,7 @@ function ClaimPop({
 }
 
 // --- PNG House: Small House (top-down view) ---
-function SmallHouse({ col, row, scale, flipped = false }: { col: number; row: number; scale: number; flipped?: boolean }) {
+function SmallHouse({ col, row, scale, flipped = false, rotation = 0, itemScale = 1 }: { col: number; row: number; scale: number; flipped?: boolean; rotation?: number; itemScale?: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
 
@@ -2891,7 +2906,7 @@ function SmallHouse({ col, row, scale, flipped = false }: { col: number; row: nu
     }}>
       <Image
         source={HOUSE_PNG}
-        style={{ width: houseSize, height: houseSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: houseSize, height: houseSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -2900,7 +2915,7 @@ function SmallHouse({ col, row, scale, flipped = false }: { col: number; row: nu
 }
 
 // --- PNG House: Big House (top-down view) ---
-function BigHouse({ col, row, scale, flipped = false }: { col: number; row: number; scale: number; flipped?: boolean }) {
+function BigHouse({ col, row, scale, flipped = false, rotation = 0, itemScale = 1 }: { col: number; row: number; scale: number; flipped?: boolean; rotation?: number; itemScale?: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
 
@@ -2919,7 +2934,7 @@ function BigHouse({ col, row, scale, flipped = false }: { col: number; row: numb
     }}>
       <Image
         source={HOUSE_PNG}
-        style={{ width: houseSize, height: houseSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: houseSize, height: houseSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -2995,8 +3010,8 @@ const TREE_SOURCES: Record<string, any> = {
 };
 
 // Generic PNG Tree renderer
-function PngTreeGeneric({ col, row, scale, treeType, flipped = false }: {
-  col: number; row: number; scale: number; treeType: string; flipped?: boolean;
+function PngTreeGeneric({ col, row, scale, treeType, flipped = false, rotation = 0, itemScale = 1 }: {
+  col: number; row: number; scale: number; treeType: string; flipped?: boolean; rotation?: number; itemScale?: number;
 }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
@@ -3014,7 +3029,7 @@ function PngTreeGeneric({ col, row, scale, treeType, flipped = false }: {
     }}>
       <Image
         source={TREE_SOURCES[treeType] || TREE_PNG}
-        style={{ width: treeSize, height: treeSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: treeSize, height: treeSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -3075,7 +3090,7 @@ function GrassOverlay({ col, row, scale }: { col: number; row: number; scale: nu
 }
 
 // --- PNG Town Market Building ---
-function TownMarket({ col, row, scale, flipped = false }: { col: number; row: number; scale: number; flipped?: boolean }) {
+function TownMarket({ col, row, scale, flipped = false, rotation = 0, itemScale = 1 }: { col: number; row: number; scale: number; flipped?: boolean; rotation?: number; itemScale?: number }) {
   const pos = gridToScreen(col, row, scale);
   const ts = TILE_SIZE * scale;
   const marketSize = ts * 2.2;
@@ -3092,7 +3107,7 @@ function TownMarket({ col, row, scale, flipped = false }: { col: number; row: nu
     }}>
       <Image
         source={TOWN_MARKET_PNG}
-        style={{ width: marketSize, height: marketSize, transform: [{ scaleX: flipped ? -1 : 1 }] }}
+        style={{ width: marketSize, height: marketSize, transform: [{ rotate: `${rotation}deg` }, { scaleX: flipped ? -1 : 1 }, { scale: itemScale }] }}
         contentFit="contain"
         cachePolicy="memory"
       />
@@ -3101,24 +3116,24 @@ function TownMarket({ col, row, scale, flipped = false }: { col: number; row: nu
 }
 
 // --- Building Component Selector ---
-function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growthStage = -1, goldenCropTags }: {
-  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean; growthStage?: number; goldenCropTags?: Record<string, boolean>;
+function BuildingOnTile({ col, row, buildingType, scale, flipped = false, rotation = 0, itemScale = 1, growthStage = -1, goldenCropTags }: {
+  col: number; row: number; buildingType: BuildingType; scale: number; flipped?: boolean; rotation?: number; itemScale?: number; growthStage?: number; goldenCropTags?: Record<string, boolean>;
 }) {
   // All tree types use the generic renderer
   if (buildingType in TREE_SOURCES) {
-    return <PngTreeGeneric col={col} row={row} scale={scale} treeType={buildingType} flipped={flipped} />;
+    return <PngTreeGeneric col={col} row={row} scale={scale} treeType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All user house types use the generic renderer
   if (buildingType in HOUSE_SOURCES) {
-    return <PngHouseGeneric col={col} row={row} scale={scale} houseType={buildingType} flipped={flipped} />;
+    return <PngHouseGeneric col={col} row={row} scale={scale} houseType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All community building types use the generic renderer
   if (buildingType in COMMUNITY_SOURCES) {
-    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
+    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All temple types use the generic renderer
   if (buildingType in TEMPLE_SOURCES) {
-    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} />;
+    return <PngCommunityGeneric col={col} row={row} scale={scale} communityType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All road tile types use the generic renderer
   if (buildingType in ROAD_SOURCES) {
@@ -3126,19 +3141,19 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
   }
   // All decoration types use the generic renderer
   if (buildingType in DECORATION_SOURCES) {
-    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All mountain types use the generic decoration renderer (static PNG sprites)
   if (buildingType in MOUNTAIN_SOURCES) {
-    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} />;
+    return <PngDecorationGeneric col={col} row={row} scale={scale} decorationType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All industry/factory types use the dedicated generic renderer
   if (buildingType in INDUSTRY_SOURCES) {
-    return <PngIndustryGeneric col={col} row={row} scale={scale} industryType={buildingType} flipped={flipped} />;
+    return <PngIndustryGeneric col={col} row={row} scale={scale} industryType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All farm building types use the generic renderer
   if (buildingType in FARM_SOURCES) {
-    return <PngFarmGeneric col={col} row={row} scale={scale} farmType={buildingType} flipped={flipped} />;
+    return <PngFarmGeneric col={col} row={row} scale={scale} farmType={buildingType} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
   }
   // All crop types render as emoji on farmland
   if (buildingType in CROP_EMOJIS) {
@@ -3147,9 +3162,9 @@ function BuildingOnTile({ col, row, buildingType, scale, flipped = false, growth
     return <EmojiCrop col={col} row={row} scale={scale} cropType={buildingType} flipped={flipped} growthStage={growthStage >= 0 ? growthStage : 0} isGolden={isGoldenCrop} />;
   }
   switch (buildingType) {
-    case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} />;
-    case "house_big": return <BigHouse col={col} row={row} scale={scale} flipped={flipped} />;
-    case "town_market": return <TownMarket col={col} row={row} scale={scale} flipped={flipped} />;
+    case "house_small": return <SmallHouse col={col} row={row} scale={scale} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
+    case "house_big": return <BigHouse col={col} row={row} scale={scale} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
+    case "town_market": return <TownMarket col={col} row={row} scale={scale} flipped={flipped} rotation={rotation} itemScale={itemScale} />;
     default: return null;
   }
 }
@@ -3175,7 +3190,7 @@ export default function IsometricMap() {
             const migrated = parsed.map((rowArr) =>
               rowArr.map((cell) => {
                 const newBuilding = (OLD_CROP_MAP[cell.building] || cell.building) as BuildingType;
-                return { ...cell, building: newBuilding, cropGrowthStage: cell.cropGrowthStage ?? 0 };
+                return { ...cell, building: newBuilding, cropGrowthStage: cell.cropGrowthStage ?? 0, flipRotation: normalizeRotation(cell.flipRotation), itemScale: normalizeScale(cell.itemScale) };
               })
             );
             setGrid(migrated);
@@ -3187,7 +3202,7 @@ export default function IsometricMap() {
       setLoaded(true);
     });
     // Clear out old save keys from previous versions so stale maps never restore
-    ["map_grid", "map_grid_v1"].forEach((oldKey) => {
+    ["map_grid", "map_grid_v1", "map_grid_v2", "map_grid_v3"].forEach((oldKey) => {
       AsyncStorage.removeItem(oldKey).catch(() => {});
     });
     // Load saved coin balance (profile currency)
@@ -4093,7 +4108,10 @@ export default function IsometricMap() {
   const MAX_SCALE = MAX_ZOOM;
 
   // Move clipboard: holds object picked up via long press (cut mode)
-  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: string; roadRotation?: number; origCol?: number; origRow?: number } | null>(null);
+  const [moveClipboard, setMoveClipboard] = useState<{ type: "building" | "road" | "grass"; buildingType?: BuildingType; roadType?: string; roadRotation?: number; flipRotation?: number; itemScale?: number; origCol?: number; origRow?: number } | null>(null);
+  // Live resize/rotate preview while an item is picked up
+  const [previewRotation, setPreviewRotation] = useState(0);
+  const [previewScale, setPreviewScale] = useState<number>(1);
   const [pickupMessage, setPickupMessage] = useState<string | null>(null);
 
   // Grid snap preview: track hovered tile when item is in clipboard
@@ -5303,12 +5321,16 @@ export default function IsometricMap() {
         const cell = newGrid[row][col];
         // Pick up whatever is there into clipboard for moving
         if (cell.building !== "none") {
-          setMoveClipboard({ type: "building", buildingType: cell.building, origCol: col, origRow: row });
+          setMoveClipboard({ type: "building", buildingType: cell.building, flipRotation: cell.flipRotation ?? 0, itemScale: cell.itemScale ?? 1, origCol: col, origRow: row });
+          setPreviewRotation(normalizeRotation(cell.flipRotation ?? 0));
+          setPreviewScale(normalizeScale(cell.itemScale ?? 1));
           setPickupMessage("Item picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].building = "none";
           removedFlag = true;
         } else if (cell.roadOverlay) {
-          setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation, origCol: col, origRow: row });
+          setMoveClipboard({ type: "road", roadType: cell.roadOverlay, roadRotation: cell.roadRotation, flipRotation: cell.flipRotation ?? 0, itemScale: cell.itemScale ?? 1, origCol: col, origRow: row });
+          setPreviewRotation(normalizeRotation(cell.flipRotation ?? 0));
+          setPreviewScale(normalizeScale(cell.itemScale ?? 1));
           setPickupMessage("Road picked up! Tap a tile to shift it, or remove it.");
           newGrid[row][col].roadOverlay = null;
           newGrid[row][col].roadRotation = 0;
@@ -5321,6 +5343,8 @@ export default function IsometricMap() {
         } else {
           // Tapping elsewhere while holding cancels the picked item
           setMoveClipboard(null);
+          setPreviewRotation(0);
+          setPreviewScale(1);
           setPickupMessage(null);
         }
         // Sell refund: every pickup refunds 50 coins (item removed from map)
@@ -5603,9 +5627,13 @@ export default function IsometricMap() {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
                   newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "grass") {
                   newGrid[row][col].grassOverlay = true;
                 }
@@ -5633,9 +5661,13 @@ export default function IsometricMap() {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
                   newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "grass") {
                   newGrid[row][col].grassOverlay = true;
                 }
@@ -5708,9 +5740,13 @@ export default function IsometricMap() {
                   newGrid[row][col].building = moveClipboard.buildingType || "none";
                   newGrid[row][col].roadOverlay = null;
                   newGrid[row][col].cropGrowthStage = 0; // Reset growth for moved items
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "road") {
                   newGrid[row][col].roadOverlay = moveClipboard.roadType || null;
                   newGrid[row][col].roadRotation = moveClipboard.roadRotation || 0;
+                  newGrid[row][col].flipRotation = previewRotation;
+                  newGrid[row][col].itemScale = normalizeScale(previewScale);
                 } else if (moveClipboard.type === "grass") {
                   newGrid[row][col].grassOverlay = true;
                 }
@@ -6170,7 +6206,7 @@ export default function IsometricMap() {
         const isPressed = pressTarget !== null && pressTarget.col === col && pressTarget.row === row;
         elements.push(
           <View key={`bld-wrap-${row}-${col}`}>
-            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} growthStage={cell.cropGrowthStage ?? 0} goldenCropTags={goldenCropTags} />
+            <BuildingOnTile col={col} row={row} buildingType={cell.building} scale={currentScale} flipped={cell.flipped || false} rotation={cell.flipRotation || 0} itemScale={cell.itemScale || 1} growthStage={cell.cropGrowthStage ?? 0} goldenCropTags={goldenCropTags} />
             {/* Long-press hit area for item selection */}
             <TouchableOpacity
               activeOpacity={0.3}
@@ -6248,7 +6284,7 @@ export default function IsometricMap() {
       }
     }
     return elements;
-  }, [grid, currentScale, pressTarget, pressProgress, startPressTimer, cancelPressTimer, handleTilePress, handleRemoveBuilding]);
+      }, [grid, currentScale, pressTarget, pressProgress, startPressTimer, cancelPressTimer, handleTilePress, handleRemoveBuilding, previewRotation, previewScale]);
 
   // Hit areas for grass/dirt tiles (these tiles have pointerEvents="none" so they need separate touch handlers)
   const grassHitAreas = useMemo(() => {
@@ -6630,11 +6666,31 @@ export default function IsometricMap() {
             <Text style={styles.clipboardSubtext}>
               Tap a grass tile to shift it • 🗑️ to remove
             </Text>
+            <View style={styles.clipboardActions}>
+              {moveClipboard.type !== "grass" && (
+                <>
+                  <TouchableOpacity style={styles.clipboardActionBtn} onPress={() => { setPreviewRotation((r) => normalizeRotation(r + 270)); }} activeOpacity={0.6}>
+                    <Text style={styles.clipboardActionBtnText}>🔄◀</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.clipboardActionBtn} onPress={() => { setPreviewRotation((r) => normalizeRotation(r + 90)); }} activeOpacity={0.6}>
+                    <Text style={styles.clipboardActionBtnText}>🔄▶</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.clipboardActionBtn} onPress={() => setPreviewScale((s) => { const idx = ITEM_SCALE_LEVELS.indexOf(s); return idx > 0 ? Number(ITEM_SCALE_LEVELS[idx - 1]) : s; })} activeOpacity={0.6}>
+                    <Text style={styles.clipboardActionBtnText}>🔽</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.clipboardActionBtn} onPress={() => setPreviewScale((s) => { const idx = ITEM_SCALE_LEVELS.indexOf(s); return idx >= 0 && idx < ITEM_SCALE_LEVELS.length - 1 ? Number(ITEM_SCALE_LEVELS[idx + 1]) : s; })} activeOpacity={0.6}>
+                    <Text style={styles.clipboardActionBtnText}>🔼</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
           <TouchableOpacity
             style={styles.clipboardRemoveBtn}
             onPress={() => {
               setMoveClipboard(null);
+              setPreviewRotation(0);
+              setPreviewScale(1);
               setPickupMessage(null);
             }}
             activeOpacity={0.7}
@@ -8898,6 +8954,26 @@ const styles = StyleSheet.create({
   clipboardPreviewImage: {
     width: 44,
     height: 44,
+  },
+  clipboardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  clipboardActionBtn: {
+    width: 34,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(245,158,11,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  clipboardActionBtnText: {
+    fontSize: 13,
+    lineHeight: 16,
   },
   profileButton: {
     flexDirection: "row",

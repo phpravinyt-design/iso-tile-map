@@ -59,3 +59,49 @@
   11. countCategoryItems/profile stats categories add mountains ("⛰️ Mountains")
   12. itemStats computation ~3803-3830 add mountains count
 - Existing selector state pattern: selectedDecorationType/setShowDecorationSelector — mirror for mountains: selectedMountainType, showMountainSelector
+
+## Resize & rotate placed items (current task)
+
+- [x] Add scale (resize) field to placed item state so each item remembers its size
+- [x] Add rotation field (0/90/180/270) to placed item state
+- [x] UI controls: after 5-sec long-press (movable state) show small resize and rotate buttons (clipboard bar: 🔄◀/▶ rotate, 🔼/🔽 resize levels 0.6-1.4)
+- [x] Persist scale/rotation in saved map (MAP_SAVE_VERSION 4 + migration)
+- [x] Apply scale/rotation to PNG renderer and flipped rendering (all renderers: tree/house/community/industry/farm/decoration/town market, BuildingOnTile)
+- [x] Test, checkpoint, deliver (tsc clean, 72 tests passing, preview verified)
+
+## Key facts for resize/rotate implementation (save before compaction)
+
+Design: add `flipRotation: number` (0|90|180|270) + `itemScale: number` (0.6|0.8|1|1.2|1.4) fields to GridCell. Rotate replaces free rotate — user taps 🔄 to cycle 90°. Resize: ➕/➖ buttons to step through scale levels. Controls appear as a small floating panel at screen bottom when an item is in "move mode" (after 5s long-press), alongside existing move/delete affordances. Persist via existing AsyncStorage MAP_SAVE_KEY (JSON.stringify(grid)) — auto persists. Migration: normalize on load (flipRotation ?? 0, itemScale ?? 1, clamped).
+
+Key code locations in components/IsometricMap.tsx:
+- GridCell type def line ~2221
+- MAP_SAVE_VERSION=3, key ~2232-2235 (bump to 4 for schema change, or migrate)
+- createDefaultGrid ~2255-2276
+- Load migration block ~3162-3192 (add flipRotation/itemScale defaults)
+- Save effect ~3300-3303
+- PngDecorationGeneric ~1880-1920 (add rotation/scale props; renderBuildingAt switch ~3115-3160 passes flipped)
+- Generic renderers (community/temple ~1957, industry ~1985, farm ~2011, house ~2039): all pass flipped only — add optional rotation/itemScale props with defaults
+- handleTilePress movement clipboard ~5698-5716 (moveClipboard carries buildingType/roadType — extend with flipRotation/itemScale; clear on drop)
+- Long-press move mode: search "moveClipboard" and "Pick up" messages
+- Toolbar/mode switch ~7533-7585
+
+Note: mountains render via PngDecorationGeneric (mountain check ~3131). Roads already support rotation.
+Plan: implement flipRotation only as "rotation 90° steps" + itemScale steps 0.7/1/1.3 to keep simple. UI: when any item picked up (move mode), bottom panel shows 🔄 Rotate and ⬆️⬇️ size buttons + 🗑️ drop/put. Also allow changing rotation/scale BEFORE placing? Simpler: only after long-press pickup. Controls overlay: fixed bottom bar visible while moveClipboard set.
+
+## State so far (resize/rotate)
+
+DONE:
+- GridCell now has `flipRotation: number` and `itemScale: number` fields
+- ITEM_SCALE_LEVELS = [0.6, 0.8, 1, 1.2, 1.4]; normalizeRotation/normalizeScale helpers added after line ~2220
+- MAP_SAVE_VERSION bumped to 4; migration adds defaults + clears v1-v3 old keys
+- createDefaultGrid cells include flipRotation: 0, itemScale: 1
+
+TODO next:
+1. moveClipboard state (line ~4111): add flipRotation?, itemScale? fields; populate in handleRemoveBuilding (cell.flipRotation, cell.itemScale)
+2. Placement branches (3 places: mode "tile" ~5615, "grass_plant" ~5645, "community/temple/decoration/..." ~5720): restore cell.flipRotation/cell.itemScale on place
+3. BuildingOnTile (line ~3119): add flipRotation, itemScale props; pass to PngTreeGeneric/PngHouseGeneric/PngCommunityGeneric/PngDecorationGeneric/PngIndustryGeneric/PngFarmGeneric/TownMarket (each renderer needs rotation/scale props; default rotation=0, itemScale=1). Transform: [{ rotate: `${rot}deg` }, { scaleX: flipped?-1:1 }, { scale: itemScale }]. Roads already rotate.
+4. Render call site line ~6188: pass cell.flipRotation||0, cell.itemScale||1 to BuildingOnTile
+5. Add resize/rotate controls in the clipboard indicator bar (~6616 styles.clipboardBar): ➖/➕ rotate buttons + resize stepper. Buttons: 🔄- (rotate -90), 🔄+ (rotate +90), ⬇️ (scale down), ⬆️ (scale up). Also add small on-item controls? Keep only in clipboard bar. Store on moveClipboard local preview state OR directly mutate grid cell at origCol/origRow before placing back.
+   Simplest: keep a separate state `previewRotation`/`previewScale` in clipboard bar; on placement, write those values to the new cell.
+6. handleTilePress deps array includes moveClipboard already.
+7. Tests: run pnpm test + tsc; checkpoint.
